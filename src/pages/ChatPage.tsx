@@ -6,6 +6,7 @@ import { useSessionStore, getGroup, formatSessionTime, type Group } from '../sto
 import { useChatStore } from '../stores/chatStore'
 import { useAuthStore } from '../stores/authStore'
 import { updateSessionAPI } from '../api/sessions'
+import SettingsPanel from '../components/SettingsPanel'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -172,6 +173,7 @@ export default function ChatPage() {
   const { token } = useAuthStore()
 
   const model = currentSession?.model ?? MODELS[0].value
+  const [showSettings, setShowSettings] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [showSceneSelect, setShowSceneSelect] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -279,7 +281,7 @@ export default function ChatPage() {
 
       {/* ── Sidebar ── */}
       <aside
-        className="flex flex-col flex-shrink-0 h-full"
+        className="relative flex flex-col flex-shrink-0 h-full"
         style={{ width: 260, background: '#0a1a3a', color: '#c8d4e8' }}
       >
         {/* Sidebar top */}
@@ -422,6 +424,7 @@ export default function ChatPage() {
         {/* Sidebar bottom */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
           <button
+            onClick={() => setShowSettings(true)}
             className="flex items-center gap-2.5 w-full px-4 py-4 text-sm transition-colors duration-150 cursor-pointer"
             style={{ color: 'rgba(200,212,232,0.55)' }}
             onMouseEnter={e => (e.currentTarget.style.color = '#c8d4e8')}
@@ -431,6 +434,16 @@ export default function ChatPage() {
             <span>Settings</span>
           </button>
         </div>
+
+        {showSettings && (
+          <SettingsPanel
+            onClose={() => setShowSettings(false)}
+            onNavigate={(page) => {
+              console.log('Navigate to:', page)
+              // TODO: 后续实现 Memory 和 Features 子面板
+            }}
+          />
+        )}
       </aside>
 
       {/* ── Chat area ── */}
