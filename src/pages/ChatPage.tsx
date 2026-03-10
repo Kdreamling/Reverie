@@ -5,6 +5,7 @@ import rehypeHighlight from 'rehype-highlight'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
 import { useAuthStore } from '../stores/authStore'
+import { updateSessionAPI } from '../api/sessions'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -25,6 +26,12 @@ const SCENES = [
   { key: 'code', icon: '💻', label: '代码' },
   { key: 'roleplay', icon: '🎭', label: '剧本' },
   { key: 'reading', icon: '📚', label: '学习' },
+]
+
+const WELCOME_MESSAGES = [
+  'I ache for you.',
+  'Fell in love with me slowly.',
+  'Stay a little longer in this dream with me.',
 ]
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -88,20 +95,69 @@ function AiAvatar() {
   )
 }
 
-function WelcomeScreen() {
+function WelcomeScreen({ onSelectScene, currentScene }: { onSelectScene: (scene: string) => void; currentScene: string }) {
+  const [greeting] = useState(() => WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)])
+
   return (
-    <div className="flex flex-col items-center justify-center flex-1 gap-3 select-none" style={{ paddingBottom: 80 }}>
-      <span style={{ color: '#002FA7', fontSize: 22, opacity: 0.4 }}>✦</span>
+    <div className="flex flex-col items-center justify-center flex-1 gap-6 select-none" style={{ paddingBottom: 80 }}>
+      <div className="flex flex-col items-center gap-3">
+        <span style={{ color: '#002FA7', fontSize: 22, opacity: 0.4 }}>✦</span>
+        <p
+          style={{
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            letterSpacing: '0.3em',
+            color: '#c8cfe0',
+            fontSize: '1.1rem',
+          }}
+        >
+          REVERIE
+        </p>
+      </div>
+
       <p
         style={{
           fontFamily: 'Georgia, "Times New Roman", serif',
-          letterSpacing: '0.3em',
-          color: '#c8cfe0',
-          fontSize: '1.1rem',
+          fontStyle: 'italic',
+          color: '#a0aac0',
+          fontSize: '0.85rem',
+          letterSpacing: '0.05em',
         }}
       >
-        REVERIE
+        {greeting}
       </p>
+
+      <div className="grid grid-cols-4 gap-3 mt-4">
+        {SCENES.map(s => {
+          const isDefault = s.key === currentScene
+          return (
+            <button
+              key={s.key}
+              onClick={() => onSelectScene(s.key)}
+              className="flex flex-col items-center gap-1.5 px-5 py-3 rounded-xl transition-all duration-150 cursor-pointer"
+              style={{
+                background: isDefault ? 'rgba(0,47,167,0.08)' : 'rgba(0,0,0,0.02)',
+                border: isDefault ? '1px solid rgba(0,47,167,0.25)' : '1px solid #e8ecf5',
+                color: isDefault ? '#002FA7' : '#7a8399',
+              }}
+              onMouseEnter={e => {
+                if (!isDefault) {
+                  e.currentTarget.style.background = 'rgba(0,47,167,0.05)'
+                  e.currentTarget.style.borderColor = 'rgba(0,47,167,0.15)'
+                }
+              }}
+              onMouseLeave={e => {
+                if (!isDefault) {
+                  e.currentTarget.style.background = 'rgba(0,0,0,0.02)'
+                  e.currentTarget.style.borderColor = '#e8ecf5'
+                }
+              }}
+            >
+              <span style={{ fontSize: 22 }}>{s.icon}</span>
+              <span className="text-xs font-medium">{s.label}</span>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -164,6 +220,16 @@ export default function ChatPage() {
   async function handleCreateWithScene(sceneKey: string) {
     setShowSceneSelect(false)
     await createSession(sceneKey, model)
+  }
+
+  async function handleWelcomeScene(sceneKey: string) {
+    if (currentSession) {
+      await updateSessionAPI(currentSession.id, { scene_type: sceneKey })
+      await fetchSessions()
+      selectSession(currentSession.id)
+    } else {
+      await createSession(sceneKey, model)
+    }
   }
 
   async function handleSend() {
@@ -341,7 +407,7 @@ export default function ChatPage() {
         {/* Messages */}
         <main className="flex-1 overflow-y-auto flex flex-col">
           {showWelcome ? (
-            <WelcomeScreen />
+          <WelcomeScreen onSelectScene={handleWelcomeScene} currentScene={currentSession?.scene_type || 'daily'} />
           ) : (
             <div className="mx-auto w-full px-6 pt-8 pb-4" style={{ maxWidth: 800 }}>
 
