@@ -176,6 +176,7 @@ export default function ChatPage() {
   const [showSceneSelect, setShowSceneSelect] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [input, setInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -198,8 +199,13 @@ export default function ChatPage() {
 
   // When active session changes: load its messages
   useEffect(() => {
-    clearMessages()
-    if (currentSession) loadMessages(currentSession.id)
+    if (currentSession) {
+      setIsLoadingMessages(true)
+      clearMessages()
+      loadMessages(currentSession.id).finally(() => setIsLoadingMessages(false))
+    } else {
+      clearMessages()
+    }
   }, [currentSession?.id, loadMessages, clearMessages])
 
   // Auto-resize textarea
@@ -259,7 +265,7 @@ export default function ChatPage() {
     }
   }
 
-  const showWelcome = !isStreaming && (!Array.isArray(messages) || messages.length === 0)
+  const showWelcome = !isStreaming && !isLoadingMessages && (!Array.isArray(messages) || messages.length === 0)
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: '#fafbfd' }}>
