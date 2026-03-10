@@ -221,6 +221,13 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages.length, currentText, currentThinking])
 
+  // Restore focus to input after streaming ends
+  useEffect(() => {
+    if (!isStreaming) {
+      textareaRef.current?.focus()
+    }
+  }, [isStreaming])
+
   async function handleModelChange(newModel: string) {
     await updateSessionModel(newModel)
   }
