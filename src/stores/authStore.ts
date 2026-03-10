@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { loginAPI } from '../api/auth'
 
+const savedToken = localStorage.getItem('token')
+
 interface AuthState {
   token: string | null
   isLoggedIn: boolean
@@ -11,14 +13,11 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  token: null,
-  isLoggedIn: false,
+  token: savedToken,
+  isLoggedIn: !!savedToken,
 
   init() {
-    const token = localStorage.getItem('token')
-    if (token) {
-      set({ token, isLoggedIn: true })
-    }
+    // token now restored synchronously at store creation
   },
 
   async login(password: string) {

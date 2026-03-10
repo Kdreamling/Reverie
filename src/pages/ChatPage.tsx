@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
+import { useAuthStore } from '../stores/authStore'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -105,6 +106,7 @@ export default function ChatPage() {
     useSessionStore()
   const { messages, isStreaming, currentThinking, currentText, loadMessages, sendMessage, clearMessages } =
     useChatStore()
+  const { token } = useAuthStore()
 
   const model = currentSession?.model ?? MODELS[0].value
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -113,7 +115,7 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Load sessions on mount
-  useEffect(() => { fetchSessions() }, [fetchSessions])
+  useEffect(() => { if (token) fetchSessions() }, [token, fetchSessions])
 
   // When active session changes: load its messages
   useEffect(() => {

@@ -10,7 +10,8 @@ export interface Session {
 }
 
 export async function fetchSessionsAPI(): Promise<Session[]> {
-  return client.get<Session[]>('/sessions')
+  const res = await client.get<{ sessions: Session[] }>('/sessions')
+  return res.sessions
 }
 
 export async function createSessionAPI(scene_type: string, model: string): Promise<Session> {
