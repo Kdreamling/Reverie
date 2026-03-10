@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { ChevronLeft, Brain, Settings, LogOut } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
+import MemoryPanel from './MemoryPanel'
 
 interface Props {
   onClose: () => void
@@ -8,11 +10,20 @@ interface Props {
 
 export default function SettingsPanel({ onClose, onNavigate }: Props) {
   const logout = useAuthStore(s => s.logout)
+  const [page, setPage] = useState<'menu' | 'memory' | 'features'>('menu')
 
   const menuItems = [
     { key: 'memory', icon: Brain, label: 'Memory', desc: '查看和管理记忆' },
     { key: 'features', icon: Settings, label: 'Features', desc: '功能开关' },
   ]
+
+  if (page === 'memory') {
+    return (
+      <div className="absolute inset-0 z-10">
+        <MemoryPanel onBack={() => setPage('menu')} />
+      </div>
+    )
+  }
 
   return (
     <div
@@ -38,7 +49,10 @@ export default function SettingsPanel({ onClose, onNavigate }: Props) {
         {menuItems.map(item => (
           <button
             key={item.key}
-            onClick={() => onNavigate(item.key)}
+            onClick={() => {
+              if (item.key === 'memory') setPage('memory')
+              else onNavigate(item.key)
+            }}
             className="flex items-center gap-3 w-full px-3 py-3 rounded-lg transition-colors duration-150 cursor-pointer text-left"
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
