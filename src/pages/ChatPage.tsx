@@ -20,6 +20,13 @@ const MODELS: { value: string; label: string }[] = [
   { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
 ]
 
+const SCENES = [
+  { key: 'daily', icon: '🏠', label: '日常' },
+  { key: 'code', icon: '💻', label: '代码' },
+  { key: 'roleplay', icon: '🎭', label: '剧本' },
+  { key: 'reading', icon: '📚', label: '学习' },
+]
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ThinkingBlock({ text, defaultOpen = false }: { text: string; defaultOpen?: boolean }) {
@@ -110,12 +117,26 @@ export default function ChatPage() {
 
   const model = currentSession?.model ?? MODELS[0].value
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [showSceneSelect, setShowSceneSelect] = useState(false)
   const [input, setInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const sceneRef = useRef<HTMLDivElement>(null)
 
   // Load sessions on mount
   useEffect(() => { if (token) fetchSessions() }, [token, fetchSessions])
+
+  // Click outside to close scene panel
+  useEffect(() => {
+    if (!showSceneSelect) return
+    function handleClickOutside(e: MouseEvent) {
+      if (sceneRef.current && !sceneRef.current.contains(e.target as Node)) {
+        setShowSceneSelect(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showSceneSelect])
 
   // When active session changes: load its messages
   useEffect(() => {
@@ -138,6 +159,11 @@ export default function ChatPage() {
 
   async function handleModelChange(newModel: string) {
     await updateSessionModel(newModel)
+  }
+
+  async function handleCreateWithScene(sceneKey: string) {
+    setShowSceneSelect(false)
+    await createSession(sceneKey, model)
   }
 
   async function handleSend() {
@@ -165,20 +191,55 @@ export default function ChatPage() {
         style={{ width: 260, background: '#0a1a3a', color: '#c8d4e8' }}
       >
         {/* Sidebar top */}
-        <div className="flex items-center justify-between px-4 py-4">
-          <span className="text-sm font-medium select-none" style={{ letterSpacing: '0.15em' }}>
-            ✦ REVERIE
-          </span>
-          <button
-            onClick={() => createSession('daily', model)}
-            className="flex items-center justify-center rounded-md transition-colors duration-150 cursor-pointer"
-            style={{ width: 28, height: 28, border: '1px solid rgba(255,255,255,0.2)', color: '#c8d4e8' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.07)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-            title="New chat"
-          >
-            <Plus size={14} strokeWidth={1.8} />
-          </button>
+        <div className="px-4 py-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium select-none" style={{ letterSpacing: '0.15em' }}>
+              ✦ REVERIE
+            </span>
+            <button
+              onClick={() => setShowSceneSelect(s => !s)}
+              className="flex items-center justify-center rounded-md transition-colors duration-150 cursor-pointer"
+              style={{ width: 28, height: 28, border: '1px solid rgba(255,255,255,0.2)', color: '#c8d4e8' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.07)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              title="New chat"
+            >
+              <Plus size={14} strokeWidth={1.8} />
+            </button>
+          </div>
+
+          {showSceneSelect && (
+            <div
+              ref={sceneRef}
+              className="grid grid-cols-2 gap-2 mt-3"
+            >
+              {SCENES.map(s => {
+                const defaultScene = currentSession?.scene_type || 'daily'
+                const isDefault = s.key === defaultScene
+                return (
+                  <button
+                    key={s.key}
+                    onClick={() => handleCreateWithScene(s.key)}
+                    className="flex flex-col items-center gap-1 py-3 rounded-lg transition-colors duration-150 cursor-pointer"
+                    style={{
+                      background: isDefault ? 'rgba(0,47,167,0.3)' : 'rgba(255,255,255,0.05)',
+                      border: isDefault ? '1px solid rgba(0,47,167,0.6)' : '1px solid rgba(255,255,255,0.1)',
+                      color: '#c8d4e8',
+                    }}
+                    onMouseEnter={e => {
+                      if (!isDefault) e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
+                    }}
+                    onMouseLeave={e => {
+                      if (!isDefault) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
+                    }}
+                  >
+                    <span style={{ fontSize: 20 }}>{s.icon}</span>
+                    <span className="text-xs">{s.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Session list */}
