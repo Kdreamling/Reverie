@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { fetchMessagesAPI, streamChat, type ChatMessage } from '../api/chat'
+import { updateSessionAPI } from '../api/sessions'
+import { useSessionStore } from './sessionStore'
 
 interface SseEvent {
   type: string
@@ -93,6 +95,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       currentThinking: '',
       currentText: '',
     }))
+
+    // 自动命名：如果标题是"新对话"或为空，用消息前20字命名
+    const sessionStore = useSessionStore.getState()
+    const session = sessionStore.sessions.find(s => s.id === sessionId)
+    if (session && (!session.title || session.title === '新对话')) {
+      const autoTitle = content.length > 20 ? content.slice(0, 20) + '…' : content
+      updateSessionAPI(sessionId, { title: autoTitle })
+        .then(() => sessionStore.fetchSessions())
+        .catch(() => {})
+    }
 
     const token = localStorage.getItem('token') ?? ''
     try {

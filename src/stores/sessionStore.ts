@@ -85,13 +85,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   async updateSessionModel(model) {
     const session = get().currentSession
     if (!session) return
-    // Update locally first for instant UI feedback
-    const updated = { ...session, model }
-    set(s => ({
-      currentSession: updated,
-      sessions: s.sessions.map(x => x.id === session.id ? updated : x),
-    }))
-    // Sync to backend
+    // 先同步更新 model 到后端
     await updateSessionAPI(session.id, { model })
+    // 然后从后端拉取最新数据，避免覆盖其他字段
+    await get().fetchSessions()
+    // 重新选中当前 session（fetchSessions 会刷新列表，需要重新定位）
+    const fresh = get().sessions.find(s => s.id === session.id)
+    if (fresh) set({ currentSession: fresh })
   },
 }))
