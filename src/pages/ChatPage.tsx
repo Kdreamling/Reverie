@@ -174,6 +174,8 @@ export default function ChatPage() {
   const model = currentSession?.model ?? MODELS[0].value
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [showSceneSelect, setShowSceneSelect] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingTitle, setEditingTitle] = useState('')
   const [input, setInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -230,6 +232,17 @@ export default function ChatPage() {
     } else {
       await createSession(sceneKey, model)
     }
+  }
+
+  async function handleRenameConfirm() {
+    if (!editingId) return
+    const trimmed = editingTitle.trim()
+    if (trimmed) {
+      await updateSessionAPI(editingId, { title: trimmed })
+      await fetchSessions()
+    }
+    setEditingId(null)
+    setEditingTitle('')
   }
 
   async function handleSend() {
@@ -342,7 +355,31 @@ export default function ChatPage() {
                         color: isActive ? '#e8edf8' : '#c8d4e8',
                       }}
                     >
-                      <p className="text-xs truncate leading-snug pr-5">{session.title || 'New Chat'}</p>
+                      {editingId === session.id ? (
+                        <input
+                          autoFocus
+                          value={editingTitle}
+                          onChange={e => setEditingTitle(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') { e.preventDefault(); handleRenameConfirm() }
+                            if (e.key === 'Escape') { setEditingId(null); setEditingTitle('') }
+                          }}
+                          onBlur={handleRenameConfirm}
+                          className="text-xs leading-snug bg-transparent outline-none w-full pr-5"
+                          style={{ color: '#e8edf8', borderBottom: '1px solid rgba(0,47,167,0.5)' }}
+                        />
+                      ) : (
+                        <p
+                          className="text-xs truncate leading-snug pr-5"
+                          onDoubleClick={e => {
+                            e.stopPropagation()
+                            setEditingId(session.id)
+                            setEditingTitle(session.title || '')
+                          }}
+                        >
+                          {session.title || 'New Chat'}
+                        </p>
+                      )}
                       <p
                         className="text-xs mt-0.5"
                         style={{ color: 'rgba(200,212,232,0.4)', fontSize: 10 }}
