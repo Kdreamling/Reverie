@@ -19,7 +19,8 @@ const GROUPS: { key: Group; label: string }[] = [
 const MODELS: { value: string; label: string }[] = [
   { value: 'deepseek-chat', label: 'DeepSeek Chat' },
   { value: 'deepseek-reasoner', label: 'DeepSeek Reasoner' },
-  { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
+  { value: '[0.1]claude-opus-4-6-thinking', label: 'Claude Opus 4.6' },
+  { value: 'anthropic/claude-opus-4.6', label: 'Claude Opus (OR)' },
 ]
 
 const SCENES = [

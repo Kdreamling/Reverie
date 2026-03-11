@@ -67,7 +67,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await login(password)
-      navigate('/')
+      navigate('/', { replace: true })
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
         setError('Incorrect password.')
