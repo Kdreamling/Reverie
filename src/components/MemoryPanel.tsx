@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChevronLeft, Plus, Pencil, Trash2, Loader, Check, X, ChevronDown } from 'lucide-react'
+import { ChevronLeft, Plus, Pencil, Trash2, Loader, Check, X } from 'lucide-react'
 import { fetchMemoriesAPI, createMemoryAPI, updateMemoryAPI, deleteMemoryAPI, type Memory } from '../api/memories'
 
 const LAYER_FILTERS = [
