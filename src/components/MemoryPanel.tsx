@@ -194,7 +194,7 @@ export default function MemoryPanel({ onBack }: Props) {
               border: '1px solid rgba(255,255,255,0.1)',
             }}
           />
-          <div className="flex items-center gap-2 mt-2">
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
             {/* Layer select */}
             <select
               value={addLayer}
@@ -210,23 +210,11 @@ export default function MemoryPanel({ onBack }: Props) {
                 <option key={o.key} value={o.key} style={{ background: '#0a1a3a' }}>{o.label}</option>
               ))}
             </select>
-            {/* Scene input */}
-            <input
-              value={addScene}
-              onChange={e => setAddScene(e.target.value)}
-              placeholder="场景（可选）"
-              className="flex-1 rounded-md px-2 py-1 text-xs outline-none"
-              style={{
-                background: 'rgba(255,255,255,0.06)',
-                color: '#c8d4e8',
-                border: '1px solid rgba(255,255,255,0.1)',
-              }}
-            />
             {/* Save button */}
             <button
               onClick={handleAdd}
               disabled={!addContent.trim() || saving}
-              className="flex items-center gap-1 px-3 py-1 rounded-md text-xs transition-colors duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1 px-3 py-1 rounded-md text-xs transition-colors duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0 ml-auto"
               style={{ background: '#002FA7', color: '#fff' }}
             >
               {saving ? <Loader size={12} className="animate-spin" /> : <Check size={12} />}
