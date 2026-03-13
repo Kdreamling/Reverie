@@ -38,6 +38,35 @@ const WELCOME_MESSAGES = [
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+function MemoryRefBlock({ query, found, content }: { query: string; found: number; content: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div
+      className="mb-4 rounded-md overflow-hidden"
+      style={{ borderLeft: '3px solid rgba(0,47,167,0.35)', background: 'rgba(0,47,167,0.04)' }}
+    >
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 w-full px-3 py-2 text-left cursor-pointer"
+        style={{ color: 'rgba(0,47,167,0.6)' }}
+      >
+        {open
+          ? <ChevronDown size={13} strokeWidth={2} />
+          : <ChevronRight size={13} strokeWidth={2} />
+        }
+        <span className="text-xs font-medium tracking-wide">
+          搜索记忆「{query}」· 找到 {found} 条
+        </span>
+      </button>
+      {open && (
+        <p className="px-3 pb-3 text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#7a8399' }}>
+          {content || '（无内容）'}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function ThinkingBlock({ text, defaultOpen = false }: { text: string; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
@@ -482,6 +511,9 @@ export default function ChatPage() {
                   <div className="flex-1 min-w-0 pt-0.5">
                     {msg.role === 'assistant' && (msg.thinking || msg.thinking_summary) && (
                       <ThinkingBlock text={(msg.thinking ?? msg.thinking_summary)!} />
+                    )}
+                    {msg.role === 'assistant' && msg.memoryRef && (
+                      <MemoryRefBlock query={msg.memoryRef.query} found={msg.memoryRef.found} content={msg.memoryRef.content} />
                     )}
                     {msg.role === 'assistant' ? (
                       <MarkdownContent content={msg.content} />

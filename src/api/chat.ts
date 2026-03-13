@@ -7,6 +7,7 @@ export interface ChatMessage {
   thinking?: string | null
   thinking_summary?: string | null
   created_at: string
+  memoryRef?: { query: string; found: number; content: string } | null
 }
 
 export async function fetchMessagesAPI(sessionId: string): Promise<ChatMessage[]> {

@@ -10,6 +10,12 @@ interface SseEvent {
   found?: number
 }
 
+interface MemorySearchResult {
+  query: string
+  found: number
+  content: string
+}
+
 interface ChatState {
   messages: ChatMessage[]
   isStreaming: boolean
@@ -17,6 +23,7 @@ interface ChatState {
   currentText: string
   isSearchingMemory: boolean
   searchingQuery: string
+  pendingMemoryResult: MemorySearchResult | null
 
   loadMessages: (sessionId: string) => Promise<void>
   sendMessage: (sessionId: string, model: string, content: string) => Promise<void>
@@ -30,6 +37,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   currentText: '',
   isSearchingMemory: false,
   searchingQuery: '',
+  pendingMemoryResult: null,
 
   async loadMessages(sessionId) {
     try {
@@ -85,7 +93,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   clearMessages() {
-    set({ messages: [], isStreaming: false, currentThinking: '', currentText: '', isSearchingMemory: false, searchingQuery: '' })
+    set({ messages: [], isStreaming: false, currentThinking: '', currentText: '', isSearchingMemory: false, searchingQuery: '', pendingMemoryResult: null })
   },
 
   async sendMessage(sessionId, model, content) {
@@ -102,6 +110,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       currentText: '',
       isSearchingMemory: false,
       searchingQuery: '',
+      pendingMemoryResult: null,
     }))
 
     // 自动命名：如果标题是"新对话"或为空，用消息前20字命名
@@ -155,7 +164,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
               set({ isSearchingMemory: true, searchingQuery: event.query ?? '' })
               break
             case 'tool_result':
-              set({ isSearchingMemory: false, searchingQuery: '' })
+              set({
+                isSearchingMemory: false,
+                searchingQuery: '',
+                pendingMemoryResult: {
+                  query: event.query ?? get().searchingQuery,
+                  found: event.found ?? 0,
+                  content: event.content ?? '',
+                },
+              })
               break
             case 'thinking_start':
               // marks start of a thinking block; no content
@@ -170,7 +187,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
               set(s => ({ currentText: s.currentText + (event.content ?? '') }))
               break
             case 'done': {
-              const { currentThinking, currentText } = get()
+              const { currentThinking, currentText, pendingMemoryResult } = get()
               if (currentText || currentThinking) {
                 const assistantMsg: ChatMessage = {
                   id: `ai-${Date.now()}`,
@@ -178,6 +195,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   content: currentText,
                   thinking: currentThinking || null,
                   created_at: new Date().toISOString(),
+                  memoryRef: pendingMemoryResult ?? null,
                 }
                 set(s => ({
                   messages: [...s.messages, assistantMsg],
@@ -186,9 +204,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   isStreaming: false,
                   isSearchingMemory: false,
                   searchingQuery: '',
+                  pendingMemoryResult: null,
                 }))
               } else {
-                set({ currentThinking: '', currentText: '', isStreaming: false, isSearchingMemory: false, searchingQuery: '' })
+                set({ currentThinking: '', currentText: '', isStreaming: false, isSearchingMemory: false, searchingQuery: '', pendingMemoryResult: null })
               }
               break
             }
@@ -200,7 +219,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } finally {
       // Safety net: if done event never arrived, stop the spinner and clear streaming state
       if (get().isStreaming) {
-        set({ isStreaming: false, currentThinking: '', currentText: '', isSearchingMemory: false, searchingQuery: '' })
+      set({ isStreaming: false, currentThinking: '', currentText: '', isSearchingMemory: false, searchingQuery: '', pendingMemoryResult: null })
       }
     }
   },

@@ -13,6 +13,7 @@ const FLAG_META: FlagInfo[] = [
   { key: 'memory_enabled', label: '对话存储', desc: '将每轮对话保存到数据库' },
   { key: 'micro_summary_enabled', label: '自动记忆', desc: '对话后自动提取新记忆（上限 3 条/天）' },
   { key: 'search_enabled', label: '语义检索', desc: '注入相关历史对话（当前关闭，噪点待优化）' },
+  { key: 'memory_tool_enabled', label: 'AI 主动搜索', desc: 'AI 自主调用 search_memory 工具检索记忆' },
 ]
 
 interface Props {
