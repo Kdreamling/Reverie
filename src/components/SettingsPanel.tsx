@@ -3,6 +3,7 @@ import { ChevronLeft, Brain, Settings, LogOut, Bug } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import MemoryPanel from './MemoryPanel'
 import DebugPanel from './DebugPanel'
+import FeaturesPanel from './FeaturesPanel'
 
 interface Props {
   onClose: () => void
@@ -23,6 +24,14 @@ export default function SettingsPanel({ onClose, onNavigate }: Props) {
     return (
       <div className="absolute inset-0 z-10">
         <MemoryPanel onBack={() => setPage('menu')} />
+      </div>
+    )
+  }
+
+  if (page === 'features') {
+    return (
+      <div className="absolute inset-0 z-10">
+        <FeaturesPanel onBack={() => setPage('menu')} />
       </div>
     )
   }
@@ -61,6 +70,7 @@ export default function SettingsPanel({ onClose, onNavigate }: Props) {
             key={item.key}
             onClick={() => {
               if (item.key === 'memory') setPage('memory')
+              else if (item.key === 'features') setPage('features')
               else if (item.key === 'debug') setPage('debug')
               else onNavigate(item.key)
             }}
