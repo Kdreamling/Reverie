@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, KeyboardEvent } from 'react'
-import { Plus, Settings, Send, ChevronDown, ChevronRight, X } from 'lucide-react'
+import { Plus, Settings, Send, ChevronDown, ChevronRight, X, Menu } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
@@ -204,6 +204,7 @@ export default function ChatPage() {
 
   const model = currentSession?.model ?? MODELS[0].value
   const [showSettings, setShowSettings] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [showSceneSelect, setShowSceneSelect] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -266,6 +267,7 @@ export default function ChatPage() {
 
   async function handleCreateWithScene(sceneKey: string) {
     setShowSceneSelect(false)
+    setSidebarOpen(false)
     await createSession(sceneKey, model)
   }
 
@@ -309,9 +311,18 @@ export default function ChatPage() {
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: '#fafbfd' }}>
 
+      {/* ── Mobile overlay ── */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 md:hidden"
+          style={{ background: 'rgba(0,0,0,0.5)' }}
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* ── Sidebar ── */}
       <aside
-        className="relative flex flex-col flex-shrink-0 h-full"
+        className={`fixed md:relative left-0 top-0 h-full z-40 md:z-auto flex flex-col flex-shrink-0 transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
         style={{ width: 260, background: '#0a1a3a', color: '#c8d4e8' }}
       >
         {/* Sidebar top */}
@@ -390,7 +401,7 @@ export default function ChatPage() {
                   return (
                     <button
                       key={session.id}
-                      onClick={() => selectSession(session.id)}
+                      onClick={() => { selectSession(session.id); setSidebarOpen(false) }}
                       onMouseEnter={() => setHoveredId(session.id)}
                       onMouseLeave={() => setHoveredId(null)}
                       className="relative w-full text-left rounded-md px-3 py-2.5 mb-0.5 transition-colors duration-150 cursor-pointer"
@@ -481,12 +492,21 @@ export default function ChatPage() {
 
         {/* Top bar */}
         <header
-          className="flex items-center justify-between flex-shrink-0 px-6"
+          className="flex items-center justify-between flex-shrink-0 px-4 md:px-6"
           style={{ height: 56, borderBottom: '1px solid #dde2ed', background: '#fafbfd' }}
         >
-          <span className="text-sm font-medium" style={{ color: '#1a1f2e' }}>
-            {MODELS.find(m => m.value === model)?.label ?? model}
-          </span>
+          <div className="flex items-center gap-3">
+            <button
+              className="flex md:hidden items-center justify-center rounded-md cursor-pointer"
+              style={{ width: 32, height: 32, color: '#7a8399' }}
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu size={18} strokeWidth={1.8} />
+            </button>
+            <span className="text-sm font-medium" style={{ color: '#1a1f2e' }}>
+              {MODELS.find(m => m.value === model)?.label ?? model}
+            </span>
+          </div>
           <select
             value={model}
             onChange={e => handleModelChange(e.target.value)}
