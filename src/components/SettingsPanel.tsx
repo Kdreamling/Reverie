@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { ChevronLeft, Brain, Settings, LogOut } from 'lucide-react'
+import { ChevronLeft, Brain, Settings, LogOut, Bug } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import MemoryPanel from './MemoryPanel'
+import DebugPanel from './DebugPanel'
 
 interface Props {
   onClose: () => void
@@ -10,17 +11,26 @@ interface Props {
 
 export default function SettingsPanel({ onClose, onNavigate }: Props) {
   const logout = useAuthStore(s => s.logout)
-  const [page, setPage] = useState<'menu' | 'memory' | 'features'>('menu')
+  const [page, setPage] = useState<'menu' | 'memory' | 'features' | 'debug'>('menu')
 
   const menuItems = [
     { key: 'memory', icon: Brain, label: 'Memory', desc: '查看和管理记忆' },
     { key: 'features', icon: Settings, label: 'Features', desc: '功能开关' },
+    { key: 'debug', icon: Bug, label: 'Context Debug', desc: '查看注入给 AI 的上下文' },
   ]
 
   if (page === 'memory') {
     return (
       <div className="absolute inset-0 z-10">
         <MemoryPanel onBack={() => setPage('menu')} />
+      </div>
+    )
+  }
+
+  if (page === 'debug') {
+    return (
+      <div className="absolute inset-0 z-10">
+        <DebugPanel onBack={() => setPage('menu')} />
       </div>
     )
   }
@@ -51,6 +61,7 @@ export default function SettingsPanel({ onClose, onNavigate }: Props) {
             key={item.key}
             onClick={() => {
               if (item.key === 'memory') setPage('memory')
+              else if (item.key === 'debug') setPage('debug')
               else onNavigate(item.key)
             }}
             className="flex items-center gap-3 w-full px-3 py-3 rounded-lg transition-colors duration-150 cursor-pointer text-left"
