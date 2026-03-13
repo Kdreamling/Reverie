@@ -169,7 +169,7 @@ function WelcomeScreen({ onSelectScene, currentScene }: { onSelectScene: (scene:
 export default function ChatPage() {
   const { sessions, currentSession, loading, fetchSessions, createSession, selectSession, deleteSession, updateSessionModel } =
     useSessionStore()
-  const { messages, isStreaming, currentThinking, currentText, loadMessages, sendMessage, clearMessages } =
+  const { messages, isStreaming, currentThinking, currentText, isSearchingMemory, searchingQuery, loadMessages, sendMessage, clearMessages } =
     useChatStore()
   const { token } = useAuthStore()
 
@@ -493,6 +493,20 @@ export default function ChatPage() {
                   </div>
                 </div>
               ))}
+
+              {/* Memory search indicator */}
+              {isSearchingMemory && (
+                <div className="flex gap-3 mb-4">
+                  <AiAvatar />
+                  <div className="flex items-center gap-2 pt-1" style={{ color: 'rgba(200,212,232,0.5)', fontSize: 12 }}>
+                    <span
+                      className="inline-block rounded-full flex-shrink-0"
+                      style={{ width: 6, height: 6, background: '#002FA7', opacity: 0.7, animation: 'blink 1s ease-in-out infinite' }}
+                    />
+                    正在搜索记忆{searchingQuery ? `「${searchingQuery}」` : ''}…
+                  </div>
+                </div>
+              )}
 
               {/* Live streaming row */}
               {isStreaming && (currentThinking || currentText) && (

@@ -6,6 +6,8 @@ import { useSessionStore } from './sessionStore'
 interface SseEvent {
   type: string
   content?: string
+  query?: string
+  found?: number
 }
 
 interface ChatState {
@@ -13,6 +15,8 @@ interface ChatState {
   isStreaming: boolean
   currentThinking: string
   currentText: string
+  isSearchingMemory: boolean
+  searchingQuery: string
 
   loadMessages: (sessionId: string) => Promise<void>
   sendMessage: (sessionId: string, model: string, content: string) => Promise<void>
@@ -24,6 +28,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isStreaming: false,
   currentThinking: '',
   currentText: '',
+  isSearchingMemory: false,
+  searchingQuery: '',
 
   async loadMessages(sessionId) {
     try {
@@ -79,7 +85,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   clearMessages() {
-    set({ messages: [], isStreaming: false, currentThinking: '', currentText: '' })
+    set({ messages: [], isStreaming: false, currentThinking: '', currentText: '', isSearchingMemory: false, searchingQuery: '' })
   },
 
   async sendMessage(sessionId, model, content) {
@@ -94,6 +100,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       isStreaming: true,
       currentThinking: '',
       currentText: '',
+      isSearchingMemory: false,
+      searchingQuery: '',
     }))
 
     // 自动命名：如果标题是"新对话"或为空，用消息前20字命名
@@ -143,6 +151,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
           console.log('[chatStore] SSE event:', event.type, event)
 
           switch (event.type) {
+            case 'tool_searching':
+              set({ isSearchingMemory: true, searchingQuery: event.query ?? '' })
+              break
+            case 'tool_result':
+              set({ isSearchingMemory: false, searchingQuery: '' })
+              break
             case 'thinking_start':
               // marks start of a thinking block; no content
               break
@@ -170,9 +184,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   currentThinking: '',
                   currentText: '',
                   isStreaming: false,
+                  isSearchingMemory: false,
+                  searchingQuery: '',
                 }))
               } else {
-                set({ currentThinking: '', currentText: '', isStreaming: false })
+                set({ currentThinking: '', currentText: '', isStreaming: false, isSearchingMemory: false, searchingQuery: '' })
               }
               break
             }
@@ -184,7 +200,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } finally {
       // Safety net: if done event never arrived, stop the spinner and clear streaming state
       if (get().isStreaming) {
-        set({ isStreaming: false, currentThinking: '', currentText: '' })
+        set({ isStreaming: false, currentThinking: '', currentText: '', isSearchingMemory: false, searchingQuery: '' })
       }
     }
   },
