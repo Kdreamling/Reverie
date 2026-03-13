@@ -29,9 +29,11 @@
 - 后端：`_execute_memory_search` — 搜索 `memories` 表 + hybrid_search 对话检索，结果注入 messages
 - 前端：chatStore 新增 `isSearchingMemory` / `searchingQuery` 状态 + SSE 事件分发
 - 前端：ChatPage 搜索进行中动效（蓝点 + "正在搜索记忆「query」…"）
-- 前端：ChatPage 搜索结果徽章（"参考了 N 条记忆" 附在 assistant 消息下方）
+- 前端：`MemoryRefBlock` 折叠块 — 显示实际检索到的内容（query + 条数 + 原文），附在 assistant 消息下方
 - 前端：FeaturesPanel 新增 memory_tool_enabled 开关
+- 后端：`tool_result` SSE 事件新增 `content` 字段，携带实际检索文本
 - 默认关闭，通过 Features 面板按需开启
+- Git tag：`v-phase5-memory-tool`
 
 ### Bug Fix — FEATURE_FLAGS 双份技术债修复
 - 问题：`main.py` 自己维护一份 FEATURE_FLAGS，`config.py` 另一份，admin 端点修改的和 `context_builder.py` 读的不是同一个对象
@@ -46,6 +48,11 @@
 - 当前默认关闭，噪点过多
 - 待条件：`conversations` 表数据量积累后，用 `GET /debug/context` 验证注入质量
 - 可通过 Features 面板临时开启测试，满意后再改 `config.py` 默认值
+
+### OpenRouter / DZZI — Claude thinking+text 混排问题
+- 现象：thinking 内容和正文混在一起输出，未正确分离为 ThinkingBlock + 正文
+- 根因待排查（adapters.py 的 SSE 解析逻辑）
+- 待处理
 
 ### 前端输入框延迟问题
 - 根因已定位：`ChatPage.tsx` 中 `currentText` / `currentThinking` 在 useEffect 依赖数组里导致不必要的重渲染
