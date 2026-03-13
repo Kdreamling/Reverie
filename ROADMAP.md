@@ -35,6 +35,12 @@
 - 默认关闭，通过 Features 面板按需开启
 - Git tag：`v-phase5-memory-tool`
 
+### Bug Fix — OpenRouter Claude thinking 格式修复
+- 根因：OpenRouter 将 thinking 以 `<thinking>...</thinking>` XML 标签混入 `content` 字段，而非 `reasoning_content` 字段，导致适配器无法识别，thinking 内容完全暴露在正文里
+- 修复：`channels.py` 新增 `thinking_format: "openai_xml"`（OpenRouter 专用）；`adapters.py` 新增 `_adapt_openai_xml()` + 流式 XML 解析器 `_parse_xml_stream()`，支持跨 chunk 边界的标签截断缓冲
+- DZZI（`reasoning_content` 字段）、DeepSeek（`reasoning` 字段）完全不受影响
+- Git tag：`v-openrouter-thinking-fix`
+
 ### Bug Fix — FEATURE_FLAGS 双份技术债修复
 - 问题：`main.py` 自己维护一份 FEATURE_FLAGS，`config.py` 另一份，admin 端点修改的和 `context_builder.py` 读的不是同一个对象
 - 修复：`main.py` 改为 `from config import FEATURE_FLAGS`，删除本地定义，统一为单一数据源
@@ -50,9 +56,7 @@
 - 可通过 Features 面板临时开启测试，满意后再改 `config.py` 默认值
 
 ### OpenRouter / DZZI — Claude thinking+text 混排问题
-- 现象：thinking 内容和正文混在一起输出，未正确分离为 ThinkingBlock + 正文
-- 根因待排查（adapters.py 的 SSE 解析逻辑）
-- 待处理
+- ✅ 已修复，见上方 Bug Fix
 
 ### 前端输入框延迟问题
 - 根因已定位：`ChatPage.tsx` 中 `currentText` / `currentThinking` 在 useEffect 依赖数组里导致不必要的重渲染
@@ -67,6 +71,10 @@
 - 考虑将阈值从 0.75 调整（需要实测数据支撑）
 
 ---
+
+### 已知小问题（低优先级，不影响功能）
+
+- **重复 `done` 事件**：`main.py` 有一个硬编码兜底 `yield done`，adapter 在循环里已经 yield 过含 `usage` 的 `done`，导致前端收到两个 done。前端遇到第一个就停止，第二个被忽略，无害但不干净。待后续清理。
 
 ## 注意事项
 
