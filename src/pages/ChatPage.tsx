@@ -220,29 +220,33 @@ export default function ChatPage() {
   const swipeStartX = useRef<number | null>(null)
   const swipeStartY = useRef<number | null>(null)
 
-  // Swipe gesture: right-swipe to open sidebar, left-swipe to close
-  function onSwipeTouchStart(e: React.TouchEvent) {
-    swipeStartX.current = e.touches[0].clientX
-    swipeStartY.current = e.touches[0].clientY
-  }
-  function onSwipeTouchEnd(e: React.TouchEvent) {
-    if (swipeStartX.current === null || swipeStartY.current === null) return
-    const startX = swipeStartX.current
-    const dx = e.changedTouches[0].clientX - startX
-    const dy = Math.abs(e.changedTouches[0].clientY - swipeStartY.current)
-    swipeStartX.current = null
-    swipeStartY.current = null
-    // Only horizontal swipes (dx dominates vertical)
-    if (Math.abs(dx) < 40 || Math.abs(dx) < dy) return
-    if (dx > 0) {
-      // Open sidebar only if swipe started from left edge (≤60px), avoids iOS back gesture conflict
-      if (startX <= 60) setSidebarOpen(true)
-    } else {
-      // Left swipe: close settings if open, otherwise close sidebar
-      if (showSettings) setShowSettings(false)
-      else setSidebarOpen(false)
+  // Window-level swipe gesture (works through overlays and fixed panels)
+  useEffect(() => {
+    function onTouchStart(e: TouchEvent) {
+      swipeStartX.current = e.touches[0].clientX
+      swipeStartY.current = e.touches[0].clientY
     }
-  }
+    function onTouchEnd(e: TouchEvent) {
+      if (swipeStartX.current === null || swipeStartY.current === null) return
+      const startX = swipeStartX.current
+      const dx = e.changedTouches[0].clientX - startX
+      const dy = Math.abs(e.changedTouches[0].clientY - swipeStartY.current)
+      swipeStartX.current = null
+      swipeStartY.current = null
+      if (Math.abs(dx) < 40 || Math.abs(dx) < dy) return
+      if (dx > 0 && startX <= 60) setSidebarOpen(true)
+      else if (dx < 0) {
+        if (showSettings) setShowSettings(false)
+        else setSidebarOpen(false)
+      }
+    }
+    window.addEventListener('touchstart', onTouchStart, { passive: true })
+    window.addEventListener('touchend', onTouchEnd, { passive: true })
+    return () => {
+      window.removeEventListener('touchstart', onTouchStart)
+      window.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [showSettings])
 
   function handleTouchStart(e: React.TouchEvent, sessionId: string) {
     const touch = e.touches[0]
@@ -368,7 +372,7 @@ export default function ChatPage() {
   const showWelcome = !isStreaming && !isLoadingMessages && (!Array.isArray(messages) || messages.length === 0)
 
   return (
-    <div className="flex overflow-hidden" style={{ background: '#fafbfd', height: '100dvh' }}>
+    <div className="flex overflow-hidden" style={{ background: '#fafbfd', height: '100dvh', overscrollBehavior: 'none' }}>
 
       {/* ── Mobile overlay ── */}
       {sidebarOpen && (
@@ -594,11 +598,7 @@ export default function ChatPage() {
       </aside>
 
       {/* ── Chat area ── */}
-      <div
-        className="flex flex-col flex-1 min-w-0 h-full"
-        onTouchStart={onSwipeTouchStart}
-        onTouchEnd={onSwipeTouchEnd}
-      >
+      <div className="flex flex-col flex-1 min-w-0 h-full">
 
         {/* Top bar */}
         <header
