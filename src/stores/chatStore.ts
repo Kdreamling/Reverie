@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { fetchMessagesAPI, streamChat, type ChatMessage } from '../api/chat'
+import { fetchMessagesAPI, deleteConversationAPI, streamChat, type ChatMessage } from '../api/chat'
 import { updateSessionAPI } from '../api/sessions'
 import { useSessionStore } from './sessionStore'
 
@@ -27,6 +27,7 @@ interface ChatState {
 
   loadMessages: (sessionId: string) => Promise<void>
   sendMessage: (sessionId: string, model: string, content: string) => Promise<void>
+  deleteConversation: (sessionId: string, conversationId: string) => Promise<void>
   clearMessages: () => void
 }
 
@@ -72,6 +73,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             role: 'user',
             content: r.user_msg,
             created_at: r.created_at,
+            conversationId: r.id,
           })
         }
         if (r.assistant_msg) {
@@ -81,6 +83,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             content: r.assistant_msg,
             thinking: r.thinking_summary ?? null,
             created_at: r.created_at,
+            conversationId: r.id,
           })
         }
       }
@@ -94,6 +97,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   clearMessages() {
     set({ messages: [], isStreaming: false, currentThinking: '', currentText: '', isSearchingMemory: false, searchingQuery: '', pendingMemoryResult: null })
+  },
+
+  async deleteConversation(sessionId, conversationId) {
+    await deleteConversationAPI(sessionId, conversationId)
+    set(s => ({
+      messages: s.messages.filter(m => m.conversationId !== conversationId)
+    }))
   },
 
   async sendMessage(sessionId, model, content) {

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, KeyboardEvent } from 'react'
-import { Plus, Settings, ArrowUp, ChevronDown, ChevronRight, X, Menu } from 'lucide-react'
+import { Plus, Settings, ArrowUp, ChevronDown, ChevronRight, X, Menu, Copy, Trash2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
@@ -198,7 +198,7 @@ function WelcomeScreen({ onSelectScene, currentScene }: { onSelectScene: (scene:
 export default function ChatPage() {
   const { sessions, currentSession, loading, fetchSessions, createSession, selectSession, deleteSession, updateSessionModel } =
     useSessionStore()
-  const { messages, isStreaming, currentThinking, currentText, isSearchingMemory, searchingQuery, loadMessages, sendMessage, clearMessages } =
+  const { messages, isStreaming, currentThinking, currentText, isSearchingMemory, searchingQuery, loadMessages, sendMessage, clearMessages, deleteConversation } =
     useChatStore()
   const { token } = useAuthStore()
 
@@ -209,6 +209,12 @@ export default function ChatPage() {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [longPressMenu, setLongPressMenu] = useState<{ id: string; x: number; y: number } | null>(null)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Message action menu
+  const [msgMenu, setMsgMenu] = useState<{ conversationId: string; x: number; y: number } | null>(null)
+  const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
+  const msgLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [showSceneSelect, setShowSceneSelect] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
@@ -264,6 +270,38 @@ export default function ChatPage() {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
+  }
+
+  function showToast(msg: string) {
+    setToast(msg)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(null), 1500)
+  }
+
+  function onMsgLongPressStart(e: React.TouchEvent, conversationId: string) {
+    const touch = e.touches[0]
+    msgLongPressTimer.current = setTimeout(() => {
+      setMsgMenu({ conversationId, x: touch.clientX, y: touch.clientY })
+    }, 500)
+  }
+
+  function onMsgLongPressEnd() {
+    if (msgLongPressTimer.current) {
+      clearTimeout(msgLongPressTimer.current)
+      msgLongPressTimer.current = null
+    }
+  }
+
+  async function handleCopyMsg(content: string) {
+    setMsgMenu(null)
+    await navigator.clipboard.writeText(content)
+    showToast('已复制')
+  }
+
+  async function handleDeleteConv(conversationId: string) {
+    setMsgMenu(null)
+    if (!window.confirm('确定删除这轮对话吗？')) return
+    await deleteConversation(currentSession!.id, conversationId)
   }
 
   // iOS keyboard: listen to visualViewport resize to keep input above keyboard
@@ -660,7 +698,15 @@ export default function ChatPage() {
 
               {/* Completed messages */}
               {Array.isArray(messages) && messages.map(msg => (
-                <div key={msg.id} className="flex gap-3 mb-8">
+                <div
+                  key={msg.id}
+                  className="flex gap-3 mb-8 group relative"
+                  onMouseEnter={() => setHoveredMsgId(msg.id)}
+                  onMouseLeave={() => setHoveredMsgId(null)}
+                  onTouchStart={msg.conversationId ? e => onMsgLongPressStart(e, msg.conversationId!) : undefined}
+                  onTouchEnd={onMsgLongPressEnd}
+                  onTouchMove={onMsgLongPressEnd}
+                >
                   {msg.role === 'user' ? <UserAvatar /> : <AiAvatar />}
                   <div className="flex-1 min-w-0 pt-0.5">
                     {msg.role === 'assistant' && (msg.thinking || msg.thinking_summary) && (
@@ -677,6 +723,16 @@ export default function ChatPage() {
                       </p>
                     )}
                   </div>
+                  {/* Desktop hover action button */}
+                  {hoveredMsgId === msg.id && msg.conversationId && (
+                    <button
+                      className="hidden md:flex absolute right-0 top-0 items-center justify-center rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                      style={{ width: 28, height: 28, background: '#f0f2f8', color: '#7a8399', border: '1px solid #dde2ed' }}
+                      onClick={e => setMsgMenu({ conversationId: msg.conversationId!, x: e.clientX, y: e.clientY })}
+                    >
+                      <span style={{ fontSize: 14, lineHeight: 1 }}>···</span>
+                    </button>
+                  )}
                 </div>
               ))}
 
@@ -716,6 +772,59 @@ export default function ChatPage() {
             </div>
           )}
         </main>
+
+        {/* Message action menu */}
+        {msgMenu && (
+          <>
+            <div className="fixed inset-0 z-50" onClick={() => setMsgMenu(null)} />
+            <div
+              className="fixed z-50 rounded-xl overflow-hidden shadow-lg"
+              style={{
+                left: Math.min(msgMenu.x, window.innerWidth - 160),
+                top: Math.min(msgMenu.y + 8, window.innerHeight - 110),
+                width: 148,
+                background: '#fff',
+                border: '1px solid rgba(0,0,0,0.08)',
+              }}
+            >
+              <button
+                className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-left cursor-pointer transition-colors"
+                style={{ color: '#1a1f2e', minHeight: 44 }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#f5f7fc')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                onClick={() => {
+                  const msg = messages.find(m => m.conversationId === msgMenu.conversationId)
+                  if (msg) handleCopyMsg(msg.content)
+                }}
+              >
+                <Copy size={14} strokeWidth={1.8} style={{ color: '#7a8399' }} /> 复制
+              </button>
+              <button
+                className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-left cursor-pointer transition-colors"
+                style={{ color: '#d04040', borderTop: '1px solid #f0f2f8', minHeight: 44 }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#fff5f5')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                onClick={() => handleDeleteConv(msgMenu.conversationId)}
+              >
+                <Trash2 size={14} strokeWidth={1.8} /> 删除
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Toast */}
+        {toast && (
+          <div
+            className="fixed z-50 rounded-lg px-4 py-2 text-sm pointer-events-none"
+            style={{
+              bottom: 100, left: '50%', transform: 'translateX(-50%)',
+              background: 'rgba(26,31,46,0.85)', color: '#fff',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+            }}
+          >
+            {toast}
+          </div>
+        )}
 
         {/* Input area — unified Claude-style bubble */}
         <footer style={{

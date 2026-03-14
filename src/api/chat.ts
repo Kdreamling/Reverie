@@ -8,10 +8,15 @@ export interface ChatMessage {
   thinking_summary?: string | null
   created_at: string
   memoryRef?: { query: string; found: number; content: string } | null
+  conversationId?: string
 }
 
 export async function fetchMessagesAPI(sessionId: string): Promise<ChatMessage[]> {
   return client.get<ChatMessage[]>(`/sessions/${sessionId}/messages`)
+}
+
+export async function deleteConversationAPI(sessionId: string, conversationId: string): Promise<void> {
+  return client.delete(`/sessions/${sessionId}/messages/${conversationId}`)
 }
 
 export function streamChat(
