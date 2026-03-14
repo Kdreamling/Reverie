@@ -229,28 +229,6 @@ export default function ChatPage() {
   const swipeStartX = useRef<number | null>(null)
   const swipeStartY = useRef<number | null>(null)
 
-  // Bug 3: clear editing state whenever sidebar closes
-  useEffect(() => {
-    if (!sidebarOpen) {
-      setEditingId(null)
-      setEditingTitle('')
-    }
-  }, [sidebarOpen])
-
-  // Bug 2: focus rename input and place cursor at end (bypass iOS auto-select)
-  useEffect(() => {
-    if (!editingId || !editInputRef.current) return
-    const el = editInputRef.current
-    // Use rAF to wait for React to finish rendering the input
-    requestAnimationFrame(() => {
-      el.focus()
-      // iOS selects-all after focus; override after a longer delay
-      setTimeout(() => {
-        el.setSelectionRange(el.value.length, el.value.length)
-      }, 50)
-    })
-  }, [editingId])
-
   // Window-level swipe gesture (works through overlays and fixed panels)
   useEffect(() => {
     function onTouchStart(e: TouchEvent) {
@@ -270,7 +248,9 @@ export default function ChatPage() {
         if (showSettings) {
           if (settingsPage !== 'menu') setSettingsPage('menu')
           else { setShowSettings(false); setSettingsPage('menu') }
-        } else setSidebarOpen(false) // Bug 3 effect handles clearing editingId
+        } else setSidebarOpen(false) // setEditingId cleared via direct callsites; also clear here
+        setEditingId(null)
+        setEditingTitle('')
       }
     }
     window.addEventListener('touchstart', onTouchStart, { passive: true })
@@ -391,6 +371,8 @@ export default function ChatPage() {
   async function handleCreateWithScene(sceneKey: string) {
     setShowSceneSelect(false)
     setSidebarOpen(false)
+    setEditingId(null)
+    setEditingTitle('')
     await createSession(sceneKey, model)
   }
 
@@ -439,14 +421,14 @@ export default function ChatPage() {
         <div
           className="fixed inset-0 z-30 md:hidden"
           style={{ background: 'rgba(0,0,0,0.5)' }}
-          onClick={() => setSidebarOpen(false)}
+          onClick={() => { setSidebarOpen(false); setEditingId(null); setEditingTitle('') }}
         />
       )}
 
       {/* ── Sidebar ── */}
       <aside
-        className={`fixed md:relative left-0 top-0 h-full z-40 md:z-auto flex flex-col flex-shrink-0 transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
-        style={{ width: 260, background: '#0a1a3a', color: '#c8d4e8' }}
+        className={`fixed md:relative left-0 top-0 z-40 md:z-auto flex flex-col flex-shrink-0 transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
+        style={{ width: 260, height: '100dvh', background: '#0a1a3a', color: '#c8d4e8' }}
       >
         {/* Sidebar top */}
         <div className="px-4 py-4" style={{ paddingTop: 'calc(16px + env(safe-area-inset-top))' }}>
@@ -524,7 +506,7 @@ export default function ChatPage() {
                   return (
                     <button
                       key={session.id}
-                      onClick={() => { selectSession(session.id); setSidebarOpen(false) }}
+                      onClick={() => { selectSession(session.id); setSidebarOpen(false); setEditingId(null); setEditingTitle('') }}
                       onMouseEnter={() => setHoveredId(session.id)}
                       onMouseLeave={() => setHoveredId(null)}
                       onTouchStart={e => handleTouchStart(e, session.id)}
@@ -540,6 +522,7 @@ export default function ChatPage() {
                       {editingId === session.id ? (
                         <input
                           ref={editInputRef}
+                          autoFocus
                           value={editingTitle}
                           onChange={e => setEditingTitle(e.target.value)}
                           onKeyDown={e => {
@@ -547,6 +530,7 @@ export default function ChatPage() {
                             if (e.key === 'Escape') { setEditingId(null); setEditingTitle('') }
                           }}
                           onBlur={handleRenameConfirm}
+                          placeholder={sessions.find(s => s.id === editingId)?.title || 'New Chat'}
                           className="text-xs leading-snug bg-transparent outline-none w-full pr-5"
                           style={{ color: '#e8edf8', borderBottom: '1px solid rgba(0,47,167,0.5)' }}
                         />
@@ -556,7 +540,7 @@ export default function ChatPage() {
                           onDoubleClick={e => {
                             e.stopPropagation()
                             setEditingId(session.id)
-                            setEditingTitle(session.title || '')
+                            setEditingTitle('')
                           }}
                         >
                           {session.title || 'New Chat'}
@@ -609,7 +593,7 @@ export default function ChatPage() {
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 onClick={() => {
                   setEditingId(longPressMenu.id)
-                  setEditingTitle(sessions.find(s => s.id === longPressMenu.id)?.title || '')
+                  setEditingTitle('')
                   setLongPressMenu(null)
                 }}
               >
