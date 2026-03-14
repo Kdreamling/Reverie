@@ -496,6 +496,11 @@ export default function ChatPage() {
                       {editingId === session.id ? (
                         <input
                           autoFocus
+                          onFocus={e => {
+                            const el = e.currentTarget
+                            // iOS auto-selects all on focus; override to place cursor at end
+                            setTimeout(() => el.setSelectionRange(el.value.length, el.value.length), 10)
+                          }}
                           value={editingTitle}
                           onChange={e => setEditingTitle(e.target.value)}
                           onKeyDown={e => {
