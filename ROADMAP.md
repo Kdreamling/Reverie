@@ -160,6 +160,7 @@
 
 - **重复 `done` 事件**：`main.py` 有硬编码兜底 `yield done`，adapter 在循环里已经 yield 过含 `usage` 的 `done`，前端遇到第一个就停止，无害但不干净
 - **ChatPage.tsx 文件过大**：约 900 行，侧栏 / 消息 / 输入 / 欢迎页全在一个文件里
+- **透明/毛玻璃输入框会模糊滚动条**：`backdrop-filter: blur()` 作用于 footer 时，滚动条穿过该区域会被模糊。若后续要做透明 footer，需先将滚动条限制在 footer 区域之外（如 `main` 内嵌独立滚动容器）
 
 ---
 

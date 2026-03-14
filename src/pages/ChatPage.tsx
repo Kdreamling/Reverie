@@ -649,7 +649,7 @@ export default function ChatPage() {
       </aside>
 
       {/* ── Chat area ── */}
-      <div className="flex flex-col flex-1 min-w-0 h-full relative" style={{ background: '#fafbfd' }}>
+      <div className="flex flex-col flex-1 min-w-0 h-full" style={{ background: '#fafbfd' }}>
 
         {/* Top bar */}
         <header
@@ -684,7 +684,7 @@ export default function ChatPage() {
         </header>
 
         {/* Messages */}
-        <main className="flex-1 overflow-y-auto flex flex-col" style={{ paddingBottom: 80 }}>
+        <main className="flex-1 overflow-y-auto flex flex-col">
           {showWelcome ? (
           <WelcomeScreen onSelectScene={handleWelcomeScene} currentScene={currentSession?.scene_type || 'daily'} />
           ) : (
@@ -818,24 +818,18 @@ export default function ChatPage() {
           </div>
         )}
 
-        {/* Input area — Claude-style floating bubble with gradient fade */}
-        <footer className="absolute bottom-0 left-0 right-0 z-10" style={{
+        {/* Input area */}
+        <footer style={{
+          background: '#fafbfd',
           paddingBottom: keyboardOffset > 0 ? `${keyboardOffset}px` : 'env(safe-area-inset-bottom)',
         }}>
-          {/* Gradient fade from transparent to page background */}
-          <div style={{
-            height: 32,
-            background: 'linear-gradient(to bottom, rgba(250,251,253,0), rgba(250,251,253,1))',
-            pointerEvents: 'none',
-          }} />
-          <div style={{ background: '#fafbfd' }}>
-          <div className="mx-auto px-3 md:px-6 pt-1 pb-3" style={{ maxWidth: 800 }}>
+          <div className="mx-auto px-3 md:px-6 py-3" style={{ maxWidth: 800 }}>
             <div
               className={`flex gap-3 px-4 transition-all duration-200 ${isFocused || input ? 'rounded-2xl items-end py-3' : 'rounded-full items-center py-2.5'}`}
               style={{
                 background: '#fff',
-                boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-                border: '1px solid rgba(0,0,0,0.06)',
+                boxShadow: '0 1px 6px rgba(0,0,0,0.07)',
+                border: '1px solid rgba(0,0,0,0.07)',
               }}
             >
               <textarea
@@ -869,7 +863,6 @@ export default function ChatPage() {
             <p className="hidden md:block text-center text-xs mt-2" style={{ color: '#aab2c8' }}>
               Press Enter to send · Shift+Enter for new line
             </p>
-          </div>
           </div>
         </footer>
 
