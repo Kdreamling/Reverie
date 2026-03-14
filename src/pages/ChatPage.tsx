@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, KeyboardEvent } from 'react'
-import { Plus, Settings, ArrowUp, ChevronDown, ChevronRight, X, Menu, Copy, Trash2 } from 'lucide-react'
+import { Plus, Settings, ArrowUp, ChevronDown, ChevronRight, X, Menu, Copy, Trash2, Check } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
@@ -209,15 +209,16 @@ export default function ChatPage() {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [longPressMenu, setLongPressMenu] = useState<{ id: string; x: number; y: number } | null>(null)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Message action menu
-  const [msgMenu, setMsgMenu] = useState<{ conversationId: string; x: number; y: number } | null>(null)
-  const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null)
+  // Message copy state
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null)
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Toast
   const [toast, setToast] = useState<string | null>(null)
-  const msgLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [showSceneSelect, setShowSceneSelect] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
+  const editInputRef = useRef<HTMLInputElement>(null)
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [input, setInput] = useState('')
   const [isFocused, setIsFocused] = useState(false)
@@ -227,6 +228,28 @@ export default function ChatPage() {
   const sceneRef = useRef<HTMLDivElement>(null)
   const swipeStartX = useRef<number | null>(null)
   const swipeStartY = useRef<number | null>(null)
+
+  // Bug 3: clear editing state whenever sidebar closes
+  useEffect(() => {
+    if (!sidebarOpen) {
+      setEditingId(null)
+      setEditingTitle('')
+    }
+  }, [sidebarOpen])
+
+  // Bug 2: focus rename input and place cursor at end (bypass iOS auto-select)
+  useEffect(() => {
+    if (!editingId || !editInputRef.current) return
+    const el = editInputRef.current
+    // Use rAF to wait for React to finish rendering the input
+    requestAnimationFrame(() => {
+      el.focus()
+      // iOS selects-all after focus; override after a longer delay
+      setTimeout(() => {
+        el.setSelectionRange(el.value.length, el.value.length)
+      }, 50)
+    })
+  }, [editingId])
 
   // Window-level swipe gesture (works through overlays and fixed panels)
   useEffect(() => {
@@ -247,7 +270,7 @@ export default function ChatPage() {
         if (showSettings) {
           if (settingsPage !== 'menu') setSettingsPage('menu')
           else { setShowSettings(false); setSettingsPage('menu') }
-        } else setSidebarOpen(false)
+        } else setSidebarOpen(false) // Bug 3 effect handles clearing editingId
       }
     }
     window.addEventListener('touchstart', onTouchStart, { passive: true })
@@ -256,7 +279,7 @@ export default function ChatPage() {
       window.removeEventListener('touchstart', onTouchStart)
       window.removeEventListener('touchend', onTouchEnd)
     }
-  }, [showSettings])
+  }, [showSettings, settingsPage])
 
   function handleTouchStart(e: React.TouchEvent, sessionId: string) {
     const touch = e.touches[0]
@@ -278,28 +301,14 @@ export default function ChatPage() {
     toastTimer.current = setTimeout(() => setToast(null), 1500)
   }
 
-  function onMsgLongPressStart(e: React.TouchEvent, conversationId: string) {
-    const touch = e.touches[0]
-    msgLongPressTimer.current = setTimeout(() => {
-      setMsgMenu({ conversationId, x: touch.clientX, y: touch.clientY })
-    }, 500)
-  }
-
-  function onMsgLongPressEnd() {
-    if (msgLongPressTimer.current) {
-      clearTimeout(msgLongPressTimer.current)
-      msgLongPressTimer.current = null
-    }
-  }
-
-  async function handleCopyMsg(content: string) {
-    setMsgMenu(null)
+  async function handleCopyMsg(msgId: string, content: string) {
     await navigator.clipboard.writeText(content)
-    showToast('已复制')
+    setCopiedMsgId(msgId)
+    if (copiedTimer.current) clearTimeout(copiedTimer.current)
+    copiedTimer.current = setTimeout(() => setCopiedMsgId(null), 1500)
   }
 
   async function handleDeleteConv(conversationId: string) {
-    setMsgMenu(null)
     if (!window.confirm('确定删除这轮对话吗？')) return
     try {
       await deleteConversation(currentSession!.id, conversationId)
@@ -324,12 +333,13 @@ export default function ChatPage() {
     }
   }, [])
 
-  // Auto-grow textarea: collapse when unfocused, grow when focused
+  // Bug 4: Auto-grow textarea; collapse + reset scroll on blur
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
     if (!isFocused) {
       el.style.height = '22px'
+      el.scrollTop = 0  // show text from the beginning when collapsed
       return
     }
     el.style.height = 'auto'
@@ -529,12 +539,7 @@ export default function ChatPage() {
                     >
                       {editingId === session.id ? (
                         <input
-                          autoFocus
-                          onFocus={e => {
-                            const el = e.currentTarget
-                            // iOS auto-selects all on focus; override to place cursor at end
-                            setTimeout(() => el.setSelectionRange(el.value.length, el.value.length), 20)
-                          }}
+                          ref={editInputRef}
                           value={editingTitle}
                           onChange={e => setEditingTitle(e.target.value)}
                           onKeyDown={e => {
@@ -627,8 +632,8 @@ export default function ChatPage() {
           </>
         )}
 
-        {/* Sidebar bottom */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+        {/* Bug 1: Sidebar bottom — explicit dark background + safe-area bottom padding */}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', background: '#0a1a3a', paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <button
             onClick={() => setShowSettings(true)}
             className="flex items-center gap-2.5 w-full px-4 py-4 text-sm transition-colors duration-150 cursor-pointer"
@@ -651,7 +656,7 @@ export default function ChatPage() {
       </aside>
 
       {/* ── Chat area ── */}
-      <div className="flex flex-col flex-1 min-w-0 h-full">
+      <div className="flex flex-col flex-1 min-w-0 h-full" style={{ background: '#fafbfd' }}>
 
         {/* Top bar */}
         <header
@@ -694,15 +699,7 @@ export default function ChatPage() {
 
               {/* Completed messages */}
               {Array.isArray(messages) && messages.map(msg => (
-                <div
-                  key={msg.id}
-                  className="flex gap-3 mb-8 group relative"
-                  onMouseEnter={() => setHoveredMsgId(msg.id)}
-                  onMouseLeave={() => setHoveredMsgId(null)}
-                  onTouchStart={msg.conversationId ? e => onMsgLongPressStart(e, msg.conversationId!) : undefined}
-                  onTouchEnd={onMsgLongPressEnd}
-                  onTouchMove={onMsgLongPressEnd}
-                >
+                <div key={msg.id} className="flex gap-3 mb-6">
                   {msg.role === 'user' ? <UserAvatar /> : <AiAvatar />}
                   <div className="flex-1 min-w-0 pt-0.5">
                     {msg.role === 'assistant' && (msg.thinking || msg.thinking_summary) && (
@@ -718,17 +715,33 @@ export default function ChatPage() {
                         {msg.content}
                       </p>
                     )}
+                    {/* Inline action icons */}
+                    <div className={`flex items-center gap-3 mt-1.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <button
+                        onClick={() => handleCopyMsg(msg.id, msg.content)}
+                        className="flex items-center justify-center transition-colors cursor-pointer"
+                        style={{ color: copiedMsgId === msg.id ? '#22c55e' : '#c0c8d8' }}
+                        title="复制"
+                      >
+                        {copiedMsgId === msg.id
+                          ? <Check size={15} strokeWidth={2} />
+                          : <Copy size={15} strokeWidth={1.8} />
+                        }
+                      </button>
+                      {msg.conversationId && (
+                        <button
+                          onClick={() => handleDeleteConv(msg.conversationId!)}
+                          className="flex items-center justify-center transition-colors cursor-pointer"
+                          style={{ color: '#c0c8d8' }}
+                          onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
+                          onMouseLeave={e => (e.currentTarget.style.color = '#c0c8d8')}
+                          title="删除"
+                        >
+                          <Trash2 size={15} strokeWidth={1.8} />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  {/* Desktop hover action button */}
-                  {hoveredMsgId === msg.id && msg.conversationId && (
-                    <button
-                      className="hidden md:flex absolute right-0 top-0 items-center justify-center rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                      style={{ width: 28, height: 28, background: '#f0f2f8', color: '#7a8399', border: '1px solid #dde2ed' }}
-                      onClick={e => setMsgMenu({ conversationId: msg.conversationId!, x: e.clientX, y: e.clientY })}
-                    >
-                      <span style={{ fontSize: 14, lineHeight: 1 }}>···</span>
-                    </button>
-                  )}
                 </div>
               ))}
 
@@ -798,45 +811,6 @@ export default function ChatPage() {
           )}
         </main>
 
-        {/* Message action menu */}
-        {msgMenu && (
-          <>
-            <div className="fixed inset-0 z-50" onClick={() => setMsgMenu(null)} />
-            <div
-              className="fixed z-50 rounded-xl overflow-hidden shadow-lg"
-              style={{
-                left: Math.min(msgMenu.x, window.innerWidth - 160),
-                top: Math.min(msgMenu.y + 8, window.innerHeight - 110),
-                width: 148,
-                background: '#fff',
-                border: '1px solid rgba(0,0,0,0.08)',
-              }}
-            >
-              <button
-                className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-left cursor-pointer transition-colors"
-                style={{ color: '#1a1f2e', minHeight: 44 }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#f5f7fc')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                onClick={() => {
-                  const msg = messages.find(m => m.conversationId === msgMenu.conversationId)
-                  if (msg) handleCopyMsg(msg.content)
-                }}
-              >
-                <Copy size={14} strokeWidth={1.8} style={{ color: '#7a8399' }} /> 复制
-              </button>
-              <button
-                className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-left cursor-pointer transition-colors"
-                style={{ color: '#d04040', borderTop: '1px solid #f0f2f8', minHeight: 44 }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#fff5f5')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                onClick={() => handleDeleteConv(msgMenu.conversationId)}
-              >
-                <Trash2 size={14} strokeWidth={1.8} /> 删除
-              </button>
-            </div>
-          </>
-        )}
-
         {/* Toast */}
         {toast && (
           <div
@@ -852,8 +826,10 @@ export default function ChatPage() {
         )}
 
         {/* Input area — unified Claude-style bubble */}
+        {/* Bug 1: no background on footer; chat area div has explicit #fafbfd */}
         <footer style={{
-          paddingBottom: keyboardOffset > 0 ? keyboardOffset : 'env(safe-area-inset-bottom)',
+          background: '#fafbfd',
+          paddingBottom: keyboardOffset > 0 ? `${keyboardOffset}px` : 'env(safe-area-inset-bottom)',
         }}>
           <div className="mx-auto px-3 md:px-6 py-3" style={{ maxWidth: 800 }}>
             <div
