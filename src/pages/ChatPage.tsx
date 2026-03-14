@@ -219,6 +219,7 @@ export default function ChatPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
   const editInputRef = useRef<HTMLInputElement>(null)
+  const closingSidebarRef = useRef(false)
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [input, setInput] = useState('')
   const [isFocused, setIsFocused] = useState(false)
@@ -248,7 +249,7 @@ export default function ChatPage() {
         if (showSettings) {
           if (settingsPage !== 'menu') setSettingsPage('menu')
           else { setShowSettings(false); setSettingsPage('menu') }
-        } else setSidebarOpen(false) // setEditingId cleared via direct callsites; also clear here
+        } else { closingSidebarRef.current = true; setSidebarOpen(false); setTimeout(() => closingSidebarRef.current = false, 100) }
         setEditingId(null)
         setEditingTitle('')
       }
@@ -387,6 +388,7 @@ export default function ChatPage() {
   }
 
   async function handleRenameConfirm() {
+    if (closingSidebarRef.current) { setEditingId(null); setEditingTitle(''); return }
     if (!editingId) return
     const trimmed = editingTitle.trim()
     if (trimmed) {
@@ -414,21 +416,21 @@ export default function ChatPage() {
   const showWelcome = !isStreaming && !isLoadingMessages && (!Array.isArray(messages) || messages.length === 0)
 
   return (
-    <div className="flex overflow-hidden" style={{ background: '#fafbfd', height: 'calc(100dvh + env(safe-area-inset-bottom, 0px))', overscrollBehavior: 'none' }}>
+    <div className="flex overflow-hidden" style={{ background: '#fafbfd', height: '100%', overscrollBehavior: 'none' }}>
 
       {/* ── Mobile overlay ── */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-30 md:hidden"
           style={{ background: 'rgba(0,0,0,0.5)' }}
-          onClick={() => { setSidebarOpen(false); setEditingId(null); setEditingTitle('') }}
+          onClick={() => { closingSidebarRef.current = true; setSidebarOpen(false); setEditingId(null); setEditingTitle(''); setTimeout(() => closingSidebarRef.current = false, 100) }}
         />
       )}
 
       {/* ── Sidebar ── */}
       <aside
         className={`fixed md:relative left-0 top-0 z-40 md:z-auto flex flex-col flex-shrink-0 transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
-        style={{ width: 260, height: 'calc(100dvh + env(safe-area-inset-bottom, 0px))', background: '#0a1a3a', color: '#c8d4e8' }}
+        style={{ width: 260, height: '100%', background: '#0a1a3a', color: '#c8d4e8' }}
       >
         {/* Sidebar top */}
         <div className="px-4 py-4" style={{ paddingTop: 'calc(16px + env(safe-area-inset-top))' }}>
@@ -506,7 +508,7 @@ export default function ChatPage() {
                   return (
                     <button
                       key={session.id}
-                      onClick={() => { selectSession(session.id); setSidebarOpen(false); setEditingId(null); setEditingTitle('') }}
+                      onClick={() => { selectSession(session.id); closingSidebarRef.current = true; setSidebarOpen(false); setEditingId(null); setEditingTitle(''); setTimeout(() => closingSidebarRef.current = false, 100) }}
                       onMouseEnter={() => setHoveredId(session.id)}
                       onMouseLeave={() => setHoveredId(null)}
                       onTouchStart={e => handleTouchStart(e, session.id)}
@@ -647,7 +649,7 @@ export default function ChatPage() {
       </aside>
 
       {/* ── Chat area ── */}
-      <div className="flex flex-col flex-1 min-w-0 h-full" style={{ background: '#fafbfd' }}>
+      <div className="flex flex-col flex-1 min-w-0 h-full relative" style={{ background: '#fafbfd' }}>
 
         {/* Top bar */}
         <header
@@ -682,7 +684,7 @@ export default function ChatPage() {
         </header>
 
         {/* Messages */}
-        <main className="flex-1 overflow-y-auto flex flex-col">
+        <main className="flex-1 overflow-y-auto flex flex-col" style={{ paddingBottom: 80 }}>
           {showWelcome ? (
           <WelcomeScreen onSelectScene={handleWelcomeScene} currentScene={currentSession?.scene_type || 'daily'} />
           ) : (
@@ -818,8 +820,8 @@ export default function ChatPage() {
 
         {/* Input area — unified Claude-style bubble */}
         {/* Bug 1: no background on footer; chat area div has explicit #fafbfd */}
-        <footer style={{
-          background: '#fafbfd',
+        <footer className="absolute bottom-0 left-0 right-0 z-10" style={{
+          background: 'transparent',
           paddingBottom: keyboardOffset > 0 ? `${keyboardOffset}px` : 'env(safe-area-inset-bottom)',
         }}>
           <div className="mx-auto px-3 md:px-6 py-3" style={{ maxWidth: 800 }}>
