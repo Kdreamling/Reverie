@@ -149,6 +149,7 @@ export default function MemoryPanel({ onBack }: Props) {
 
       {/* Filter tabs + Add button */}
       <div className="flex items-center gap-1.5 px-3 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="flex items-center gap-1.5 overflow-x-auto flex-1" style={{ scrollbarWidth: 'none' }}>
         {LAYER_FILTERS.map(f => (
           <button
             key={f.key}
@@ -163,6 +164,7 @@ export default function MemoryPanel({ onBack }: Props) {
             {f.label}
           </button>
         ))}
+        </div>
         <button
           onClick={() => setShowAdd(!showAdd)}
           className="ml-auto flex items-center justify-center rounded-md transition-colors duration-150 cursor-pointer"

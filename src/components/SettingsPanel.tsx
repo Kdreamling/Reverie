@@ -22,7 +22,7 @@ export default function SettingsPanel({ onClose, onNavigate }: Props) {
 
   if (page === 'memory') {
     return (
-      <div className="absolute inset-0 z-10">
+      <div className="fixed md:absolute inset-0 z-50 md:z-10">
         <MemoryPanel onBack={() => setPage('menu')} />
       </div>
     )
@@ -30,7 +30,7 @@ export default function SettingsPanel({ onClose, onNavigate }: Props) {
 
   if (page === 'features') {
     return (
-      <div className="absolute inset-0 z-10">
+      <div className="fixed md:absolute inset-0 z-50 md:z-10">
         <FeaturesPanel onBack={() => setPage('menu')} />
       </div>
     )
@@ -38,7 +38,7 @@ export default function SettingsPanel({ onClose, onNavigate }: Props) {
 
   if (page === 'debug') {
     return (
-      <div className="absolute inset-0 z-10">
+      <div className="fixed md:absolute inset-0 z-50 md:z-10">
         <DebugPanel onBack={() => setPage('menu')} />
       </div>
     )
@@ -46,7 +46,7 @@ export default function SettingsPanel({ onClose, onNavigate }: Props) {
 
   return (
     <div
-      className="absolute inset-0 flex flex-col z-10"
+      className="fixed md:absolute inset-0 flex flex-col z-50 md:z-10"
       style={{ background: '#0a1a3a', color: '#c8d4e8' }}
     >
       {/* Header */}
