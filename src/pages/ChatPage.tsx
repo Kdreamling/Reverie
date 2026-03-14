@@ -722,7 +722,7 @@ export default function ChatPage() {
           {showWelcome ? (
           <WelcomeScreen onSelectScene={handleWelcomeScene} currentScene={currentSession?.scene_type || 'daily'} />
           ) : (
-            <div className="mx-auto w-full px-3 md:px-6 pt-8 pb-4" style={{ maxWidth: 800 }}>
+            <div className="mx-auto w-full px-3 md:px-6 pt-8" style={{ maxWidth: 800, paddingBottom: 90 }}>
 
               {/* Completed messages */}
               {Array.isArray(messages) && messages.map(msg => (
@@ -836,6 +836,68 @@ export default function ChatPage() {
               <div ref={messagesEndRef} />
             </div>
           )}
+
+          {/* Sticky input — inside scroll container so scrollbar is not covered */}
+          <div style={{
+            position: 'sticky',
+            bottom: 0,
+            zIndex: 10,
+            marginTop: 'auto',
+            background: '#fafbfd',
+            paddingBottom: keyboardOffset > 0 ? `${keyboardOffset}px` : 'env(safe-area-inset-bottom)',
+          }}>
+            {/* Top gradient fade — text fades out smoothly */}
+            <div style={{
+              position: 'absolute',
+              top: -36,
+              left: 0,
+              right: 0,
+              height: 36,
+              background: 'linear-gradient(to bottom, rgba(250,251,253,0), rgba(250,251,253,1))',
+              pointerEvents: 'none',
+            }} />
+            <div className="mx-auto px-3 md:px-6 py-3 relative" style={{ maxWidth: 800 }}>
+              <div
+                className={`flex gap-3 px-4 transition-all duration-200 ${isFocused || input ? 'rounded-2xl items-end py-3' : 'rounded-full items-center py-2.5'}`}
+                style={{
+                  background: '#fff',
+                  boxShadow: '0 1px 6px rgba(0,0,0,0.07)',
+                  border: '1px solid rgba(0,0,0,0.07)',
+                }}
+              >
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setIsFocused(false)}
+                  disabled={isStreaming || !currentSession}
+                  placeholder="Message Reverie…"
+                  rows={1}
+                  className="flex-1 resize-none bg-transparent text-sm outline-none leading-relaxed disabled:opacity-40"
+                  style={{ color: '#1a1f2e', minHeight: 22, maxHeight: 150, overflowY: 'auto', scrollbarWidth: 'none' }}
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={isStreaming || !input.trim() || !currentSession}
+                  className="flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 disabled:cursor-not-allowed"
+                  style={{
+                    width: 30, height: 30, flexShrink: 0,
+                    background: input.trim() && !isStreaming ? '#002FA7' : '#e8ecf5',
+                    color: input.trim() && !isStreaming ? '#fff' : '#aab2c8',
+                  }}
+                  onMouseEnter={e => { if (input.trim() && !isStreaming) e.currentTarget.style.background = '#001f80' }}
+                  onMouseLeave={e => { if (input.trim() && !isStreaming) e.currentTarget.style.background = '#002FA7' }}
+                >
+                  <ArrowUp size={14} strokeWidth={2.5} />
+                </button>
+              </div>
+              <p className="hidden md:block text-center text-xs mt-2" style={{ color: '#aab2c8' }}>
+                Press Enter to send · Shift+Enter for new line
+              </p>
+            </div>
+          </div>
         </main>
 
         {/* Toast */}
@@ -851,54 +913,6 @@ export default function ChatPage() {
             {toast}
           </div>
         )}
-
-        {/* Input area */}
-        <footer style={{
-          background: '#fafbfd',
-          paddingBottom: keyboardOffset > 0 ? `${keyboardOffset}px` : 'env(safe-area-inset-bottom)',
-        }}>
-          <div className="mx-auto px-3 md:px-6 py-3" style={{ maxWidth: 800 }}>
-            <div
-              className={`flex gap-3 px-4 transition-all duration-200 ${isFocused || input ? 'rounded-2xl items-end py-3' : 'rounded-full items-center py-2.5'}`}
-              style={{
-                background: '#fff',
-                boxShadow: '0 1px 6px rgba(0,0,0,0.07)',
-                border: '1px solid rgba(0,0,0,0.07)',
-              }}
-            >
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                disabled={isStreaming || !currentSession}
-                placeholder="Message Reverie…"
-                rows={1}
-                className="flex-1 resize-none bg-transparent text-sm outline-none leading-relaxed disabled:opacity-40"
-                style={{ color: '#1a1f2e', minHeight: 22, maxHeight: 150, overflowY: 'auto', scrollbarWidth: 'none' }}
-              />
-              <button
-                onClick={handleSend}
-                disabled={isStreaming || !input.trim() || !currentSession}
-                className="flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 disabled:cursor-not-allowed"
-                style={{
-                  width: 30, height: 30, flexShrink: 0,
-                  background: input.trim() && !isStreaming ? '#002FA7' : '#e8ecf5',
-                  color: input.trim() && !isStreaming ? '#fff' : '#aab2c8',
-                }}
-                onMouseEnter={e => { if (input.trim() && !isStreaming) e.currentTarget.style.background = '#001f80' }}
-                onMouseLeave={e => { if (input.trim() && !isStreaming) e.currentTarget.style.background = '#002FA7' }}
-              >
-                <ArrowUp size={14} strokeWidth={2.5} />
-              </button>
-            </div>
-            <p className="hidden md:block text-center text-xs mt-2" style={{ color: '#aab2c8' }}>
-              Press Enter to send · Shift+Enter for new line
-            </p>
-          </div>
-        </footer>
 
       </div>
 
