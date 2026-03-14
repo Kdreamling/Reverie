@@ -198,7 +198,7 @@ function WelcomeScreen({ onSelectScene, currentScene }: { onSelectScene: (scene:
 export default function ChatPage() {
   const { sessions, currentSession, loading, fetchSessions, createSession, selectSession, deleteSession, updateSessionModel } =
     useSessionStore()
-  const { messages, isStreaming, currentThinking, currentText, isSearchingMemory, searchingQuery, loadMessages, sendMessage, clearMessages, deleteConversation } =
+  const { messages, isStreaming, currentThinking, currentText, isSearchingMemory, searchingQuery, loadMessages, sendMessage, clearMessages, deleteConversation, lastError, retryLast, clearError } =
     useChatStore()
   const { token } = useAuthStore()
 
@@ -735,6 +735,35 @@ export default function ChatPage() {
                   )}
                 </div>
               ))}
+
+              {/* Error / retry block */}
+              {lastError && !isStreaming && (
+                <div className="flex items-center gap-3 mb-6 px-1">
+                  <div
+                    className="flex-1 flex items-center gap-2 rounded-xl px-4 py-3 text-sm"
+                    style={{ background: 'rgba(208,64,64,0.06)', border: '1px solid rgba(208,64,64,0.18)', color: '#b03030' }}
+                  >
+                    <span>⚠ {lastError}</span>
+                  </div>
+                  <button
+                    onClick={() => retryLast(currentSession!.id, model)}
+                    className="flex items-center gap-1.5 rounded-xl px-3 py-3 text-sm font-medium transition-colors cursor-pointer"
+                    style={{ background: '#002FA7', color: '#fff', whiteSpace: 'nowrap' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#001f80')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '#002FA7')}
+                  >
+                    重试
+                  </button>
+                  <button
+                    onClick={clearError}
+                    className="flex items-center justify-center rounded-xl cursor-pointer"
+                    style={{ width: 36, height: 44, color: '#aab2c8' }}
+                    title="忽略"
+                  >
+                    <X size={14} strokeWidth={2} />
+                  </button>
+                </div>
+              )}
 
               {/* Memory search indicator */}
               {isSearchingMemory && (

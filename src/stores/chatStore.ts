@@ -24,11 +24,15 @@ interface ChatState {
   isSearchingMemory: boolean
   searchingQuery: string
   pendingMemoryResult: MemorySearchResult | null
+  lastError: string | null       // error message shown below failed user message
+  retryContent: string | null    // content of last user message for retry
 
   loadMessages: (sessionId: string) => Promise<void>
   sendMessage: (sessionId: string, model: string, content: string) => Promise<void>
   deleteConversation: (sessionId: string, conversationId: string) => Promise<void>
   clearMessages: () => void
+  retryLast: (sessionId: string, model: string) => void
+  clearError: () => void
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -39,6 +43,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isSearchingMemory: false,
   searchingQuery: '',
   pendingMemoryResult: null,
+  lastError: null,
+  retryContent: null,
 
   async loadMessages(sessionId) {
     try {
@@ -121,6 +127,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       isSearchingMemory: false,
       searchingQuery: '',
       pendingMemoryResult: null,
+      lastError: null,
+      retryContent: content,
     }))
 
     // 自动命名：如果标题是"新对话"或为空，用消息前20字命名
@@ -150,87 +158,111 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
+      let gotFirstChunk = false
 
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
+      // 30s timeout waiting for first SSE chunk
+      const timeoutId = setTimeout(() => {
+        if (!gotFirstChunk && get().isStreaming) {
+          reader.cancel()
+          set({ isStreaming: false, currentThinking: '', currentText: '', isSearchingMemory: false, searchingQuery: '', pendingMemoryResult: null, lastError: '连接超时，请重试' })
+        }
+      }, 30000)
 
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
 
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          const jsonStr = line.slice(6).trim()
-          if (!jsonStr || jsonStr === '[DONE]') continue
+          gotFirstChunk = true
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() ?? ''
 
-          let event: SseEvent
-          try { event = JSON.parse(jsonStr) } catch { continue }
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue
+            const jsonStr = line.slice(6).trim()
+            if (!jsonStr || jsonStr === '[DONE]') continue
 
-          console.log('[chatStore] SSE event:', event.type, event)
+            let event: SseEvent
+            try { event = JSON.parse(jsonStr) } catch { continue }
 
-          switch (event.type) {
-            case 'tool_searching':
-              set({ isSearchingMemory: true, searchingQuery: event.query ?? '' })
-              break
-            case 'tool_result':
-              set({
-                isSearchingMemory: false,
-                searchingQuery: '',
-                pendingMemoryResult: {
-                  query: event.query ?? get().searchingQuery,
-                  found: event.found ?? 0,
-                  content: event.content ?? '',
-                },
-              })
-              break
-            case 'thinking_start':
-              // marks start of a thinking block; no content
-              break
-            case 'thinking_delta':
-              set(s => ({ currentThinking: s.currentThinking + (event.content ?? '') }))
-              break
-            case 'thinking_end':
-              // marks end of thinking block; no content
-              break
-            case 'text_delta':
-              set(s => ({ currentText: s.currentText + (event.content ?? '') }))
-              break
-            case 'done': {
-              const { currentThinking, currentText, pendingMemoryResult } = get()
-              if (currentText || currentThinking) {
-                const assistantMsg: ChatMessage = {
-                  id: `ai-${Date.now()}`,
-                  role: 'assistant',
-                  content: currentText,
-                  thinking: currentThinking || null,
-                  created_at: new Date().toISOString(),
-                  memoryRef: pendingMemoryResult ?? null,
-                }
-                set(s => ({
-                  messages: [...s.messages, assistantMsg],
-                  currentThinking: '',
-                  currentText: '',
-                  isStreaming: false,
+            console.log('[chatStore] SSE event:', event.type, event)
+
+            switch (event.type) {
+              case 'tool_searching':
+                set({ isSearchingMemory: true, searchingQuery: event.query ?? '' })
+                break
+              case 'tool_result':
+                set({
                   isSearchingMemory: false,
                   searchingQuery: '',
-                  pendingMemoryResult: null,
-                }))
-              } else {
-                set({ currentThinking: '', currentText: '', isStreaming: false, isSearchingMemory: false, searchingQuery: '', pendingMemoryResult: null })
+                  pendingMemoryResult: {
+                    query: event.query ?? get().searchingQuery,
+                    found: event.found ?? 0,
+                    content: event.content ?? '',
+                  },
+                })
+                break
+              case 'thinking_start':
+                break
+              case 'thinking_delta':
+                set(s => ({ currentThinking: s.currentThinking + (event.content ?? '') }))
+                break
+              case 'thinking_end':
+                break
+              case 'text_delta':
+                set(s => ({ currentText: s.currentText + (event.content ?? '') }))
+                break
+              case 'done': {
+                const { currentThinking, currentText, pendingMemoryResult } = get()
+                if (currentText || currentThinking) {
+                  const assistantMsg: ChatMessage = {
+                    id: `ai-${Date.now()}`,
+                    role: 'assistant',
+                    content: currentText,
+                    thinking: currentThinking || null,
+                    created_at: new Date().toISOString(),
+                    memoryRef: pendingMemoryResult ?? null,
+                  }
+                  set(s => ({
+                    messages: [...s.messages, assistantMsg],
+                    currentThinking: '',
+                    currentText: '',
+                    isStreaming: false,
+                    isSearchingMemory: false,
+                    searchingQuery: '',
+                    pendingMemoryResult: null,
+                  }))
+                } else {
+                  set({ currentThinking: '', currentText: '', isStreaming: false, isSearchingMemory: false, searchingQuery: '', pendingMemoryResult: null })
+                }
+                break
               }
-              break
             }
           }
         }
+      } finally {
+        clearTimeout(timeoutId)
       }
     } catch {
-      // network error or stream aborted — leave partial content, stop streaming
+      set({ isStreaming: false, currentThinking: '', currentText: '', isSearchingMemory: false, searchingQuery: '', pendingMemoryResult: null, lastError: '发送失败，请重试' })
+      return
     } finally {
-      // Safety net: if done event never arrived, stop the spinner and clear streaming state
       if (get().isStreaming) {
-      set({ isStreaming: false, currentThinking: '', currentText: '', isSearchingMemory: false, searchingQuery: '', pendingMemoryResult: null })
+        set({ isStreaming: false, currentThinking: '', currentText: '', isSearchingMemory: false, searchingQuery: '', pendingMemoryResult: null, lastError: '连接中断，请重试' })
       }
     }
+  },
+
+  retryLast(sessionId, model) {
+    const { retryContent } = get()
+    if (!retryContent) return
+    // remove the last user message (the failed one) then resend
+    set(s => ({ messages: s.messages.slice(0, -1), lastError: null }))
+    get().sendMessage(sessionId, model, retryContent)
+  },
+
+  clearError() {
+    set({ lastError: null })
   },
 }))
