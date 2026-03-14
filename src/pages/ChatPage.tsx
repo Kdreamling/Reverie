@@ -157,7 +157,7 @@ function WelcomeScreen({ onSelectScene, currentScene }: { onSelectScene: (scene:
         {greeting}
       </p>
 
-      <div className="grid grid-cols-4 gap-3 mt-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
         {SCENES.map(s => {
           const isDefault = s.key === currentScene
           return (
@@ -522,7 +522,7 @@ export default function ChatPage() {
           {showWelcome ? (
           <WelcomeScreen onSelectScene={handleWelcomeScene} currentScene={currentSession?.scene_type || 'daily'} />
           ) : (
-            <div className="mx-auto w-full px-6 pt-8 pb-4" style={{ maxWidth: 800 }}>
+            <div className="mx-auto w-full px-3 md:px-6 pt-8 pb-4" style={{ maxWidth: 800 }}>
 
               {/* Completed messages */}
               {Array.isArray(messages) && messages.map(msg => (
@@ -585,7 +585,7 @@ export default function ChatPage() {
 
         {/* Input area */}
         <footer style={{ background: '#f2f4fa', borderTop: '1px solid #dde2ed' }}>
-          <div className="mx-auto px-6 py-4" style={{ maxWidth: 800 }}>
+          <div className="mx-auto px-3 md:px-6 py-4" style={{ maxWidth: 800 }}>
             <div
               className="flex items-end gap-3 rounded-xl px-4 py-3"
               style={{ background: '#fff', border: '1px solid #dde2ed' }}
