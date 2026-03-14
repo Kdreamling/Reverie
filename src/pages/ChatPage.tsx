@@ -207,8 +207,6 @@ export default function ChatPage() {
   const [settingsPage, setSettingsPage] = useState<'menu' | 'memory' | 'features' | 'debug'>('menu')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const [longPressMenu, setLongPressMenu] = useState<{ id: string; x: number; y: number } | null>(null)
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Message copy state
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null)
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -216,10 +214,10 @@ export default function ChatPage() {
   const [toast, setToast] = useState<string | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [showSceneSelect, setShowSceneSelect] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editingTitle, setEditingTitle] = useState('')
-  const editInputRef = useRef<HTMLInputElement>(null)
-  const closingSidebarRef = useRef(false)
+  const [swipedId, setSwipedId] = useState<string | null>(null)
+  const [renameModal, setRenameModal] = useState<{ id: string; title: string } | null>(null)
+  const itemSwipeRef = useRef<{ startX: number; startY: number; id: string; isSwiping: boolean } | null>(null)
+  const itemSwipeActive = useRef(false)
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [input, setInput] = useState('')
   const [isFocused, setIsFocused] = useState(false)
@@ -244,14 +242,14 @@ export default function ChatPage() {
       swipeStartX.current = null
       swipeStartY.current = null
       if (Math.abs(dx) < 40 || Math.abs(dx) < dy) return
-      if (dx > 0 && startX <= 60) { closingSidebarRef.current = false; setSidebarOpen(true); setEditingId(null); setEditingTitle('') }
+      if (dx > 0 && startX <= 60) { setSidebarOpen(true) }
       else if (dx < 0) {
+        if (itemSwipeActive.current) return
+        if (renameModal) return
         if (showSettings) {
           if (settingsPage !== 'menu') setSettingsPage('menu')
           else { setShowSettings(false); setSettingsPage('menu') }
-        } else { closingSidebarRef.current = true; setSidebarOpen(false); setEditingId(null); setEditingTitle('') }
-        setEditingId(null)
-        setEditingTitle('')
+        } else { setSidebarOpen(false) }
       }
     }
     window.addEventListener('touchstart', onTouchStart, { passive: true })
@@ -260,20 +258,43 @@ export default function ChatPage() {
       window.removeEventListener('touchstart', onTouchStart)
       window.removeEventListener('touchend', onTouchEnd)
     }
-  }, [showSettings, settingsPage])
+  }, [showSettings, settingsPage, renameModal])
 
-  function handleTouchStart(e: React.TouchEvent, sessionId: string) {
-    const touch = e.touches[0]
-    longPressTimer.current = setTimeout(() => {
-      setLongPressMenu({ id: sessionId, x: touch.clientX, y: touch.clientY })
-    }, 500)
+  function handleItemTouchStart(e: React.TouchEvent, id: string) {
+    itemSwipeRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY, id, isSwiping: false }
   }
 
-  function handleTouchEnd() {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
+  function handleItemTouchMove(e: React.TouchEvent) {
+    if (!itemSwipeRef.current) return
+    const dx = e.touches[0].clientX - itemSwipeRef.current.startX
+    const dy = Math.abs(e.touches[0].clientY - itemSwipeRef.current.startY)
+    if (Math.abs(dx) > 20 && Math.abs(dx) > dy) {
+      itemSwipeRef.current.isSwiping = true
+      itemSwipeActive.current = true
     }
+  }
+
+  function handleItemTouchEnd(e: React.TouchEvent) {
+    if (!itemSwipeRef.current) return
+    const { startX, id, isSwiping } = itemSwipeRef.current
+    const dx = e.changedTouches[0].clientX - startX
+    itemSwipeRef.current = null
+    setTimeout(() => { itemSwipeActive.current = false }, 50)
+    if (!isSwiping) return // tap — let click pass through normally
+    e.preventDefault() // swipe — prevent ghost click
+    if (dx < -70) setSwipedId(id)
+    else if (dx > 30) setSwipedId(null)
+  }
+
+  async function doRename() {
+    if (!renameModal) return
+    const trimmed = renameModal.title.trim()
+    if (trimmed) {
+      await updateSessionAPI(renameModal.id, { title: trimmed })
+      await fetchSessions()
+    }
+    setRenameModal(null)
+    setSwipedId(null)
   }
 
   function showToast(msg: string) {
@@ -330,6 +351,11 @@ export default function ChatPage() {
   // Load sessions on mount
   useEffect(() => { if (token) fetchSessions() }, [token, fetchSessions])
 
+  // Clean up swipe/rename state whenever sidebar closes
+  useEffect(() => {
+    if (!sidebarOpen) { setSwipedId(null); setRenameModal(null) }
+  }, [sidebarOpen])
+
   // Click outside to close scene panel
   useEffect(() => {
     if (!showSceneSelect) return
@@ -353,10 +379,19 @@ export default function ChatPage() {
     }
   }, [currentSession?.id, loadMessages, clearMessages])
 
-  // Scroll to bottom on new messages and during streaming
+  // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length, currentText, currentThinking])
+  }, [messages.length])
+
+  // During streaming, scroll periodically instead of on every token
+  useEffect(() => {
+    if (!isStreaming) return
+    const id = setInterval(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }, 300)
+    return () => clearInterval(id)
+  }, [isStreaming])
 
   // Restore focus to input after streaming ends
   useEffect(() => {
@@ -372,8 +407,6 @@ export default function ChatPage() {
   async function handleCreateWithScene(sceneKey: string) {
     setShowSceneSelect(false)
     setSidebarOpen(false)
-    setEditingId(null)
-    setEditingTitle('')
     await createSession(sceneKey, model)
   }
 
@@ -387,17 +420,6 @@ export default function ChatPage() {
     }
   }
 
-  async function handleRenameConfirm() {
-    if (closingSidebarRef.current) { setEditingId(null); setEditingTitle(''); return }
-    if (!editingId) return
-    const trimmed = editingTitle.trim()
-    if (trimmed) {
-      await updateSessionAPI(editingId, { title: trimmed })
-      await fetchSessions()
-    }
-    setEditingId(null)
-    setEditingTitle('')
-  }
 
   async function handleSend() {
     const text = input.trim()
@@ -423,7 +445,7 @@ export default function ChatPage() {
         <div
           className="fixed inset-0 z-30 md:hidden"
           style={{ background: 'rgba(0,0,0,0.5)' }}
-          onClick={() => { closingSidebarRef.current = true; setSidebarOpen(false); setEditingId(null); setEditingTitle('') }}
+          onClick={() => { setSidebarOpen(false) }}
         />
       )}
 
@@ -505,75 +527,87 @@ export default function ChatPage() {
                 {items.map(session => {
                   const isActive = session.id === currentSession?.id
                   const isHovered = session.id === hoveredId
+                  const isSwiped = session.id === swipedId
                   return (
-                    <button
+                    <div
                       key={session.id}
-                      onClick={() => { selectSession(session.id); closingSidebarRef.current = true; setSidebarOpen(false); setEditingId(null); setEditingTitle('') }}
-                      onMouseEnter={() => setHoveredId(session.id)}
-                      onMouseLeave={() => setHoveredId(null)}
-                      onTouchStart={e => handleTouchStart(e, session.id)}
-                      onTouchEnd={handleTouchEnd}
-                      onTouchMove={handleTouchEnd}
-                      className="relative w-full text-left rounded-md px-3 py-2.5 mb-0.5 transition-colors duration-150 cursor-pointer select-none"
-                      style={{
-                        background: isActive ? 'rgba(0,47,167,0.3)' : isHovered ? 'rgba(255,255,255,0.05)' : 'transparent',
-                        borderLeft: isActive ? '2px solid #002FA7' : '2px solid transparent',
-                        color: isActive ? '#e8edf8' : '#c8d4e8',
-                      }}
+                      className="relative mb-0.5 rounded-md select-none"
+                      style={{ overflow: 'hidden' }}
                     >
-                      {editingId === session.id ? (
-                        <input
-                          ref={el => {
-                            (editInputRef as React.MutableRefObject<HTMLInputElement | null>).current = el
-                            if (el) {
-                              requestAnimationFrame(() => {
-                                el.focus({ preventScroll: true })
-                                el.selectionStart = el.selectionEnd = el.value.length
-                              })
-                            }
-                          }}
-                          value={editingTitle}
-                          onChange={e => setEditingTitle(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') { e.preventDefault(); handleRenameConfirm() }
-                            if (e.key === 'Escape') { setEditingId(null); setEditingTitle('') }
-                          }}
-                          onBlur={handleRenameConfirm}
-                          placeholder={sessions.find(s => s.id === editingId)?.title || 'New Chat'}
-                          className="text-xs leading-snug bg-transparent outline-none w-full pr-5"
-                          style={{ color: '#e8edf8', borderBottom: '1px solid rgba(0,47,167,0.5)' }}
-                        />
-                      ) : (
+                      {/* Swipe-reveal action buttons — only rendered when swiped */}
+                      {isSwiped && (
+                        <div
+                          className="absolute right-0 top-0 bottom-0 flex"
+                          style={{ width: 130 }}
+                          onTouchStart={e => e.nativeEvent.stopImmediatePropagation()}
+                          onTouchMove={e => e.nativeEvent.stopImmediatePropagation()}
+                          onTouchEnd={e => e.nativeEvent.stopImmediatePropagation()}
+                        >
+                          <button
+                            className="flex-1 flex items-center justify-center text-xs cursor-pointer"
+                            style={{ background: '#1e4a8a', color: '#c8d4e8' }}
+                            onClick={e => { e.stopPropagation(); setSwipedId(null); setRenameModal({ id: session.id, title: session.title || '' }) }}
+                            onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); setSwipedId(null); setRenameModal({ id: session.id, title: session.title || '' }) }}
+                          >
+                            重命名
+                          </button>
+                          <button
+                            className="flex-1 flex items-center justify-center text-xs cursor-pointer"
+                            style={{ background: '#8a1e1e', color: '#f0c0c0' }}
+                            onClick={e => { e.stopPropagation(); setSwipedId(null); if (window.confirm('确定要删除这个对话吗？')) deleteSession(session.id) }}
+                            onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); setSwipedId(null); if (window.confirm('确定要删除这个对话吗？')) deleteSession(session.id) }}
+                          >
+                            删除
+                          </button>
+                        </div>
+                      )}
+                      {/* Session content — slides left on swipe */}
+                      <button
+                        onClick={() => {
+                          if (isSwiped) { setSwipedId(null); return }
+                          selectSession(session.id); setSidebarOpen(false)
+                        }}
+                        onMouseEnter={() => setHoveredId(session.id)}
+                        onMouseLeave={() => setHoveredId(null)}
+                        onTouchStart={e => { e.nativeEvent.stopImmediatePropagation(); handleItemTouchStart(e, session.id) }}
+                        onTouchMove={e => { e.nativeEvent.stopImmediatePropagation(); handleItemTouchMove(e) }}
+                        onTouchEnd={e => { e.nativeEvent.stopImmediatePropagation(); handleItemTouchEnd(e) }}
+                        className="relative w-full text-left rounded-md px-3 py-2.5 transition-colors duration-150 cursor-pointer"
+                        style={{
+                          background: isActive ? 'rgba(0,47,167,0.3)' : isHovered ? 'rgba(255,255,255,0.05)' : '#0a1a3a',
+                          borderLeft: isActive ? '2px solid #002FA7' : '2px solid transparent',
+                          color: isActive ? '#e8edf8' : '#c8d4e8',
+                          transform: isSwiped ? 'translateX(-130px)' : 'translateX(0)',
+                          transition: 'transform 0.25s ease',
+                        }}
+                      >
                         <p
-                          className="text-xs truncate leading-snug pr-5"
-                          onDoubleClick={e => {
-                            e.stopPropagation()
-                            setEditingId(session.id)
-                            setEditingTitle('')
-                          }}
+                          className="text-xs leading-snug"
+                          style={{ paddingRight: 32, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                          onDoubleClick={e => { e.stopPropagation(); setRenameModal({ id: session.id, title: session.title || '' }) }}
                         >
                           {session.title || 'New Chat'}
                         </p>
-                      )}
-                      <p
-                        className="text-xs mt-0.5"
-                        style={{ color: 'rgba(200,212,232,0.4)', fontSize: 10 }}
-                      >
-                        {formatSessionTime(session.updated_at)}
-                      </p>
-                      {isHovered && (
-                        <span
-                          role="button"
-                          onClick={e => { e.stopPropagation(); if (window.confirm('确定要删除这个对话吗？')) deleteSession(session.id) }}
-                          className="absolute right-2 top-1/2 flex items-center justify-center rounded cursor-pointer"
-                          style={{ width: 18, height: 18, transform: 'translateY(-50%)', color: 'rgba(200,212,232,0.5)' }}
-                          onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#e8edf8')}
-                          onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'rgba(200,212,232,0.5)')}
+                        <p
+                          className="text-xs mt-0.5"
+                          style={{ color: 'rgba(200,212,232,0.4)', fontSize: 10 }}
                         >
-                          <X size={12} strokeWidth={2} />
-                        </span>
-                      )}
-                    </button>
+                          {formatSessionTime(session.updated_at)}
+                        </p>
+                        {isHovered && (
+                          <span
+                            role="button"
+                            onClick={e => { e.stopPropagation(); if (window.confirm('确定要删除这个对话吗？')) deleteSession(session.id) }}
+                            className="absolute right-2 top-1/2 hidden md:flex items-center justify-center rounded cursor-pointer"
+                            style={{ width: 18, height: 18, transform: 'translateY(-50%)', color: 'rgba(200,212,232,0.5)' }}
+                            onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#e8edf8')}
+                            onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'rgba(200,212,232,0.5)')}
+                          >
+                            <X size={12} strokeWidth={2} />
+                          </span>
+                        )}
+                      </button>
+                    </div>
                   )
                 })}
               </div>
@@ -581,46 +615,46 @@ export default function ChatPage() {
           })}
         </nav>
 
-        {/* Long-press context menu (mobile) */}
-        {longPressMenu && (
+        {/* Rename modal */}
+        {renameModal && (
           <>
-            <div className="fixed inset-0 z-50" onClick={() => setLongPressMenu(null)} />
+            <div className="fixed inset-0 z-50" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={() => { setRenameModal(null); setSwipedId(null) }} onTouchStart={e => e.nativeEvent.stopImmediatePropagation()} onTouchEnd={e => { e.nativeEvent.stopImmediatePropagation(); e.preventDefault(); setRenameModal(null); setSwipedId(null) }} />
             <div
-              className="fixed z-50 rounded-lg overflow-hidden shadow-lg"
+              className="fixed z-50 rounded-xl shadow-xl"
+              onClick={e => e.stopPropagation()}
+              onTouchStart={e => e.nativeEvent.stopImmediatePropagation()}
+              onTouchMove={e => e.nativeEvent.stopImmediatePropagation()}
+              onTouchEnd={e => e.nativeEvent.stopImmediatePropagation()}
               style={{
-                left: Math.min(longPressMenu.x, window.innerWidth - 160),
-                top: Math.min(longPressMenu.y, window.innerHeight - 100),
-                width: 152,
-                background: '#1a2d5a',
-                border: '1px solid rgba(255,255,255,0.12)',
+                left: '50%', top: '40%', transform: 'translate(-50%, -50%)',
+                width: 280, background: '#1a2d5a',
+                border: '1px solid rgba(255,255,255,0.12)', padding: '20px',
               }}
             >
-              <button
-                className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-left cursor-pointer"
-                style={{ color: '#c8d4e8' }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.07)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                onClick={() => {
-                  setEditingId(longPressMenu.id)
-                  setEditingTitle('')
-                  setLongPressMenu(null)
-                }}
-              >
-                <span style={{ fontSize: 13 }}>✎</span> 重命名
-              </button>
-              <button
-                className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-left cursor-pointer"
-                style={{ color: 'rgba(220,100,100,0.9)', borderTop: '1px solid rgba(255,255,255,0.07)' }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.07)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                onClick={() => {
-                  const id = longPressMenu.id
-                  setLongPressMenu(null)
-                  if (window.confirm('确定要删除这个对话吗？')) deleteSession(id)
-                }}
-              >
-                <span style={{ fontSize: 13 }}>✕</span> 删除
-              </button>
+              <p className="text-sm mb-3" style={{ color: '#c8d4e8' }}>重命名对话</p>
+              <input
+                autoFocus
+                value={renameModal.title}
+                onChange={e => setRenameModal({ ...renameModal, title: e.target.value })}
+                onKeyDown={e => { if (e.key === 'Enter') doRename(); if (e.key === 'Escape') { setRenameModal(null); setSwipedId(null) } }}
+                placeholder="输入新名称…"
+                className="w-full text-sm outline-none rounded-md px-3 py-2"
+                style={{ background: 'rgba(255,255,255,0.07)', color: '#e8edf8', border: '1px solid rgba(0,47,167,0.5)' }}
+              />
+              <div className="flex gap-2 mt-4 justify-end">
+                <button
+                  className="px-4 py-1.5 rounded-md text-sm cursor-pointer"
+                  style={{ color: '#8a9abc', background: 'transparent' }}
+                  onClick={() => { setRenameModal(null); setSwipedId(null) }}
+                  onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); setRenameModal(null); setSwipedId(null) }}
+                >取消</button>
+                <button
+                  className="px-4 py-1.5 rounded-md text-sm cursor-pointer"
+                  style={{ background: '#002FA7', color: '#fff' }}
+                  onClick={doRename}
+                  onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); doRename() }}
+                >确认</button>
+              </div>
             </div>
           </>
         )}
@@ -665,7 +699,7 @@ export default function ChatPage() {
             <button
               className="flex md:hidden items-center justify-center rounded-md cursor-pointer"
               style={{ width: 32, height: 32, color: '#7a8399' }}
-              onClick={() => { closingSidebarRef.current = false; setSidebarOpen(true); setEditingId(null); setEditingTitle('') }}
+              onClick={() => { setSidebarOpen(true) }}
             >
               <Menu size={18} strokeWidth={1.8} />
             </button>
