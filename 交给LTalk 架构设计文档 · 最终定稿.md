@@ -1746,26 +1746,26 @@ async def startup():
 
 ```
 Phase 0：后端改造
-  ├── 数据库表改造（sessions / memory_summaries / conversations / memories）
-  ├── context_builder.py 独立模块
-  ├── 鉴权（Basic Auth + JWT）
-  ├── 会话CRUD API
-  ├── 多通道配置 + thinking适配器
-  ├── 实时微摘要
-  ├── 安全加固（RLS / 关闭docs）
-  └── 备份定时任务
+  ├── ✅ 数据库表改造（sessions / memory_summaries / conversations / memories）
+  ├── ✅ context_builder.py 独立模块
+  ├── ✅ 鉴权（Basic Auth + JWT）
+  ├── ✅ 会话CRUD API
+  ├── ✅ 多通道配置 + thinking适配器
+  ├── ✅ 实时微摘要
+  ├── ✅ 安全加固（RLS / 关闭docs）
+  └── ✅ 备份定时任务
 
 Phase 1：HTML Demo → React基础版
-  ├── HTML Demo验证核心链路（流式/thinking/鉴权）
-  ├── React：流式对话 + Markdown + 代码高亮
-  ├── React：ThinkingBlock可折叠
-  ├── React：会话管理 + 场景切换
-  ├── React：模型切换
-  └── React：基本好看的界面
+  ├── ✅ HTML Demo验证核心链路（流式/thinking/鉴权）
+  ├── ✅ React：流式对话 + Markdown + 代码高亮
+  ├── ✅ React：ThinkingBlock可折叠
+  ├── ✅ React：会话管理 + 场景切换
+  ├── ✅ React：模型切换
+  └── ✅ React：基本好看的界面
 
 Phase 2：增强
   ├── 文件上传（图片/文档）
-  ├── 记忆面板UI
+  ├── ✅ 记忆面板UI（MemoryPanel）
   ├── 对话导出
   └── 全量备份导出
 
@@ -1782,7 +1782,22 @@ Phase 4：生活功能
   ├── 历史对话搜索
   ├── 主动消息系统
   ├── Web Push通知
-  └── 手机端响应式
+  └── ✅ 手机端响应式（已完成，见下方详情）
+
+── 手机端响应式详情 ────────────────────────────────
+  ✅ 侧边栏抽屉（hamburger + 右滑开 / 左滑关 / 遮罩点击关）
+  ✅ iOS safe-area-inset-top / bottom 全面适配
+  ✅ visualViewport API 键盘弹出检测
+  ✅ height: 100dvh（Safari 兼容）
+  ✅ Settings / Memory / Features / Debug 面板手机全屏
+  ✅ PWA manifest + Apple meta tags
+  ✅ 气泡输入框（未聚焦胶囊 ↔ 聚焦展开，textarea 自动增高）
+  ✅ 消息内联操作（Copy / Delete 图标，替代长按弹层）
+  ✅ 30s SSE 超时 + 错误提示 + 重试
+  ✅ 消息删除 API（DELETE /sessions/{id}/messages/{conv_id}）
+  ✅ body 背景 #fafbfd（修复 iOS safe-area 漏白）
+  ✅ 重命名空白输入框（autoFocus + placeholder，规避 iOS 全选）
+──────────────────────────────────────────────────────
 ```
 
 ---
