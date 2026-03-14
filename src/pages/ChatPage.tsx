@@ -206,6 +206,8 @@ export default function ChatPage() {
   const [showSettings, setShowSettings] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [longPressMenu, setLongPressMenu] = useState<{ id: string; x: number; y: number } | null>(null)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [showSceneSelect, setShowSceneSelect] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
@@ -215,6 +217,20 @@ export default function ChatPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<HTMLDivElement>(null)
+
+  function handleTouchStart(e: React.TouchEvent, sessionId: string) {
+    const touch = e.touches[0]
+    longPressTimer.current = setTimeout(() => {
+      setLongPressMenu({ id: sessionId, x: touch.clientX, y: touch.clientY })
+    }, 500)
+  }
+
+  function handleTouchEnd() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
 
   // iOS keyboard: listen to visualViewport resize to keep input above keyboard
   useEffect(() => {
@@ -421,6 +437,9 @@ export default function ChatPage() {
                       onClick={() => { selectSession(session.id); setSidebarOpen(false) }}
                       onMouseEnter={() => setHoveredId(session.id)}
                       onMouseLeave={() => setHoveredId(null)}
+                      onTouchStart={e => handleTouchStart(e, session.id)}
+                      onTouchEnd={handleTouchEnd}
+                      onTouchMove={handleTouchEnd}
                       className="relative w-full text-left rounded-md px-3 py-2.5 mb-0.5 transition-colors duration-150 cursor-pointer"
                       style={{
                         background: isActive ? 'rgba(0,47,167,0.3)' : isHovered ? 'rgba(255,255,255,0.05)' : 'transparent',
@@ -478,6 +497,50 @@ export default function ChatPage() {
             )
           })}
         </nav>
+
+        {/* Long-press context menu (mobile) */}
+        {longPressMenu && (
+          <>
+            <div className="fixed inset-0 z-50" onClick={() => setLongPressMenu(null)} />
+            <div
+              className="fixed z-50 rounded-lg overflow-hidden shadow-lg"
+              style={{
+                left: Math.min(longPressMenu.x, window.innerWidth - 160),
+                top: Math.min(longPressMenu.y, window.innerHeight - 100),
+                width: 152,
+                background: '#1a2d5a',
+                border: '1px solid rgba(255,255,255,0.12)',
+              }}
+            >
+              <button
+                className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-left cursor-pointer"
+                style={{ color: '#c8d4e8' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.07)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                onClick={() => {
+                  setEditingId(longPressMenu.id)
+                  setEditingTitle(sessions.find(s => s.id === longPressMenu.id)?.title || '')
+                  setLongPressMenu(null)
+                }}
+              >
+                <span style={{ fontSize: 13 }}>✎</span> 重命名
+              </button>
+              <button
+                className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-left cursor-pointer"
+                style={{ color: 'rgba(220,100,100,0.9)', borderTop: '1px solid rgba(255,255,255,0.07)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.07)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                onClick={() => {
+                  const id = longPressMenu.id
+                  setLongPressMenu(null)
+                  if (window.confirm('确定要删除这个对话吗？')) deleteSession(id)
+                }}
+              >
+                <span style={{ fontSize: 13 }}>✕</span> 删除
+              </button>
+            </div>
+          </>
+        )}
 
         {/* Sidebar bottom */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
