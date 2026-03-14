@@ -217,6 +217,25 @@ export default function ChatPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<HTMLDivElement>(null)
+  const swipeStartX = useRef<number | null>(null)
+  const swipeStartY = useRef<number | null>(null)
+
+  // Swipe gesture: right-swipe to open sidebar, left-swipe to close
+  function onSwipeTouchStart(e: React.TouchEvent) {
+    swipeStartX.current = e.touches[0].clientX
+    swipeStartY.current = e.touches[0].clientY
+  }
+  function onSwipeTouchEnd(e: React.TouchEvent) {
+    if (swipeStartX.current === null || swipeStartY.current === null) return
+    const dx = e.changedTouches[0].clientX - swipeStartX.current
+    const dy = Math.abs(e.changedTouches[0].clientY - swipeStartY.current)
+    swipeStartX.current = null
+    swipeStartY.current = null
+    // Only horizontal swipes (dx > dy to avoid interfering with vertical scroll)
+    if (Math.abs(dx) < 40 || Math.abs(dx) < dy) return
+    if (dx > 0) setSidebarOpen(true)   // swipe right → open
+    else setSidebarOpen(false)          // swipe left → close
+  }
 
   function handleTouchStart(e: React.TouchEvent, sessionId: string) {
     const touch = e.touches[0]
@@ -342,7 +361,7 @@ export default function ChatPage() {
   const showWelcome = !isStreaming && !isLoadingMessages && (!Array.isArray(messages) || messages.length === 0)
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#fafbfd' }}>
+    <div className="flex overflow-hidden" style={{ background: '#fafbfd', height: '100dvh' }}>
 
       {/* ── Mobile overlay ── */}
       {sidebarOpen && (
@@ -359,7 +378,7 @@ export default function ChatPage() {
         style={{ width: 260, background: '#0a1a3a', color: '#c8d4e8' }}
       >
         {/* Sidebar top */}
-        <div className="px-4 py-4">
+        <div className="px-4 py-4" style={{ paddingTop: 'calc(16px + env(safe-area-inset-top))' }}>
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium select-none" style={{ letterSpacing: '0.15em' }}>
               ✦ REVERIE
@@ -568,12 +587,21 @@ export default function ChatPage() {
       </aside>
 
       {/* ── Chat area ── */}
-      <div className="flex flex-col flex-1 min-w-0 h-full">
+      <div
+        className="flex flex-col flex-1 min-w-0 h-full"
+        onTouchStart={onSwipeTouchStart}
+        onTouchEnd={onSwipeTouchEnd}
+      >
 
         {/* Top bar */}
         <header
           className="flex items-center justify-between flex-shrink-0 px-4 md:px-6"
-          style={{ height: 56, borderBottom: '1px solid #dde2ed', background: '#fafbfd' }}
+          style={{
+            height: 'calc(56px + env(safe-area-inset-top))',
+            paddingTop: 'env(safe-area-inset-top)',
+            borderBottom: '1px solid #dde2ed',
+            background: '#fafbfd',
+          }}
         >
           <div className="flex items-center gap-3">
             <button
