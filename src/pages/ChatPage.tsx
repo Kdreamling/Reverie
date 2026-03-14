@@ -211,9 +211,26 @@ export default function ChatPage() {
   const [editingTitle, setEditingTitle] = useState('')
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [input, setInput] = useState('')
+  const [keyboardOffset, setKeyboardOffset] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<HTMLDivElement>(null)
+
+  // iOS keyboard: listen to visualViewport resize to keep input above keyboard
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    function onResize() {
+      const offset = window.innerHeight - vv!.height - vv!.offsetTop
+      setKeyboardOffset(Math.max(0, offset))
+    }
+    vv.addEventListener('resize', onResize)
+    vv.addEventListener('scroll', onResize)
+    return () => {
+      vv.removeEventListener('resize', onResize)
+      vv.removeEventListener('scroll', onResize)
+    }
+  }, [])
 
   // Load sessions on mount
   useEffect(() => { if (token) fetchSessions() }, [token, fetchSessions])
@@ -584,7 +601,11 @@ export default function ChatPage() {
         </main>
 
         {/* Input area */}
-        <footer style={{ background: '#f2f4fa', borderTop: '1px solid #dde2ed' }}>
+        <footer style={{
+          background: '#f2f4fa',
+          borderTop: '1px solid #dde2ed',
+          paddingBottom: keyboardOffset > 0 ? keyboardOffset : 'env(safe-area-inset-bottom)',
+        }}>
           <div className="mx-auto px-3 md:px-6 py-4" style={{ maxWidth: 800 }}>
             <div
               className="flex items-end gap-3 rounded-xl px-4 py-3"
@@ -616,7 +637,7 @@ export default function ChatPage() {
                 <Send size={14} strokeWidth={2} />
               </button>
             </div>
-            <p className="text-center text-xs mt-2" style={{ color: '#aab2c8' }}>
+            <p className="hidden md:block text-center text-xs mt-2" style={{ color: '#aab2c8' }}>
               Press Enter to send · Shift+Enter for new line
             </p>
           </div>
