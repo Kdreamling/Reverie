@@ -227,14 +227,21 @@ export default function ChatPage() {
   }
   function onSwipeTouchEnd(e: React.TouchEvent) {
     if (swipeStartX.current === null || swipeStartY.current === null) return
-    const dx = e.changedTouches[0].clientX - swipeStartX.current
+    const startX = swipeStartX.current
+    const dx = e.changedTouches[0].clientX - startX
     const dy = Math.abs(e.changedTouches[0].clientY - swipeStartY.current)
     swipeStartX.current = null
     swipeStartY.current = null
-    // Only horizontal swipes (dx > dy to avoid interfering with vertical scroll)
+    // Only horizontal swipes (dx dominates vertical)
     if (Math.abs(dx) < 40 || Math.abs(dx) < dy) return
-    if (dx > 0) setSidebarOpen(true)   // swipe right → open
-    else setSidebarOpen(false)          // swipe left → close
+    if (dx > 0) {
+      // Open sidebar only if swipe started from left edge (≤60px), avoids iOS back gesture conflict
+      if (startX <= 60) setSidebarOpen(true)
+    } else {
+      // Left swipe: close settings if open, otherwise close sidebar
+      if (showSettings) setShowSettings(false)
+      else setSidebarOpen(false)
+    }
   }
 
   function handleTouchStart(e: React.TouchEvent, sessionId: string) {

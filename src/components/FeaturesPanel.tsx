@@ -58,8 +58,13 @@ export default function FeaturesPanel({ onBack }: Props) {
       {/* Header */}
       <button
         onClick={onBack}
-        className="flex items-center gap-2 px-4 py-4 w-full text-left transition-colors duration-150 cursor-pointer"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', color: '#c8d4e8' }}
+        className="flex items-center gap-2 px-4 w-full text-left transition-colors duration-150 cursor-pointer"
+        style={{
+          paddingTop: 'calc(16px + env(safe-area-inset-top))',
+          paddingBottom: 16,
+          borderBottom: '1px solid rgba(255,255,255,0.07)',
+          color: '#c8d4e8',
+        }}
         onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
       >
