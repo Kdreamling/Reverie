@@ -301,7 +301,11 @@ export default function ChatPage() {
   async function handleDeleteConv(conversationId: string) {
     setMsgMenu(null)
     if (!window.confirm('确定删除这轮对话吗？')) return
-    await deleteConversation(currentSession!.id, conversationId)
+    try {
+      await deleteConversation(currentSession!.id, conversationId)
+    } catch {
+      showToast('删除失败，请重试')
+    }
   }
 
   // iOS keyboard: listen to visualViewport resize to keep input above keyboard
@@ -320,11 +324,11 @@ export default function ChatPage() {
     }
   }, [])
 
-  // Auto-grow textarea
+  // Auto-grow textarea: collapse when unfocused, grow when focused
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
-    if (!input && !isFocused) {
+    if (!isFocused) {
       el.style.height = '22px'
       return
     }
@@ -357,14 +361,6 @@ export default function ChatPage() {
       clearMessages()
     }
   }, [currentSession?.id, loadMessages, clearMessages])
-
-  // Auto-resize textarea
-  useEffect(() => {
-    const el = textareaRef.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = Math.min(el.scrollHeight, 22 * 5 + 24) + 'px'
-  }, [input])
 
   // Scroll to bottom on new messages and during streaming
   useEffect(() => {
@@ -537,7 +533,7 @@ export default function ChatPage() {
                           onFocus={e => {
                             const el = e.currentTarget
                             // iOS auto-selects all on focus; override to place cursor at end
-                            setTimeout(() => el.setSelectionRange(el.value.length, el.value.length), 10)
+                            setTimeout(() => el.setSelectionRange(el.value.length, el.value.length), 20)
                           }}
                           value={editingTitle}
                           onChange={e => setEditingTitle(e.target.value)}
@@ -857,12 +853,11 @@ export default function ChatPage() {
 
         {/* Input area — unified Claude-style bubble */}
         <footer style={{
-          background: '#fafbfd',
           paddingBottom: keyboardOffset > 0 ? keyboardOffset : 'env(safe-area-inset-bottom)',
         }}>
           <div className="mx-auto px-3 md:px-6 py-3" style={{ maxWidth: 800 }}>
             <div
-              className={`flex gap-3 rounded-2xl px-4 transition-all duration-150 ${isFocused || input ? 'items-end py-3' : 'items-center py-2.5'}`}
+              className={`flex gap-3 px-4 transition-all duration-200 ${isFocused || input ? 'rounded-2xl items-end py-3' : 'rounded-full items-center py-2.5'}`}
               style={{
                 background: '#fff',
                 boxShadow: '0 1px 6px rgba(0,0,0,0.07)',
