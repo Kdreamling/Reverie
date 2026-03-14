@@ -4,6 +4,7 @@
 html, body {
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
+  background: #f2f4fa;
 }
 /* ── Markdown prose ─────────────────────────────────────────────────────────── */
 .md-content { line-height: 1.75; color: #1a1f2e; font-size: 0.875rem; }

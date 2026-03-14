@@ -204,6 +204,7 @@ export default function ChatPage() {
 
   const model = currentSession?.model ?? MODELS[0].value
   const [showSettings, setShowSettings] = useState(false)
+  const [settingsPage, setSettingsPage] = useState<'menu' | 'memory' | 'features' | 'debug'>('menu')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [longPressMenu, setLongPressMenu] = useState<{ id: string; x: number; y: number } | null>(null)
@@ -236,8 +237,10 @@ export default function ChatPage() {
       if (Math.abs(dx) < 40 || Math.abs(dx) < dy) return
       if (dx > 0 && startX <= 60) setSidebarOpen(true)
       else if (dx < 0) {
-        if (showSettings) setShowSettings(false)
-        else setSidebarOpen(false)
+        if (showSettings) {
+          if (settingsPage !== 'menu') setSettingsPage('menu')
+          else { setShowSettings(false); setSettingsPage('menu') }
+        } else setSidebarOpen(false)
       }
     }
     window.addEventListener('touchstart', onTouchStart, { passive: true })
@@ -588,11 +591,9 @@ export default function ChatPage() {
 
         {showSettings && (
           <SettingsPanel
-            onClose={() => setShowSettings(false)}
-            onNavigate={(page) => {
-              console.log('Navigate to:', page)
-              // TODO: 后续实现 Memory 和 Features 子面板
-            }}
+            page={settingsPage}
+            onPageChange={setSettingsPage}
+            onClose={() => { setShowSettings(false); setSettingsPage('menu') }}
           />
         )}
       </aside>
@@ -704,7 +705,40 @@ export default function ChatPage() {
           borderTop: '1px solid #dde2ed',
           paddingBottom: keyboardOffset > 0 ? keyboardOffset : 'env(safe-area-inset-bottom)',
         }}>
-          <div className="mx-auto px-3 md:px-6 py-4" style={{ maxWidth: 800 }}>
+          {/* Mobile: pill-style floating input */}
+          <div className="md:hidden px-3 pt-2 pb-1">
+            <div
+              className="flex items-end gap-2 rounded-3xl px-4 py-2.5 shadow-sm"
+              style={{ background: '#fff', border: '1px solid #dde2ed' }}
+            >
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                disabled={isStreaming || !currentSession}
+                placeholder={currentSession ? 'Message Reverie…' : '请先选择对话'}
+                rows={1}
+                className="flex-1 resize-none bg-transparent text-sm outline-none leading-relaxed disabled:opacity-40"
+                style={{ color: '#1a1f2e', minHeight: 22, maxHeight: 100, overflowY: 'auto', scrollbarWidth: 'none' }}
+              />
+              <button
+                onClick={handleSend}
+                disabled={isStreaming || !input.trim() || !currentSession}
+                className="flex-shrink-0 flex items-center justify-center rounded-full transition-colors duration-150 disabled:cursor-not-allowed"
+                style={{
+                  width: 30, height: 30, marginBottom: 1,
+                  background: input.trim() && !isStreaming ? '#002FA7' : '#e8ecf5',
+                  color: input.trim() && !isStreaming ? '#fff' : '#aab2c8',
+                }}
+              >
+                <Send size={13} strokeWidth={2} />
+              </button>
+            </div>
+          </div>
+
+          {/* Desktop: original full-width input */}
+          <div className="hidden md:block mx-auto px-6 py-4" style={{ maxWidth: 800 }}>
             <div
               className="flex items-end gap-3 rounded-xl px-4 py-3"
               style={{ background: '#fff', border: '1px solid #dde2ed' }}
@@ -735,7 +769,7 @@ export default function ChatPage() {
                 <Send size={14} strokeWidth={2} />
               </button>
             </div>
-            <p className="hidden md:block text-center text-xs mt-2" style={{ color: '#aab2c8' }}>
+            <p className="text-center text-xs mt-2" style={{ color: '#aab2c8' }}>
               Press Enter to send · Shift+Enter for new line
             </p>
           </div>

@@ -1,29 +1,30 @@
-import { useState } from 'react'
 import { ChevronLeft, Brain, Settings, LogOut, Bug } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import MemoryPanel from './MemoryPanel'
 import DebugPanel from './DebugPanel'
 import FeaturesPanel from './FeaturesPanel'
 
+type Page = 'menu' | 'memory' | 'features' | 'debug'
+
 interface Props {
+  page: Page
+  onPageChange: (page: Page) => void
   onClose: () => void
-  onNavigate: (page: string) => void
 }
 
-export default function SettingsPanel({ onClose, onNavigate }: Props) {
+export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
   const logout = useAuthStore(s => s.logout)
-  const [page, setPage] = useState<'menu' | 'memory' | 'features' | 'debug'>('menu')
 
   const menuItems = [
-    { key: 'memory', icon: Brain, label: 'Memory', desc: '查看和管理记忆' },
-    { key: 'features', icon: Settings, label: 'Features', desc: '功能开关' },
-    { key: 'debug', icon: Bug, label: 'Context Debug', desc: '查看注入给 AI 的上下文' },
+    { key: 'memory' as Page, icon: Brain, label: 'Memory', desc: '查看和管理记忆' },
+    { key: 'features' as Page, icon: Settings, label: 'Features', desc: '功能开关' },
+    { key: 'debug' as Page, icon: Bug, label: 'Context Debug', desc: '查看注入给 AI 的上下文' },
   ]
 
   if (page === 'memory') {
     return (
       <div className="fixed md:absolute inset-0 z-50 md:z-10">
-        <MemoryPanel onBack={() => setPage('menu')} />
+        <MemoryPanel onBack={() => onPageChange('menu')} />
       </div>
     )
   }
@@ -31,7 +32,7 @@ export default function SettingsPanel({ onClose, onNavigate }: Props) {
   if (page === 'features') {
     return (
       <div className="fixed md:absolute inset-0 z-50 md:z-10">
-        <FeaturesPanel onBack={() => setPage('menu')} />
+        <FeaturesPanel onBack={() => onPageChange('menu')} />
       </div>
     )
   }
@@ -39,7 +40,7 @@ export default function SettingsPanel({ onClose, onNavigate }: Props) {
   if (page === 'debug') {
     return (
       <div className="fixed md:absolute inset-0 z-50 md:z-10">
-        <DebugPanel onBack={() => setPage('menu')} />
+        <DebugPanel onBack={() => onPageChange('menu')} />
       </div>
     )
   }
@@ -73,12 +74,7 @@ export default function SettingsPanel({ onClose, onNavigate }: Props) {
         {menuItems.map(item => (
           <button
             key={item.key}
-            onClick={() => {
-              if (item.key === 'memory') setPage('memory')
-              else if (item.key === 'features') setPage('features')
-              else if (item.key === 'debug') setPage('debug')
-              else onNavigate(item.key)
-            }}
+            onClick={() => onPageChange(item.key)}
             className="flex items-center gap-3 w-full px-3 py-3 rounded-lg transition-colors duration-150 cursor-pointer text-left"
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
