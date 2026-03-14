@@ -833,9 +833,7 @@ export default function ChatPage() {
             <div
               className={`flex gap-3 px-4 transition-all duration-200 ${isFocused || input ? 'rounded-2xl items-end py-3' : 'rounded-full items-center py-2.5'}`}
               style={{
-                background: 'rgba(255,255,255,0.85)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
+                background: '#fff',
                 boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
                 border: '1px solid rgba(0,0,0,0.06)',
               }}

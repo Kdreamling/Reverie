@@ -114,9 +114,23 @@
 - `main.py` 改为 `from config import FEATURE_FLAGS`，删除本地定义，统一单一数据源
 - 同步修复：`_reverie_store` 加入 `memory_enabled` 早返回守卫
 
+### Bug Fix 轮次 · v2.7–v2.8（Mobile Bugfix Round 4）
+- html/body/root 全部 `position: fixed; overflow: hidden; height: 100%`，锁死 iOS 视口防止整页滑动
+- body `touch-action: none` 防止 iOS PWA 触摸输入时界面挪动
+- 侧边栏会话标题添加 `-webkit-user-select: none` 防止 iOS 长按触发原生文字选择
+- 侧边栏 / 根容器高度统一改为 `height: 100%`（继承 fixed html/body）
+- 输入框 footer 改为 `position: absolute; bottom: 0`，背景透明，Claude 风格浮动气泡
+- footer 上方 32px 线性渐变淡出（transparent → #fafbfd），消除硬边界
+- Bug 3 修复：`closingSidebarRef` 防止 onBlur 竞态，仅在打开侧边栏时重置
+- Git tags：`v2.7-mobile-bugfix-4.2`, `v2.8-mobile-bugfix-4.3`
+
 ---
 
 ## 未完成 / 待处理
+
+### iOS 重命名会话仍有全选问题
+- 已尝试 3 轮修复（autoFocus + 空 value + placeholder 等），iOS 行为不一致
+- 暂搁置，后续可考虑换方案：自定义 modal 弹窗替代 inline input，或 contentEditable div
 
 ### 语义检索优化（`search_enabled`）
 - 当前默认关闭，噪点过多
