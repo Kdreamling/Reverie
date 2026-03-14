@@ -243,7 +243,7 @@ export default function ChatPage() {
       swipeStartX.current = null
       swipeStartY.current = null
       if (Math.abs(dx) < 40 || Math.abs(dx) < dy) return
-      if (dx > 0 && startX <= 60) setSidebarOpen(true)
+      if (dx > 0 && startX <= 60) { setSidebarOpen(true); setEditingId(null); setEditingTitle('') }
       else if (dx < 0) {
         if (showSettings) {
           if (settingsPage !== 'menu') setSettingsPage('menu')
@@ -521,8 +521,15 @@ export default function ChatPage() {
                     >
                       {editingId === session.id ? (
                         <input
-                          ref={editInputRef}
-                          autoFocus
+                          ref={el => {
+                            (editInputRef as React.MutableRefObject<HTMLInputElement | null>).current = el
+                            if (el) {
+                              requestAnimationFrame(() => {
+                                el.focus({ preventScroll: true })
+                                el.selectionStart = el.selectionEnd = el.value.length
+                              })
+                            }
+                          }}
                           value={editingTitle}
                           onChange={e => setEditingTitle(e.target.value)}
                           onKeyDown={e => {
@@ -656,7 +663,7 @@ export default function ChatPage() {
             <button
               className="flex md:hidden items-center justify-center rounded-md cursor-pointer"
               style={{ width: 32, height: 32, color: '#7a8399' }}
-              onClick={() => setSidebarOpen(true)}
+              onClick={() => { setSidebarOpen(true); setEditingId(null); setEditingTitle('') }}
             >
               <Menu size={18} strokeWidth={1.8} />
             </button>

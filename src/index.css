@@ -1,10 +1,10 @@
 @import "tailwindcss";
 @import "highlight.js/styles/github.css";
 
-html, body {
+html, body, #root {
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
-  background: #fafbfd;
+  background: #fafbfd !important;
 }
 /* ── Markdown prose ─────────────────────────────────────────────────────────── */
 .md-content { line-height: 1.75; color: #1a1f2e; font-size: 0.875rem; }
