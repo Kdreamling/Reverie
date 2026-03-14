@@ -244,12 +244,12 @@ export default function ChatPage() {
       swipeStartX.current = null
       swipeStartY.current = null
       if (Math.abs(dx) < 40 || Math.abs(dx) < dy) return
-      if (dx > 0 && startX <= 60) { setSidebarOpen(true); setEditingId(null); setEditingTitle('') }
+      if (dx > 0 && startX <= 60) { closingSidebarRef.current = false; setSidebarOpen(true); setEditingId(null); setEditingTitle('') }
       else if (dx < 0) {
         if (showSettings) {
           if (settingsPage !== 'menu') setSettingsPage('menu')
           else { setShowSettings(false); setSettingsPage('menu') }
-        } else { closingSidebarRef.current = true; setSidebarOpen(false); setTimeout(() => closingSidebarRef.current = false, 100) }
+        } else { closingSidebarRef.current = true; setSidebarOpen(false); setEditingId(null); setEditingTitle('') }
         setEditingId(null)
         setEditingTitle('')
       }
@@ -423,7 +423,7 @@ export default function ChatPage() {
         <div
           className="fixed inset-0 z-30 md:hidden"
           style={{ background: 'rgba(0,0,0,0.5)' }}
-          onClick={() => { closingSidebarRef.current = true; setSidebarOpen(false); setEditingId(null); setEditingTitle(''); setTimeout(() => closingSidebarRef.current = false, 100) }}
+          onClick={() => { closingSidebarRef.current = true; setSidebarOpen(false); setEditingId(null); setEditingTitle('') }}
         />
       )}
 
@@ -508,7 +508,7 @@ export default function ChatPage() {
                   return (
                     <button
                       key={session.id}
-                      onClick={() => { selectSession(session.id); closingSidebarRef.current = true; setSidebarOpen(false); setEditingId(null); setEditingTitle(''); setTimeout(() => closingSidebarRef.current = false, 100) }}
+                      onClick={() => { selectSession(session.id); closingSidebarRef.current = true; setSidebarOpen(false); setEditingId(null); setEditingTitle('') }}
                       onMouseEnter={() => setHoveredId(session.id)}
                       onMouseLeave={() => setHoveredId(null)}
                       onTouchStart={e => handleTouchStart(e, session.id)}
@@ -665,7 +665,7 @@ export default function ChatPage() {
             <button
               className="flex md:hidden items-center justify-center rounded-md cursor-pointer"
               style={{ width: 32, height: 32, color: '#7a8399' }}
-              onClick={() => { setSidebarOpen(true); setEditingId(null); setEditingTitle('') }}
+              onClick={() => { closingSidebarRef.current = false; setSidebarOpen(true); setEditingId(null); setEditingTitle('') }}
             >
               <Menu size={18} strokeWidth={1.8} />
             </button>
@@ -818,19 +818,26 @@ export default function ChatPage() {
           </div>
         )}
 
-        {/* Input area — unified Claude-style bubble */}
-        {/* Bug 1: no background on footer; chat area div has explicit #fafbfd */}
+        {/* Input area — Claude-style floating bubble with gradient fade */}
         <footer className="absolute bottom-0 left-0 right-0 z-10" style={{
-          background: 'transparent',
           paddingBottom: keyboardOffset > 0 ? `${keyboardOffset}px` : 'env(safe-area-inset-bottom)',
         }}>
-          <div className="mx-auto px-3 md:px-6 py-3" style={{ maxWidth: 800 }}>
+          {/* Gradient fade from transparent to page background */}
+          <div style={{
+            height: 32,
+            background: 'linear-gradient(to bottom, rgba(250,251,253,0), rgba(250,251,253,1))',
+            pointerEvents: 'none',
+          }} />
+          <div style={{ background: '#fafbfd' }}>
+          <div className="mx-auto px-3 md:px-6 pt-1 pb-3" style={{ maxWidth: 800 }}>
             <div
               className={`flex gap-3 px-4 transition-all duration-200 ${isFocused || input ? 'rounded-2xl items-end py-3' : 'rounded-full items-center py-2.5'}`}
               style={{
-                background: '#fff',
-                boxShadow: '0 1px 6px rgba(0,0,0,0.07)',
-                border: '1px solid rgba(0,0,0,0.07)',
+                background: 'rgba(255,255,255,0.85)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+                border: '1px solid rgba(0,0,0,0.06)',
               }}
             >
               <textarea
@@ -864,6 +871,7 @@ export default function ChatPage() {
             <p className="hidden md:block text-center text-xs mt-2" style={{ color: '#aab2c8' }}>
               Press Enter to send · Shift+Enter for new line
             </p>
+          </div>
           </div>
         </footer>
 
