@@ -414,7 +414,7 @@ export default function ChatPage() {
   const showWelcome = !isStreaming && !isLoadingMessages && (!Array.isArray(messages) || messages.length === 0)
 
   return (
-    <div className="flex overflow-hidden" style={{ background: '#fafbfd', height: '100dvh', overscrollBehavior: 'none' }}>
+    <div className="flex overflow-hidden" style={{ background: '#fafbfd', height: 'calc(100dvh + env(safe-area-inset-bottom, 0px))', overscrollBehavior: 'none' }}>
 
       {/* ── Mobile overlay ── */}
       {sidebarOpen && (
@@ -428,7 +428,7 @@ export default function ChatPage() {
       {/* ── Sidebar ── */}
       <aside
         className={`fixed md:relative left-0 top-0 z-40 md:z-auto flex flex-col flex-shrink-0 transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
-        style={{ width: 260, height: '100dvh', background: '#0a1a3a', color: '#c8d4e8' }}
+        style={{ width: 260, height: 'calc(100dvh + env(safe-area-inset-bottom, 0px))', background: '#0a1a3a', color: '#c8d4e8' }}
       >
         {/* Sidebar top */}
         <div className="px-4 py-4" style={{ paddingTop: 'calc(16px + env(safe-area-inset-top))' }}>
@@ -512,7 +512,7 @@ export default function ChatPage() {
                       onTouchStart={e => handleTouchStart(e, session.id)}
                       onTouchEnd={handleTouchEnd}
                       onTouchMove={handleTouchEnd}
-                      className="relative w-full text-left rounded-md px-3 py-2.5 mb-0.5 transition-colors duration-150 cursor-pointer"
+                      className="relative w-full text-left rounded-md px-3 py-2.5 mb-0.5 transition-colors duration-150 cursor-pointer select-none"
                       style={{
                         background: isActive ? 'rgba(0,47,167,0.3)' : isHovered ? 'rgba(255,255,255,0.05)' : 'transparent',
                         borderLeft: isActive ? '2px solid #002FA7' : '2px solid transparent',
