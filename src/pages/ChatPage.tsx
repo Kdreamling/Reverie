@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
+import type { MemoryOperation } from '../api/chat'
 import { useAuthStore } from '../stores/authStore'
 import { updateSessionAPI } from '../api/sessions'
 import SettingsPanel from '../components/SettingsPanel'
@@ -20,6 +21,7 @@ const MODELS: { value: string; label: string }[] = [
   { value: 'deepseek-chat', label: 'DeepSeek Chat' },
   { value: 'deepseek-reasoner', label: 'DeepSeek Reasoner' },
   { value: '[0.1]claude-opus-4-6-thinking', label: 'Claude Opus 4.6' },
+  { value: '[按量]claude-opus-4-6-thinking', label: 'Claude Opus 4.6 (按量)' },
   { value: 'anthropic/claude-opus-4.6', label: 'Claude Opus (OR)' },
 ]
 
@@ -62,6 +64,47 @@ function MemoryRefBlock({ query, found, content }: { query: string; found: numbe
         <p className="px-3 pb-3 text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#7a8399' }}>
           {content || '（无内容）'}
         </p>
+      )}
+    </div>
+  )
+}
+
+function MemoryOpsBlock({ ops }: { ops: MemoryOperation[] }) {
+  const [open, setOpen] = useState(false)
+  const labels: Record<string, string> = { saved: '记录', updated: '更新', deleted: '删除' }
+  const colors: Record<string, string> = { saved: '#16a34a', updated: '#ca8a04', deleted: '#dc2626' }
+  return (
+    <div
+      className="mb-4 rounded-md overflow-hidden"
+      style={{ borderLeft: '3px solid rgba(22,163,74,0.4)', background: 'rgba(22,163,74,0.04)' }}
+    >
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 w-full px-3 py-2 text-left cursor-pointer"
+        style={{ color: 'rgba(22,163,74,0.7)' }}
+      >
+        {open
+          ? <ChevronDown size={13} strokeWidth={2} />
+          : <ChevronRight size={13} strokeWidth={2} />
+        }
+        <span className="text-xs font-medium tracking-wide">
+          记忆操作 · {ops.length} 条
+        </span>
+      </button>
+      {open && (
+        <div className="px-3 pb-3 space-y-1.5">
+          {ops.map((op, i) => (
+            <div key={i} className="flex items-start gap-2 text-xs" style={{ color: '#555' }}>
+              <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-white" style={{ background: colors[op.type], fontSize: 10 }}>
+                {labels[op.type]}
+              </span>
+              <span className="leading-relaxed">
+                {op.type === 'deleted' ? `ID: ${op.memory_id?.slice(0, 8)}... ${op.reason ? `(${op.reason})` : ''}` : (op.content || '（内容为空）')}
+                {op.mem_type && <span style={{ color: '#999' }}> [{op.mem_type}]</span>}
+              </span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )
@@ -198,7 +241,7 @@ function WelcomeScreen({ onSelectScene, currentScene }: { onSelectScene: (scene:
 export default function ChatPage() {
   const { sessions, currentSession, loading, fetchSessions, createSession, selectSession, deleteSession, updateSessionModel } =
     useSessionStore()
-  const { messages, isStreaming, currentThinking, currentText, isSearchingMemory, searchingQuery, loadMessages, sendMessage, clearMessages, deleteConversation, lastError, retryLast, clearError } =
+  const { messages, isStreaming, currentThinking, currentText, isSearchingMemory, searchingQuery, pendingMemoryOps, loadMessages, sendMessage, clearMessages, deleteConversation, lastError, retryLast, clearError } =
     useChatStore()
   const { token } = useAuthStore()
 
@@ -735,6 +778,9 @@ export default function ChatPage() {
                     {msg.role === 'assistant' && msg.memoryRef && (
                       <MemoryRefBlock query={msg.memoryRef.query} found={msg.memoryRef.found} content={msg.memoryRef.content} />
                     )}
+                    {msg.role === 'assistant' && msg.memoryOps && msg.memoryOps.length > 0 && (
+                      <MemoryOpsBlock ops={msg.memoryOps} />
+                    )}
                     {msg.role === 'assistant' ? (
                       <MarkdownContent content={msg.content} />
                     ) : (
@@ -816,14 +862,15 @@ export default function ChatPage() {
               )}
 
               {/* Live streaming row */}
-              {isStreaming && (currentThinking || currentText) && (
+              {isStreaming && (currentThinking || currentText || pendingMemoryOps.length > 0) && (
                 <div className="flex gap-3 mb-8">
                   <AiAvatar />
                   <div className="flex-1 min-w-0 pt-0.5">
                     {currentThinking && <ThinkingBlock text={currentThinking} defaultOpen={true} />}
+                    {pendingMemoryOps.length > 0 && <MemoryOpsBlock ops={pendingMemoryOps} />}
                     {currentText ? (
                       <MarkdownContent content={currentText} />
-                    ) : !currentThinking && (
+                    ) : !currentThinking && pendingMemoryOps.length === 0 && (
                       <span
                         className="inline-block rounded-full"
                         style={{ width: 6, height: 6, background: '#002FA7', opacity: 0.5, animation: 'blink 1s ease-in-out infinite' }}
