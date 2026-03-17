@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, KeyboardEvent } from 'react'
-import { Plus, Settings, ArrowUp, ChevronDown, ChevronRight, X, Menu, Copy, Trash2, Check } from 'lucide-react'
+import { Plus, Settings, ArrowUp, ChevronDown, ChevronRight, X, Menu, Copy, Trash2, Check, RotateCcw, Brain } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
@@ -8,6 +8,7 @@ import type { MemoryOperation } from '../api/chat'
 import { useAuthStore } from '../stores/authStore'
 import { updateSessionAPI } from '../api/sessions'
 import SettingsPanel from '../components/SettingsPanel'
+import ContextDebugPanel from '../components/ContextDebugPanel'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -38,30 +39,63 @@ const WELCOME_MESSAGES = [
   'Stay a little longer in this dream with me.',
 ]
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatMsgTime(iso: string) {
+  const d = new Date(iso)
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  return `${month}/${day} ${time}`
+}
+
+function getModelColor(value: string): string {
+  const v = value.toLowerCase()
+  if (v.includes('claude') || v.includes('opus') || v.includes('sonnet')) return '#002FA7'
+  if (v.includes('deepseek')) return '#22c55e'
+  return '#f59e0b'
+}
+
+function formatElapsed(seconds: number): string {
+  return seconds.toFixed(1) + 's'
+}
+
+/** Hook: returns a live elapsed-seconds value that ticks every 100ms while startTime is set */
+function useElapsedTimer(startTime: number | null): number {
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    if (!startTime) { setElapsed(0); return }
+    setElapsed((Date.now() - startTime) / 1000)
+    const id = setInterval(() => setElapsed((Date.now() - startTime) / 1000), 100)
+    return () => clearInterval(id)
+  }, [startTime])
+  return elapsed
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function MemoryRefBlock({ query, found, content }: { query: string; found: number; content: string }) {
+function MemoryRefBlock({ query, found, content, elapsed }: { query: string; found: number; content: string; elapsed?: number | null }) {
   const [open, setOpen] = useState(false)
+  const isActive = found === undefined || found === null  // still searching
   return (
     <div
-      className="mb-4 rounded-md overflow-hidden"
-      style={{ borderLeft: '3px solid rgba(0,47,167,0.35)', background: 'rgba(0,47,167,0.04)' }}
+      className="mb-3 rounded-xl overflow-hidden"
+      style={{ background: 'rgba(0,47,167,0.05)' }}
     >
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1.5 w-full px-3 py-2 text-left cursor-pointer"
-        style={{ color: 'rgba(0,47,167,0.6)' }}
+        className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer"
+        style={{ color: '#5a6a8a' }}
       >
-        {open
-          ? <ChevronDown size={13} strokeWidth={2} />
-          : <ChevronRight size={13} strokeWidth={2} />
-        }
-        <span className="text-xs font-medium tracking-wide">
-          搜索记忆「{query}」· 找到 {found} 条
+        {isActive ? <span className="tool-spinner" /> : <span style={{ fontSize: 11 }}>◎</span>}
+        <span className="text-xs font-medium">
+          Memory search「{query}」{found != null && ` · found ${found}`}
+          {elapsed != null && <span style={{ color: '#8a9ab5', marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
         </span>
+        {!isActive && (open ? <ChevronDown size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} />)}
       </button>
-      {open && (
-        <p className="px-3 pb-3 text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#7a8399' }}>
+      {open && content && (
+        <p className="px-3.5 pb-2.5 text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#8a9ab5' }}>
           {content || '（无内容）'}
         </p>
       )}
@@ -69,38 +103,37 @@ function MemoryRefBlock({ query, found, content }: { query: string; found: numbe
   )
 }
 
-function MemoryOpsBlock({ ops }: { ops: MemoryOperation[] }) {
+function MemoryOpsBlock({ ops, elapsed }: { ops: MemoryOperation[]; elapsed?: number | null }) {
   const [open, setOpen] = useState(false)
-  const labels: Record<string, string> = { saved: '记录', updated: '更新', deleted: '删除' }
-  const colors: Record<string, string> = { saved: '#16a34a', updated: '#ca8a04', deleted: '#dc2626' }
+  const symbols: Record<string, string> = { saved: '◉', updated: '◎', deleted: '⊗' }
+  const labels: Record<string, string> = { saved: 'saved', updated: 'updated', deleted: 'deleted' }
+  const colors: Record<string, string> = { saved: '#5a6a8a', updated: '#5a6a8a', deleted: '#c05050' }
   return (
     <div
-      className="mb-4 rounded-md overflow-hidden"
-      style={{ borderLeft: '3px solid rgba(22,163,74,0.4)', background: 'rgba(22,163,74,0.04)' }}
+      className="mb-3 rounded-xl overflow-hidden"
+      style={{ background: 'rgba(0,47,167,0.05)' }}
     >
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1.5 w-full px-3 py-2 text-left cursor-pointer"
-        style={{ color: 'rgba(22,163,74,0.7)' }}
+        className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer"
+        style={{ color: '#5a6a8a' }}
       >
-        {open
-          ? <ChevronDown size={13} strokeWidth={2} />
-          : <ChevronRight size={13} strokeWidth={2} />
-        }
-        <span className="text-xs font-medium tracking-wide">
-          记忆操作 · {ops.length} 条
+        <span style={{ fontSize: 11 }}>◑</span>
+        <span className="text-xs font-medium">
+          Memory ops · {ops.length}
+          {elapsed != null && <span style={{ color: '#8a9ab5', marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
         </span>
+        {open ? <ChevronDown size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} />}
       </button>
       {open && (
-        <div className="px-3 pb-3 space-y-1.5">
+        <div className="px-3.5 pb-2.5 space-y-1.5">
           {ops.map((op, i) => (
-            <div key={i} className="flex items-start gap-2 text-xs" style={{ color: '#555' }}>
-              <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-white" style={{ background: colors[op.type], fontSize: 10 }}>
-                {labels[op.type]}
+            <div key={i} className="flex items-start gap-2 text-xs" style={{ color: '#5a6a8a' }}>
+              <span className="flex-shrink-0" style={{ color: colors[op.type], fontSize: 10 }}>
+                {symbols[op.type]} {labels[op.type]}
               </span>
-              <span className="leading-relaxed">
+              <span className="leading-relaxed" style={{ color: '#8a9ab5' }}>
                 {op.type === 'deleted' ? `ID: ${op.memory_id?.slice(0, 8)}... ${op.reason ? `(${op.reason})` : ''}` : (op.content || '（内容为空）')}
-                {op.mem_type && <span style={{ color: '#999' }}> [{op.mem_type}]</span>}
               </span>
             </div>
           ))}
@@ -110,26 +143,29 @@ function MemoryOpsBlock({ ops }: { ops: MemoryOperation[] }) {
   )
 }
 
-function ThinkingBlock({ text, defaultOpen = false }: { text: string; defaultOpen?: boolean }) {
+function ThinkingBlock({ text, defaultOpen = false, thinkingTime, liveElapsed }: { text: string; defaultOpen?: boolean; thinkingTime?: number | null; liveElapsed?: number }) {
   const [open, setOpen] = useState(defaultOpen)
+  const isActive = liveElapsed != null && liveElapsed > 0 && !thinkingTime
+  const displayTime = thinkingTime ?? liveElapsed
   return (
     <div
-      className="mb-4 rounded-md overflow-hidden"
-      style={{ borderLeft: '3px solid #002FA7', background: '#f0f3fa' }}
+      className="mb-3 rounded-xl overflow-hidden"
+      style={{ background: 'rgba(0,47,167,0.05)' }}
     >
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1.5 w-full px-3 py-2 text-left cursor-pointer"
-        style={{ color: '#002FA7' }}
+        className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer"
+        style={{ color: '#5a6a8a' }}
       >
-        {open
-          ? <ChevronDown size={13} strokeWidth={2} />
-          : <ChevronRight size={13} strokeWidth={2} />
-        }
-        <span className="text-xs font-medium tracking-wide">Thinking</span>
+        {isActive ? <span className="tool-spinner" /> : <span style={{ fontSize: 11 }}>⊘</span>}
+        <span className="text-xs font-medium">
+          Thinking
+          {displayTime != null && displayTime > 0 && <span style={{ color: '#8a9ab5', marginLeft: 4 }}>({formatElapsed(displayTime)})</span>}
+        </span>
+        {open ? <ChevronDown size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} />}
       </button>
       {open && (
-        <p className="px-3 pb-3 text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#7a8399' }}>
+        <p className="px-3.5 pb-2.5 text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#8a9ab5' }}>
           {text}
         </p>
       )}
@@ -241,7 +277,7 @@ function WelcomeScreen({ onSelectScene, currentScene }: { onSelectScene: (scene:
 export default function ChatPage() {
   const { sessions, currentSession, loading, fetchSessions, createSession, selectSession, deleteSession, updateSessionModel } =
     useSessionStore()
-  const { messages, isStreaming, currentThinking, currentText, isSearchingMemory, searchingQuery, pendingMemoryOps, loadMessages, sendMessage, clearMessages, deleteConversation, lastError, retryLast, clearError } =
+  const { messages, isStreaming, loadMessages, sendMessage, clearMessages, deleteConversation, lastError, retryLast, clearError, thinkingStartTime, toolStartTime, streamBlocks } =
     useChatStore()
   const { token } = useAuthStore()
 
@@ -252,6 +288,7 @@ export default function ChatPage() {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   // Message copy state
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null)
+  const [debugOpenMsgId, setDebugOpenMsgId] = useState<string | null>(null)
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Toast
   const [toast, setToast] = useState<string | null>(null)
@@ -265,6 +302,8 @@ export default function ChatPage() {
   const [input, setInput] = useState('')
   const [isFocused, setIsFocused] = useState(false)
   const [keyboardOffset, setKeyboardOffset] = useState(0)
+  const [showModelDropdown, setShowModelDropdown] = useState(false)
+  const modelDropdownRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<HTMLDivElement>(null)
@@ -410,6 +449,22 @@ export default function ChatPage() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showSceneSelect])
+
+  // Click outside to close model dropdown
+  useEffect(() => {
+    if (!showModelDropdown) return
+    function handleClickOutside(e: MouseEvent) {
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(e.target as Node)) {
+        setShowModelDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showModelDropdown])
+
+  // Live elapsed timers
+  const liveThinkingElapsed = useElapsedTimer(thinkingStartTime)
+  const liveToolElapsed = useElapsedTimer(toolStartTime)
 
   // When active session changes: load its messages
   useEffect(() => {
@@ -726,38 +781,96 @@ export default function ChatPage() {
       </aside>
 
       {/* ── Chat area ── */}
-      <div className="flex flex-col flex-1 min-w-0 h-full" style={{ background: '#fafbfd' }}>
+      <div className="flex flex-col flex-1 min-w-0 h-full" style={{ background: 'linear-gradient(180deg, #f5f7fc 0%, #f0f2f9 35%, #edf0f8 65%, #f2f4fa 100%)' }}>
 
         {/* Top bar */}
         <header
-          className="flex items-center justify-between flex-shrink-0 px-4 md:px-6"
+          className="chat-header flex items-center justify-between flex-shrink-0 px-4 md:px-6"
           style={{
             height: 'calc(56px + env(safe-area-inset-top))',
             paddingTop: 'env(safe-area-inset-top)',
-            borderBottom: '1px solid #dde2ed',
-            background: '#fafbfd',
+            background: 'transparent',
           }}
         >
-          <div className="flex items-center gap-3">
-            <button
-              className="flex md:hidden items-center justify-center rounded-md cursor-pointer"
-              style={{ width: 32, height: 32, color: '#7a8399' }}
-              onClick={() => { setSidebarOpen(true) }}
-            >
-              <Menu size={18} strokeWidth={1.8} />
-            </button>
-            <span className="text-sm font-medium" style={{ color: '#1a1f2e' }}>
-              {MODELS.find(m => m.value === model)?.label ?? model}
-            </span>
-          </div>
-          <select
-            value={model}
-            onChange={e => handleModelChange(e.target.value)}
-            className="text-xs rounded-md px-2.5 py-1.5 outline-none cursor-pointer"
-            style={{ border: '1px solid #dde2ed', color: '#7a8399', background: '#fff' }}
+          {/* Left: hamburger */}
+          <button
+            className="flex md:hidden items-center justify-center rounded-md cursor-pointer"
+            style={{ width: 32, height: 32, color: '#7a8399' }}
+            onClick={() => { setSidebarOpen(true) }}
           >
-            {MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
+            <Menu size={18} strokeWidth={1.8} />
+          </button>
+          <div className="hidden md:block" style={{ width: 32 }} />
+
+          {/* Center: model selector */}
+          <div className="relative" ref={modelDropdownRef}>
+            <button
+              onClick={() => setShowModelDropdown(o => !o)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full cursor-pointer transition-colors"
+              style={{
+                background: showModelDropdown ? 'rgba(0,0,0,0.05)' : 'transparent',
+                color: '#1a1f2e',
+              }}
+            >
+              <span
+                className="rounded-full flex-shrink-0"
+                style={{ width: 7, height: 7, background: getModelColor(model) }}
+              />
+              <span className="text-sm font-medium">
+                {MODELS.find(m => m.value === model)?.label ?? model}
+              </span>
+              <ChevronDown size={13} strokeWidth={2} style={{ color: '#9ca3af' }} />
+            </button>
+
+            {showModelDropdown && (
+              <div
+                className="absolute top-full mt-1 left-1/2 rounded-xl shadow-lg overflow-hidden"
+                style={{
+                  transform: 'translateX(-50%)',
+                  minWidth: 200,
+                  background: '#fff',
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  zIndex: 50,
+                }}
+              >
+                {MODELS.map(m => (
+                  <button
+                    key={m.value}
+                    onClick={() => { handleModelChange(m.value); setShowModelDropdown(false) }}
+                    className="flex items-center gap-2.5 w-full px-4 py-2.5 text-left text-sm transition-colors cursor-pointer"
+                    style={{
+                      color: m.value === model ? '#1a1f2e' : '#5a6a8a',
+                      background: m.value === model ? 'rgba(0,47,167,0.06)' : 'transparent',
+                      fontWeight: m.value === model ? 500 : 400,
+                    }}
+                    onMouseEnter={e => { if (m.value !== model) e.currentTarget.style.background = 'rgba(0,0,0,0.03)' }}
+                    onMouseLeave={e => { if (m.value !== model) e.currentTarget.style.background = 'transparent' }}
+                  >
+                    <span
+                      className="rounded-full flex-shrink-0"
+                      style={{ width: 7, height: 7, background: getModelColor(m.value) }}
+                    />
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Right: new chat */}
+          <button
+            onClick={() => {
+              const scene = currentSession?.scene_type || 'daily'
+              handleCreateWithScene(scene)
+            }}
+            className="flex items-center justify-center rounded-md cursor-pointer transition-colors"
+            style={{ width: 32, height: 32, color: '#7a8399' }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#1a1f2e')}
+            onMouseLeave={e => (e.currentTarget.style.color = '#7a8399')}
+            title="New chat"
+          >
+            <Plus size={18} strokeWidth={1.8} />
+          </button>
         </header>
 
         {/* Messages */}
@@ -773,7 +886,7 @@ export default function ChatPage() {
                   {msg.role === 'user' ? <UserAvatar /> : <AiAvatar />}
                   <div className="flex-1 min-w-0 pt-0.5">
                     {msg.role === 'assistant' && (msg.thinking || msg.thinking_summary) && (
-                      <ThinkingBlock text={(msg.thinking ?? msg.thinking_summary)!} />
+                      <ThinkingBlock text={(msg.thinking ?? msg.thinking_summary)!} thinkingTime={msg.thinkingTime} />
                     )}
                     {msg.role === 'assistant' && msg.memoryRef && (
                       <MemoryRefBlock query={msg.memoryRef.query} found={msg.memoryRef.found} content={msg.memoryRef.content} />
@@ -788,94 +901,163 @@ export default function ChatPage() {
                         {msg.content}
                       </p>
                     )}
-                    {/* Inline action icons */}
-                    <div className={`flex items-center gap-3 mt-1.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <button
-                        onClick={() => handleCopyMsg(msg.id, msg.content)}
-                        className="flex items-center justify-center transition-colors cursor-pointer"
-                        style={{ color: copiedMsgId === msg.id ? '#22c55e' : '#c0c8d8' }}
-                        title="复制"
-                      >
-                        {copiedMsgId === msg.id
-                          ? <Check size={15} strokeWidth={2} />
-                          : <Copy size={15} strokeWidth={1.8} />
-                        }
-                      </button>
-                      {msg.conversationId && (
-                        <button
-                          onClick={() => handleDeleteConv(msg.conversationId!)}
-                          className="flex items-center justify-center transition-colors cursor-pointer"
-                          style={{ color: '#c0c8d8' }}
-                          onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
-                          onMouseLeave={e => (e.currentTarget.style.color = '#c0c8d8')}
-                          title="删除"
-                        >
-                          <Trash2 size={15} strokeWidth={1.8} />
-                        </button>
+                    {/* Action row: time/tokens on one side, buttons on other */}
+                    <div className="flex items-center justify-between mt-1.5" style={{ minHeight: 24 }}>
+                      {msg.role === 'assistant' ? (
+                        <>
+                          <span className="flex items-center gap-1 text-xs" style={{ color: '#b0b8c8', fontSize: 11 }}>
+                            {formatMsgTime(msg.created_at)}
+                            {msg.tokens && (
+                              <>
+                                <span style={{ margin: '0 2px' }}>·</span>
+                                <span>⏱</span>
+                                <span>{msg.tokens.input.toLocaleString()} in</span>
+                                <span style={{ margin: '0 2px' }}>·</span>
+                                <span>{msg.tokens.output.toLocaleString()} out</span>
+                              </>
+                            )}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            {msg.debugInfo && (
+                              <button onClick={() => setDebugOpenMsgId(debugOpenMsgId === msg.id ? null : msg.id)} className="flex items-center justify-center transition-colors cursor-pointer" style={{ color: debugOpenMsgId === msg.id ? '#002FA7' : '#c0c8d8' }} onMouseEnter={e => (e.currentTarget.style.color = '#002FA7')} onMouseLeave={e => { if (debugOpenMsgId !== msg.id) e.currentTarget.style.color = '#c0c8d8' }} title="上下文详情">
+                                <Brain size={14} strokeWidth={1.8} />
+                              </button>
+                            )}
+                            <button onClick={() => handleCopyMsg(msg.id, msg.content)} className="flex items-center justify-center transition-colors cursor-pointer" style={{ color: copiedMsgId === msg.id ? '#22c55e' : '#c0c8d8' }} title="复制">
+                              {copiedMsgId === msg.id ? <Check size={14} strokeWidth={2} /> : <Copy size={14} strokeWidth={1.8} />}
+                            </button>
+                            {msg.conversationId && (
+                              <button onClick={() => handleDeleteConv(msg.conversationId!)} className="flex items-center justify-center transition-colors cursor-pointer" style={{ color: '#c0c8d8' }} onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')} onMouseLeave={e => (e.currentTarget.style.color = '#c0c8d8')} title="删除">
+                                <Trash2 size={14} strokeWidth={1.8} />
+                              </button>
+                            )}
+                            <button onClick={() => console.log('retry', msg.id)} className="flex items-center justify-center transition-colors cursor-pointer" style={{ color: '#c0c8d8' }} onMouseEnter={e => (e.currentTarget.style.color = '#002FA7')} onMouseLeave={e => (e.currentTarget.style.color = '#c0c8d8')} title="重发">
+                              <RotateCcw size={14} strokeWidth={1.8} />
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => handleCopyMsg(msg.id, msg.content)} className="flex items-center justify-center transition-colors cursor-pointer" style={{ color: copiedMsgId === msg.id ? '#22c55e' : '#c0c8d8' }} title="复制">
+                              {copiedMsgId === msg.id ? <Check size={14} strokeWidth={2} /> : <Copy size={14} strokeWidth={1.8} />}
+                            </button>
+                            {msg.conversationId && (
+                              <button onClick={() => handleDeleteConv(msg.conversationId!)} className="flex items-center justify-center transition-colors cursor-pointer" style={{ color: '#c0c8d8' }} onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')} onMouseLeave={e => (e.currentTarget.style.color = '#c0c8d8')} title="删除">
+                                <Trash2 size={14} strokeWidth={1.8} />
+                              </button>
+                            )}
+                            <button onClick={() => console.log('retry', msg.id)} className="flex items-center justify-center transition-colors cursor-pointer" style={{ color: '#c0c8d8' }} onMouseEnter={e => (e.currentTarget.style.color = '#002FA7')} onMouseLeave={e => (e.currentTarget.style.color = '#c0c8d8')} title="重发">
+                              <RotateCcw size={14} strokeWidth={1.8} />
+                            </button>
+                          </div>
+                          <span className="text-xs" style={{ color: '#b0b8c8', fontSize: 11 }}>
+                            {formatMsgTime(msg.created_at)}
+                          </span>
+                        </>
                       )}
                     </div>
+                    {msg.role === 'assistant' && msg.debugInfo && debugOpenMsgId === msg.id && (
+                      <ContextDebugPanel debugInfo={msg.debugInfo} />
+                    )}
                   </div>
                 </div>
               ))}
 
               {/* Error / retry block */}
               {lastError && !isStreaming && (
-                <div className="flex items-center gap-3 mb-6 px-1">
+                <div className="flex gap-3 mb-6">
+                  <AiAvatar />
                   <div
-                    className="flex-1 flex items-center gap-2 rounded-xl px-4 py-3 text-sm"
-                    style={{ background: 'rgba(208,64,64,0.06)', border: '1px solid rgba(208,64,64,0.18)', color: '#b03030' }}
+                    className="flex-1 flex items-center justify-between gap-3 rounded-lg px-3 py-2"
+                    style={{ borderLeft: '3px solid rgba(208,64,64,0.2)', background: 'rgba(208,64,64,0.03)' }}
                   >
-                    <span>⚠ {lastError}</span>
+                    <span className="text-xs" style={{ color: '#b03030' }}>⚠ {lastError}</span>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => retryLast(currentSession!.id, model)}
+                        className="text-xs font-medium cursor-pointer"
+                        style={{ color: '#002FA7' }}
+                        onMouseEnter={e => (e.currentTarget.style.opacity = '0.7')}
+                        onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                      >
+                        重试
+                      </button>
+                      <button
+                        onClick={clearError}
+                        className="flex items-center justify-center cursor-pointer"
+                        style={{ color: '#b0b8c8' }}
+                        title="忽略"
+                      >
+                        <X size={13} strokeWidth={2} />
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => retryLast(currentSession!.id, model)}
-                    className="flex items-center gap-1.5 rounded-xl px-3 py-3 text-sm font-medium transition-colors cursor-pointer"
-                    style={{ background: '#002FA7', color: '#fff', whiteSpace: 'nowrap' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#001f80')}
-                    onMouseLeave={e => (e.currentTarget.style.background = '#002FA7')}
-                  >
-                    重试
-                  </button>
-                  <button
-                    onClick={clearError}
-                    className="flex items-center justify-center rounded-xl cursor-pointer"
-                    style={{ width: 36, height: 44, color: '#aab2c8' }}
-                    title="忽略"
-                  >
-                    <X size={14} strokeWidth={2} />
-                  </button>
                 </div>
               )}
 
               {/* Memory search indicator */}
-              {isSearchingMemory && (
-                <div className="flex gap-3 mb-4">
-                  <AiAvatar />
-                  <div className="flex items-center gap-2 pt-1" style={{ color: 'rgba(200,212,232,0.5)', fontSize: 12 }}>
-                    <span
-                      className="inline-block rounded-full flex-shrink-0"
-                      style={{ width: 6, height: 6, background: '#002FA7', opacity: 0.7, animation: 'blink 1s ease-in-out infinite' }}
-                    />
-                    正在搜索记忆{searchingQuery ? `「${searchingQuery}」` : ''}…
-                  </div>
-                </div>
-              )}
+              {/* (now handled inside streamBlocks below) */}
 
-              {/* Live streaming row */}
-              {isStreaming && (currentThinking || currentText || pendingMemoryOps.length > 0) && (
+              {/* Live streaming row — renders blocks in chronological order */}
+              {isStreaming && streamBlocks.length > 0 && (
                 <div className="flex gap-3 mb-8">
                   <AiAvatar />
                   <div className="flex-1 min-w-0 pt-0.5">
-                    {currentThinking && <ThinkingBlock text={currentThinking} defaultOpen={true} />}
-                    {pendingMemoryOps.length > 0 && <MemoryOpsBlock ops={pendingMemoryOps} />}
-                    {currentText ? (
-                      <MarkdownContent content={currentText} />
-                    ) : !currentThinking && pendingMemoryOps.length === 0 && (
-                      <span
-                        className="inline-block rounded-full"
-                        style={{ width: 6, height: 6, background: '#002FA7', opacity: 0.5, animation: 'blink 1s ease-in-out infinite' }}
-                      />
-                    )}
+                    {streamBlocks.map((block, i) => {
+                      switch (block.kind) {
+                        case 'thinking': {
+                          const isActive = block.elapsed === null
+                          return (
+                            <ThinkingBlock
+                              key={`sb-${i}`}
+                              text={block.text}
+                              defaultOpen={isActive}
+                              thinkingTime={block.elapsed}
+                              liveElapsed={isActive ? liveThinkingElapsed : undefined}
+                            />
+                          )
+                        }
+                        case 'text':
+                          return <MarkdownContent key={`sb-${i}`} content={block.text} />
+                        case 'tool_searching':
+                          return (
+                            <div key={`sb-${i}`} className="mb-3 rounded-xl overflow-hidden" style={{ background: 'rgba(0,47,167,0.05)' }}>
+                              <div className="flex items-center gap-2 px-3.5 py-2.5" style={{ color: '#5a6a8a' }}>
+                                <span className="tool-spinner" />
+                                <span className="text-xs font-medium">
+                                  Memory search{block.query ? `「${block.query}」` : ''}
+                                  <span style={{ color: '#8a9ab5', marginLeft: 4 }}>({formatElapsed(liveToolElapsed)})</span>
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        case 'tool_result':
+                          return (
+                            <MemoryRefBlock
+                              key={`sb-${i}`}
+                              query={block.query}
+                              found={block.found}
+                              content={block.content}
+                              elapsed={block.elapsed}
+                            />
+                          )
+                        case 'memory_op':
+                          return (
+                            <div key={`sb-${i}`} className="mb-3 rounded-xl overflow-hidden" style={{ background: 'rgba(0,47,167,0.05)' }}>
+                              <div className="flex items-center gap-2 px-3.5 py-2.5" style={{ color: '#5a6a8a' }}>
+                                <span style={{ fontSize: 11 }}>{block.op.type === 'saved' ? '◉' : block.op.type === 'updated' ? '◎' : '⊗'}</span>
+                                <span className="text-xs font-medium">
+                                  Memory {block.op.type}
+                                  {block.elapsed != null && <span style={{ color: '#8a9ab5', marginLeft: 4 }}>({formatElapsed(block.elapsed)})</span>}
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        default:
+                          return null
+                      }
+                    })}
                   </div>
                 </div>
               )}
@@ -890,7 +1072,7 @@ export default function ChatPage() {
             bottom: 0,
             zIndex: 10,
             marginTop: 'auto',
-            background: '#fafbfd',
+            background: '#f2f4fa',
             paddingBottom: keyboardOffset > 0 ? `${keyboardOffset}px` : 'env(safe-area-inset-bottom)',
           }}>
             {/* Top gradient fade — text fades out smoothly */}
@@ -900,7 +1082,7 @@ export default function ChatPage() {
               left: 0,
               right: 0,
               height: 36,
-              background: 'linear-gradient(to bottom, rgba(250,251,253,0), rgba(250,251,253,1))',
+              background: 'linear-gradient(to bottom, rgba(242,244,250,0), rgba(242,244,250,1))',
               pointerEvents: 'none',
             }} />
             <div className="mx-auto px-3 md:px-6 py-3 relative" style={{ maxWidth: 800 }}>
@@ -963,12 +1145,7 @@ export default function ChatPage() {
 
       </div>
 
-      <style>{`
-        @keyframes blink {
-          0%, 100% { opacity: 0.25; }
-          50% { opacity: 0.7; }
-        }
-      `}</style>
+      <style>{``}</style>
     </div>
   )
 }
