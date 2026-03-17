@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh root@47.86.37.182 \"cd /home/dream/memory-system && git stash && git pull origin reverie 2>&1\")",
+      "Bash(ssh -o StrictHostKeyChecking=no root@47.86.37.182 \"cd /home/dream/memory-system && git stash 2>&1 && git pull origin reverie 2>&1\")"
+    ]
+  }
+}

@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import type { DebugInfo } from '../api/chat'
 
-type Tab = 'memories' | 'search' | 'window' | 'summaries'
+type Tab = 'memories' | 'search' | 'window' | 'summaries' | 'session_summary'
 
 const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: 'memories', icon: '📌', label: '记忆' },
   { key: 'search', icon: '🔍', label: '检索' },
   { key: 'window', icon: '💬', label: '历史' },
   { key: 'summaries', icon: '📝', label: '摘要' },
+  { key: 'session_summary', icon: '📋', label: 'Session摘要' },
 ]
 
 const LAYER_COLORS: Record<string, string> = {
@@ -43,11 +44,14 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
   const { token_usage } = debugInfo
   const usageRatio = token_usage.budget > 0 ? token_usage.total / token_usage.budget : 0
 
+  const hasSessionSummary = debugInfo.session_summary?.exists ?? false
+
   const counts: Record<Tab, number | string> = {
     memories: memCount,
     search: searchCount,
     window: windowRounds > 0 ? `${windowRounds}轮` : '0',
     summaries: summaryCount,
+    session_summary: hasSessionSummary ? '有' : '无',
   }
 
   return (
@@ -64,7 +68,7 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
       {activeTab === null ? (
         <div className="px-2.5 py-2.5 sm:px-3">
           <div className="flex flex-wrap gap-1.5 mb-2">
-            {TABS.map(t => {
+            {TABS.filter(t => t.key !== 'session_summary' || hasSessionSummary).map(t => {
               const c = counts[t.key]
               const empty = c === 0 || c === '0'
               return (
@@ -124,6 +128,7 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
             {activeTab === 'search' && <SearchDetail debugInfo={debugInfo} />}
             {activeTab === 'window' && <WindowDetail debugInfo={debugInfo} />}
             {activeTab === 'summaries' && <SummaryDetail debugInfo={debugInfo} />}
+            {activeTab === 'session_summary' && <SessionSummaryDetail debugInfo={debugInfo} />}
           </div>
         </div>
       )}
@@ -258,5 +263,23 @@ function SummaryDetail({ debugInfo }: { debugInfo: DebugInfo }) {
         <p className="text-xs py-2" style={{ color: '#b0b8c8' }}>无摘要</p>
       )}
     </>
+  )
+}
+
+function SessionSummaryDetail({ debugInfo }: { debugInfo: DebugInfo }) {
+  const content = debugInfo.session_summary?.content || ''
+  return (
+    <div
+      className="rounded-lg px-2.5 py-2 text-xs"
+      style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(0,47,167,0.08)' }}
+    >
+      <span
+        className="px-1.5 py-0.5 rounded text-xs font-medium mb-1 inline-block"
+        style={{ background: 'rgba(0,47,167,0.08)', color: '#002FA7', fontSize: 10 }}
+      >
+        前情概要
+      </span>
+      <p className="leading-relaxed mt-1" style={{ color: '#3a4a6a', wordBreak: 'break-word' }}>{content}</p>
+    </div>
   )
 }

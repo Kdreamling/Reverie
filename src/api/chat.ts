@@ -23,6 +23,7 @@ export interface DebugInfo {
   sliding_window: { rounds: number; range: string; messages?: { user_msg?: string; assistant_msg?: string }[] }
   summaries: { dimension: string; content: string }[]
   token_usage: { budget: number; memories: number; search: number; summaries: number; total: number }
+  session_summary?: { content: string; exists: boolean }
 }
 
 export interface ChatMessage {

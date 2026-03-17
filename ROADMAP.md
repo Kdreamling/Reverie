@@ -1,175 +1,126 @@
-# Reverie 项目进度记录
+# Reverie 开发进度
 
-> **最后更新**：2026-03-14
+> 最后更新：2026-03-17
 
 ---
 
 ## 已完成
 
-### Phase 1 — Channel 写库修复
-- `model_channel` 和 `scene_type` 现在正确写入 `conversations` 表
-- 修复了之前两个字段均为空的问题
+### Phase 0 — 后端基础改造
+- 数据库表改造（sessions, memory_summaries, conversations, memories）
+- `context_builder.py` 独立模块，2500 token 预算
+- JWT 鉴权 + Session CRUD API
+- 多通道配置（deepseek / dzzi / dzzi-peruse / openrouter / antigravity）+ ThinkingAdapter
+- 实时微摘要（`memory_cycle.py`）
+- 安全加固（RLS, disabled FastAPI docs）+ 备份定时任务
 
-### Phase 2 — 记忆噪点治理
-- `search_enabled` 默认关闭（语义检索噪点过多，待数据量积累后重开）
-- 微摘要判断标准收紧：只记录 Dream 明确陈述的事实，过滤普通闲聊
-- `core_living` 层记忆增加 14 天活跃过滤（超期由 merged_summary 吸收）
-- 每日自动记忆上限：3 条（防刷爆）
+### Phase 1 — 前端基础
+- SSE 流式对话 + Markdown + 代码高亮
+- ThinkingBlock 可折叠
+- 会话管理（创建/删除/重命名/自动命名）+ 场景切换
+- 模型切换（DeepSeek Chat / Reasoner / Claude DZZI / Claude OpenRouter）
+- 登录页（克莱因蓝星空）
+- AuthGuard 路由守卫
 
-### Phase 3 — Context Debug 面板
-- 后端：`GET /api/debug/context?session_id=&model=`
-  - 返回实际注入给模型的完整 system prompt、token 估算、所用通道
-- 前端：`DebugPanel.tsx` + SettingsPanel 入口
-  - 查看当前会话下一次请求会注入哪些记忆
+### Phase 2（部分）— 功能增强
+- ✅ 记忆面板 UI（`MemoryPanel.tsx`，三层过滤 + 增删改查）
+- ❌ 文件上传
+- ❌ 对话导出
+- ❌ 完整备份导出
 
-### Phase 4 — Features 功能开关面板
-- 后端：`GET/PATCH /api/admin/settings`
-- 前端：`FeaturesPanel.tsx` + SettingsPanel 入口
-- 4 个开关：记忆注入、对话存储、自动记忆、语义检索
+### Phase 4（提前完成）— 手机端全面响应式
+- 侧边栏抽屉（hamburger + 右滑开 / 左滑关 / 遮罩点击关）
+- iOS 键盘适配（`visualViewport` API + `keyboardOffset`）
+- 所有面板 iOS safe-area 适配（顶底 padding）
+- `height: 100dvh`（Safari 地址栏兼容）
+- PWA manifest + Apple meta tags
+- 气泡输入框（未聚焦胶囊 ↔ 聚焦展开，textarea 自动增高）
+- 消息内联操作（Copy + Delete 图标，替代长按弹层）
+- 30s SSE 超时 + 发送失败捕获 → 红色提示 + 重试按钮
+- 消息删除 API（`DELETE /sessions/{id}/messages/{conv_id}`）
+- `body` 背景 `#fafbfd`（iOS safe-area 横条颜色修复）
 
-### Phase 5 — AI 主动搜索记忆工具（memory_tool_enabled）
-- 后端：`search_memory` tool definition（OpenAI function calling 格式，三个 channel 通用）
-- 后端：pre-streaming tool phase — 非流式探针调用，工具执行完毕后再开 SSE 流
-- 后端：`_execute_memory_search` — 搜索 `memories` 表 + hybrid_search 对话检索，结果注入 messages
-- 前端：chatStore 新增 `isSearchingMemory` / `searchingQuery` 状态 + SSE 事件分发
-- 前端：ChatPage 搜索进行中动效（蓝点 + "正在搜索记忆「query」…"）
-- 前端：`MemoryRefBlock` 折叠块 — 显示实际检索到的内容（query + 条数 + 原文），附在 assistant 消息下方
-- 前端：FeaturesPanel 新增 memory_tool_enabled 开关
-- 后端：`tool_result` SSE 事件新增 `content` 字段，携带实际检索文本
-- 默认关闭，通过 Features 面板按需开启
-- Git tag：`v-phase5-memory-tool`
+### Phase 5 — 记忆系统增强
 
-### Phase 6 — 手机端全面响应式（Steps 1–6）
-- **Step 1**：侧边栏抽屉
-  - 移动端侧栏改为 `position: fixed` 滑入抽屉
-  - 汉堡按钮（仅移动端显示）+ 半透明遮罩
-  - 顶部 safe-area-inset-top padding 防止内容藏进刘海
-- **Step 2**：聊天区响应式布局
-  - 消息区 max-width 居中，Tailwind `md:` 断点 ≥768px 切换列数
-- **Step 3**：iOS 键盘适配
-  - `visualViewport` API 监听键盘弹出 → `keyboardOffset` 推高输入框
-  - `height: 100dvh` 替换 `h-screen` 解决 Safari 底栏问题
-  - `overscroll-behavior: none` 防止整页回弹
-- **Step 4**：Settings / Memory / Features / Debug 面板全屏适配
-  - 移动端用 `fixed inset-0`，桌面端用 `absolute`
-  - 所有子面板顶部 `paddingTop: calc(16px + env(safe-area-inset-top))`
-- **Step 5**：触摸手势
-  - 右滑（起点 ≤60px）开侧边栏，左滑关闭
-  - Settings 内左滑：子页面 → 返回菜单 → 关闭 Settings
-  - 侧边栏会话长按弹出菜单（重命名 / 删除）
-  - 使用 `window.addEventListener` 全局监听，穿透 fixed 遮罩层
-- **Step 6**：PWA
-  - `public/manifest.json`：name Reverie, theme_color #002FA7, display standalone
-  - `index.html`：Apple meta tags（apple-mobile-web-app-capable, status-bar-style 等）
-  - viewport 加 `viewport-fit=cover, maximum-scale=1`
+#### 基础修复
+- `model_channel` / `scene_type` 写库修复
+- FEATURE_FLAGS 统一（`config.py` 单一来源，6 个开关）
+- OpenRouter thinking XML 格式修复（`adapters.py` 新增 `_adapt_openai_xml()`）
+- 记忆噪点治理：微摘要标准收紧，`core_living` 14 天过滤 + 毕业机制
 
-### Phase 7 — 手机端体验优化·第二轮迭代（改动 1–4）
-- **改动 1**：统一 Claude App 风格气泡输入框
-  - 移动/桌面共用同一套 UI：白色圆角卡片（`rounded-full` ↔ `rounded-2xl` 动态切换）
-  - 未聚焦紧凑胶囊，聚焦后展开，textarea 随内容自动增高（max 150px）
-  - 发送按钮：无文字时灰色，有文字时克莱因蓝
-- **改动 2**：重命名会话光标修复
-  - 重命名 input 启动时 value 为空（placeholder 显示原标题），避免 iOS 自动全选
-- **改动 3**：消息操作按钮（内联图标）
-  - 去掉长按弹出浮层菜单，改为每条消息内容下方固定显示 Copy + Trash2 图标
-  - 复制成功：图标短暂切换为 Check（1.5s）
-  - 删除：`window.confirm` 确认 → 前端移除 + 后端 DELETE API
-  - 后端：`DELETE /api/sessions/{session_id}/messages/{conversation_id}` 新路由
-- **改动 4**：AI 无响应错误处理
-  - SSE 流 30s 超时：`setTimeout` 取消 reader，显示"连接超时，请重试"
-  - 发送失败 catch：显示"发送失败，请重试"
-  - 错误区域：红色提示卡 + 重试按钮 + 忽略按钮
-  - `retryLast()`：移除最后一条用户消息并重新发送
+#### 可视化工具
+- Context Debug 面板（`GET /api/debug/context`）
+- Features 功能开关面板（6 个开关运行时热切换）
 
-### Bug Fix 轮次 · v3.4
-- footer 背景去掉独立颜色（改由根容器 `#fafbfd` 透出）
-- 修复 textarea 双 useEffect 冲突（第二个一直覆盖折叠逻辑）
-- 修复折叠条件：`!isFocused` 而非 `!input && !isFocused`（失焦即折叠）
-- textarea 失焦时 `scrollTop = 0`，确保文字从开头显示
-- `handleDeleteConv` 加 try/catch，API 失败时 toast 提示
-- Git tag：`v3.4-mobile-bugfix`
+#### AI 主动记忆工具（memory_tool_enabled）
+- `search_memory / save_memory / update_memory / delete_memory` 工具
+- `list_memories / batch_delete_memories` 工具（默认关闭，需开启 list_tool_enabled）
+- 流式工具调用（AI 回复中途实时调用，最多 3 轮循环）
+- `MemoryRefBlock` + `MemoryOpsBlock`（流式实时 + 刷新后持久化）
 
-### Bug Fix 轮次 · v3.5
-- 替换长按消息弹层 → 内联图标按钮（Copy/Check + Trash2）
-- 侧边栏底部加 `paddingBottom: env(safe-area-inset-bottom)` + 显式 `background: #0a1a3a`
-- 侧边栏 `<aside>` 使用 `height: 100dvh` 替换 `h-full`（避免 fixed 元素的 `100%` 解析为 `100vh`）
-- 加 `closeSidebar` useEffect 监听 sidebarOpen，关闭时清空 editingId
-- `sessions.py` DELETE 端点去掉 `if not result.data:` 检查（Supabase 不一定返回被删行）
-- Git tag：`v3.5-mobile-bugfix-2`
+#### 数据持久化
+- embedding 生成（`store_conversation_embedding`，SiliconFlow BAAI/bge-large-zh-v1.5 1024维）
+- `memory_ops` JSONB 持久化 + 历史消息加载还原
+- `thinking_time` / `input_tokens` / `output_tokens` 持久化
+- `<thinking>` 标签清理
 
-### Bug Fix 轮次 · v3.6
-- `index.css` body 背景从 `#f2f4fa` 改为 `#fafbfd`（iOS safe-area 横条颜色来自 body）
-- `index.css` 新增 `#root` 同样设 `#fafbfd !important`
-- 侧边栏 `<aside>` 明确 `height: 100dvh`（彻底封闭底部缝隙）
-- 重命名 input 使用 `autoFocus` + 空 value + placeholder 显示原标题，彻底避免 iOS 全选
-- 所有 `setSidebarOpen(false)` 调用点直接紧跟 `setEditingId(null)` + `setEditingTitle('')`，不再依赖 useEffect 间接触发
-- Git tag：`v3.6-mobile-bugfix-3`
+### Phase 6 — 记忆系统深度改造（2026-03-16~17）
 
-### Bug Fix — OpenRouter Claude thinking 格式修复
-- 根因：OpenRouter 将 thinking 以 `<thinking>...</thinking>` XML 标签混入 `content` 字段，而非 `reasoning_content` 字段
-- 修复：`channels.py` 新增 `thinking_format: "openai_xml"`；`adapters.py` 新增 `_adapt_openai_xml()` + 流式 XML 解析器
-- Git tag：`v-openrouter-thinking-fix`
+#### 中期记忆层（维度摘要系统）
+- 对话驱动触发：>=10 轮 或 >=3轮+24h
+- 四维度摘要：emotion / event / preference / knowledge
+- 即时合并 + 每日凌晨 1 点兜底 cron
+- context_builder 优先级 4 激活
 
-### Bug Fix — FEATURE_FLAGS 双份技术债修复
-- `main.py` 改为 `from config import FEATURE_FLAGS`，删除本地定义，统一单一数据源
-- 同步修复：`_reverie_store` 加入 `memory_enabled` 早返回守卫
+#### memories 表 Embedding + 语义检索
+- `embedding vector(1024)` + ivfflat 索引
+- `search_memories_v2` RPC
+- 所有写入路径异步生成 embedding
 
-### Bug Fix 轮次 · v2.7–v2.8（Mobile Bugfix Round 4）
-- html/body/root 全部 `position: fixed; overflow: hidden; height: 100%`，锁死 iOS 视口防止整页滑动
-- body `touch-action: none` 防止 iOS PWA 触摸输入时界面挪动
-- 侧边栏会话标题添加 `-webkit-user-select: none` 防止 iOS 长按触发原生文字选择
-- 侧边栏 / 根容器高度统一改为 `height: 100%`（继承 fixed html/body）
-- 输入框 footer 改为 `position: absolute; bottom: 0`，背景透明，Claude 风格浮动气泡
-- footer 上方 32px 线性渐变淡出（transparent → #fafbfd），消除硬边界
-- Bug 3 修复：`closingSidebarRef` 防止 onBlur 竞态，仅在打开侧边栏时重置
-- Git tags：`v2.7-mobile-bugfix-4.2`, `v2.8-mobile-bugfix-4.3`
+#### 混合检索升级（2026-03-17）
+- 语义检索从纯向量升级为 **hybrid_search 管线**
+  - 同义词扩展（synonym_service）
+  - 关键词搜索 + 向量搜索并行
+  - Rerank 二次打分（硅基流动 BAAI/bge-reranker-v2-m3，阈值 0.3）
+- 排除逻辑修正：从 `exclude_session_id`（整个 session）改为 `exclude_conversation_ids`（仅窗口内对话），消除老对话盲区
+- 滑动窗口修正：降序取最近 5 轮 + reverse（修复之前升序取最早 5 轮的 bug）
+
+#### 长对话记忆混乱修复（2026-03-17）
+- 历史窗口从 10 轮缩减到 5 轮，减少截断造成的残缺历史
+- 执行顺序调整：先拉历史 → 收集窗口 IDs → 再构建上下文
+
+#### 上下文注入可视化面板（2026-03-17）
+- 后端 `build_context()` 返回 `(messages, debug_info)` 元组
+- SSE done 事件附带 `debug_info`（记忆/检索/历史/摘要/token）
+- 前端 `ContextDebugPanel.tsx`：两层结构（pill 标签 + 详情卡片 + token 进度条）
+- `ChatMessage` 新增 `debugInfo` 字段，Brain 按钮展开面板
+- 手机端适配（32px 最小高度、触控反馈、overscroll-contain）
+
+#### 记忆毕业机制 + importance 分级
+- 14 天内 limit 3 + 超 14 天且 importance >= 0.7 limit 2
+- 按 memory_type 自动分级
 
 ---
 
-## 未完成 / 待处理
+## 待处理
 
-### iOS 重命名会话仍有全选问题
-- 已尝试 3 轮修复（autoFocus + 空 value + placeholder 等），iOS 行为不一致
-- 暂搁置，后续可考虑换方案：自定义 modal 弹窗替代 inline input，或 contentEditable div
+### 低优先级 / 暂搁置
+- 停止生成按钮
+- 代码块语言标签 + 一键复制
 
-### 语义检索优化（`search_enabled`）
-- 当前默认关闭，噪点过多
-- 待条件：`conversations` 表数据量积累后，用 `GET /debug/context` 验证注入质量
-- 可通过 Features 面板临时开启测试
-
-### 前端输入框延迟问题
-- 根因已定位：`ChatPage.tsx` 中 `currentText` / `currentThinking` 在 useEffect 依赖数组里导致不必要的重渲染
-- 已搁置，待记忆系统稳定后处理
-
-### 项目文档同步
-- `交给LTalk 架构设计文档 · 最终定稿.md` 的开发顺序已部分更新（Phase 4 手机端响应式 ✅）
-
-### 语义检索重开前置工作（可选）
-- 验证 `search_conversations_v2` RPC 的 similarity 分布是否合理
-- 考虑将阈值从 0.75 调整（需要实测数据支撑）
-
-### Phase 2（架构文档中的 Phase 2）— 文件上传、对话导出
-- 尚未开始
-
-### Phase 3（架构文档中的 Phase 3）— Artifacts
-- 尚未开始
-
----
-
-## 已知小问题（低优先级，不影响功能）
-
-- **重复 `done` 事件**：`main.py` 有硬编码兜底 `yield done`，adapter 在循环里已经 yield 过含 `usage` 的 `done`，前端遇到第一个就停止，无害但不干净
-- **ChatPage.tsx 文件过大**：约 900 行，侧栏 / 消息 / 输入 / 欢迎页全在一个文件里
-- **透明/毛玻璃输入框会模糊滚动条**：`backdrop-filter: blur()` 作用于 footer 时，滚动条穿过该区域会被模糊。若后续要做透明 footer，需先将滚动条限制在 footer 区域之外（如 `main` 内嵌独立滚动容器）
+### 未开始
+- Phase 2：文件上传、对话导出
+- Phase 3：Artifacts 系统（代码编辑器、HTML/SVG/Mermaid 预览、版本管理）
+- 语音输入/朗读
+- 历史对话搜索
+- Web Push 通知
 
 ---
 
 ## 注意事项
 
-- Features 面板的开关修改**进程内立即生效**，但服务重启后恢复 `config.py` 的默认值
-- Nginx 当前路由：`/api/` → 8001（宝塔面板已关闭日记 API 节点，避免 `/api/admin/` 被截走）
-- **前端部署**：`npm run build` → `scp -r dist/* root@kdreamling.work:/www/wwwroot/kdreamling.work/chat/`
-- **后端部署**：本地改动 → `git push origin reverie` → 服务器 `git pull origin reverie` → 重启 gateway
-- **重启命令**：`kill $(ps aux | grep "python3 main.py" | grep -v grep | awk '{print $2}'); cd /home/dream/memory-system/gateway && nohup python3 main.py > gateway.log 2>&1 &`
-- **iOS 体验关键点**：safe-area-inset-top/bottom 需要在 header/footer/sidebar 的顶底 padding 中显式处理；body 背景色必须与内容区一致否则 home indicator 条纹会漏色
-- **Git Tags**：每个里程碑都有 tag（`v3.x-*`），可用 `git checkout <tag>` 回退任意版本
+- Features 面板的开关修改**进程内立即生效**，服务重启后恢复 `config.py` 默认值
+- `search_enabled` 默认 `True`，走 hybrid_search 管线
+- `list_tool_enabled` 默认 `False`
+- Nginx 路由：`/api/` → 8001（需 JWT），`/v1/` → 8001（Kelivo 兼容，无 Basic Auth）
+- **Git Tags**：每个里程碑打 tag，最新：`v-before-debug-panel`、`v-before-hybrid-search`

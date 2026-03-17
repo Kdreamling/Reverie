@@ -8,7 +8,10 @@ html, body, #root {
   height: 100%;
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
-  background: #fafbfd !important;
+  background: #f2f4fa !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 /* Prevent iOS Safari viewport shift when touching inputs */
 body { touch-action: none; }
@@ -51,3 +54,33 @@ body { touch-action: none; }
 .md-content strong { font-weight: 600; }
 .md-content em { font-style: italic; }
 .md-content hr { border: none; border-top: 1px solid #dde2ed; margin: 1rem 0; }
+
+/* ── Gradient fade border ───────────────────────────────────────────────────── */
+.chat-header {
+  position: relative;
+  border-bottom: none !important;
+}
+.chat-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 5%;
+  right: 5%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,20,60,0.08), transparent);
+}
+
+/* ── Spinner animation for thinking/tool blocks ────────────────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.tool-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid rgba(0,47,167,0.2);
+  border-top-color: rgba(0,47,167,0.6);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
