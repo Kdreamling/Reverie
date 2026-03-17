@@ -20,7 +20,7 @@ export interface DebugInfo {
     user_msg: string; assistant_msg: string; summary?: string
     score: number; match_type: string; source: string
   }[]
-  sliding_window: { rounds: number; range: string }
+  sliding_window: { rounds: number; range: string; messages?: { user_msg?: string; assistant_msg?: string }[] }
   summaries: { dimension: string; content: string }[]
   token_usage: { budget: number; memories: number; search: number; summaries: number; total: number }
 }
