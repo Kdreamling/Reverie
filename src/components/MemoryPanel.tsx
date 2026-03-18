@@ -7,6 +7,7 @@ const LAYER_FILTERS = [
   { key: 'core_base', label: '基石', color: '#f59e0b' },
   { key: 'core_living', label: '活水', color: '#3b82f6' },
   { key: 'scene', label: '场景', color: '#8b5cf6' },
+  { key: 'ai_journal', label: '日记', color: '#10b981' },
 ]
 
 const LAYER_OPTIONS = [
@@ -19,17 +20,20 @@ const LAYER_COLORS: Record<string, string> = {
   core_base: '#f59e0b',
   core_living: '#3b82f6',
   scene: '#8b5cf6',
+  ai_journal: '#10b981',
 }
 
 const LAYER_LABELS: Record<string, string> = {
   core_base: '基石',
   core_living: '活水',
   scene: '场景',
+  ai_journal: '日记',
 }
 
 const SOURCE_LABELS: Record<string, string> = {
   manual: '手动',
   auto: '自动',
+  ai_tool: 'AI',
   diary: '日记',
 }
 
