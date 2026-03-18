@@ -1,6 +1,6 @@
 # Reverie 开发进度
 
-> 最后更新：2026-03-17
+> 最后更新：2026-03-19
 
 ---
 
@@ -99,6 +99,26 @@
 #### 记忆毕业机制 + importance 分级
 - 14 天内 limit 3 + 超 14 天且 importance >= 0.7 limit 2
 - 按 memory_type 自动分级
+
+### Phase 7 — Bug 修复 + AI 工具调用重构（2026-03-19）
+
+#### Bug 修复
+- adapters.py: `openai_xml` thinking_format 未被识别，thinking 内容泄露到文字 → 加入 dispatch
+- context_builder.py: docstring 全角标点在服务器 locale 下触发 SyntaxError → 替换为半角
+- 维度摘要游标卡死：`period_end` 只存日期导致永远重复处理同一批 → 改用 `min(created_at, period_end)` 双游标
+- 维度摘要批量追赶：积压 300+ 轮时每次只处理 30 轮 → 改为循环处理（最多 8 批 × 30 轮）
+
+#### AI 工具调用（Tool Calling）
+- OpenRouter tool calling 验证通过（非流式 + 流式 + 完整循环）
+- `_reverie_stream` 工具调用循环：检测 `finish_reason: tool_calls` → 执行 → 第二轮无 tools 强制文字回复
+- 精简工具集：`search_memory`（hybrid_search）+ `save_memory`（ai_journal 层，source="ai_tool"）
+- 工具调用轮次关闭 thinking，最终轮恢复
+- 功能开关：`memory_tool_enabled` flag，默认关闭
+- 前端复用 `tool_searching` / `tool_result` SSE 事件
+
+#### 通道管理重构
+- `channels.py` 独立模块：通道配置 + `resolve_channel()` + `MODEL_ALIASES` + `get_model_list()`
+- OpenRouter 通道：`thinking_format: "openai_xml"`，adapter 统一处理 `<thinking>` XML 标签和 `reasoning_content` 字段
 
 ---
 
