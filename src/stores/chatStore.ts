@@ -63,6 +63,9 @@ const EMPTY_STREAM = {
   toolStartTime: null, toolElapsedTime: null, streamBlocks: [] as StreamBlock[],
 }
 
+// ─── Perf: mutable streamBlocks array, only create new ref on structural changes
+// text_delta / thinking_delta mutate in-place and bump a counter to notify subscribers
+
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   isStreaming: false,
@@ -113,12 +116,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
             try {
               const raw = typeof r.memory_ops === 'string' ? JSON.parse(r.memory_ops) : r.memory_ops
               const allOps = raw as Array<{type?: string; content?: string; mem_type?: string; layer?: string; memory_id?: string; new_content?: string; reason?: string; query?: string; found?: number}>
-              // Extract search results
               const searchOp = allOps.find(op => op.type === 'tool_result')
               if (searchOp) {
                 parsedMemoryRef = { query: searchOp.query ?? '', found: searchOp.found ?? 0, content: searchOp.content ?? '' }
               }
-              // Extract memory operations (save/update/delete)
               const memOps = allOps.filter(op => op.type !== 'tool_result' && op.type !== 'tool_searching')
               if (memOps.length > 0) {
                 parsedOps = memOps.map(op => ({
@@ -210,6 +211,58 @@ export const useChatStore = create<ChatState>((set, get) => ({
       let buffer = ''
       let gotFirstChunk = false
 
+      // Perf: batch text_delta updates — accumulate for 16ms then flush once
+      let pendingTextDelta = ''
+      let pendingThinkingDelta = ''
+      let flushTimer: ReturnType<typeof setTimeout> | null = null
+
+      const flushDeltas = () => {
+        flushTimer = null
+        const textChunk = pendingTextDelta
+        const thinkingChunk = pendingThinkingDelta
+        pendingTextDelta = ''
+        pendingThinkingDelta = ''
+
+        if (!textChunk && !thinkingChunk) return
+
+        set(s => {
+          const blocks = [...s.streamBlocks]
+          let newThinking = s.currentThinking
+          let newText = s.currentText
+
+          if (thinkingChunk) {
+            newThinking += thinkingChunk
+            const lastThinkingIdx = findLastIndex(blocks, b => b.kind === 'thinking')
+            if (lastThinkingIdx >= 0) {
+              const b = blocks[lastThinkingIdx] as { kind: 'thinking'; text: string; startTime: number; elapsed: number | null }
+              blocks[lastThinkingIdx] = { ...b, text: b.text + thinkingChunk }
+            }
+          }
+
+          if (textChunk) {
+            newText += textChunk
+            const last = blocks[blocks.length - 1]
+            if (last && last.kind === 'text') {
+              blocks[blocks.length - 1] = { ...last, text: last.text + textChunk }
+            } else {
+              blocks.push({ kind: 'text', text: textChunk })
+            }
+          }
+
+          return {
+            currentThinking: newThinking,
+            currentText: newText,
+            streamBlocks: blocks,
+          }
+        })
+      }
+
+      const scheduleFlush = () => {
+        if (!flushTimer) {
+          flushTimer = setTimeout(flushDeltas, 16)
+        }
+      }
+
       const timeoutId = setTimeout(() => {
         if (!gotFirstChunk && get().isStreaming) {
           reader.cancel()
@@ -235,10 +288,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
             let event: SseEvent
             try { event = JSON.parse(jsonStr) } catch { continue }
 
-            console.log('[chatStore] SSE event:', event.type, event)
-
             switch (event.type) {
               case 'tool_searching': {
+                flushDeltas() // flush any pending text first
                 const now = Date.now()
                 set(s => ({
                   isSearchingMemory: true,
@@ -250,11 +302,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 break
               }
               case 'tool_result': {
+                flushDeltas()
                 set(s => {
                   const elapsed = s.toolStartTime ? (Date.now() - s.toolStartTime) / 1000 : null
-                  // Replace last tool_searching block with tool_result
                   const blocks = [...s.streamBlocks]
-                  const lastSearchIdx = blocks.map((b, i) => b.kind === 'tool_searching' ? i : -1).filter(i => i >= 0).pop() ?? -1
+                  const lastSearchIdx = findLastIndex(blocks, b => b.kind === 'tool_searching')
                   if (lastSearchIdx >= 0) {
                     blocks[lastSearchIdx] = {
                       kind: 'tool_result',
@@ -280,6 +332,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 break
               }
               case 'memory_saved': {
+                flushDeltas()
                 const op: MemoryOperation = {
                   type: 'saved', content: event.content ?? '', mem_type: event.mem_type, layer: event.layer,
                   timestamp: new Date().toISOString(),
@@ -296,6 +349,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 break
               }
               case 'memory_updated': {
+                flushDeltas()
                 const op: MemoryOperation = {
                   type: 'updated', content: event.new_content ?? '', memory_id: event.memory_id,
                   timestamp: new Date().toISOString(),
@@ -312,6 +366,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 break
               }
               case 'memory_deleted': {
+                flushDeltas()
                 const op: MemoryOperation = {
                   type: 'deleted', content: '', memory_id: event.memory_id, reason: event.reason,
                   timestamp: new Date().toISOString(),
@@ -328,6 +383,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 break
               }
               case 'thinking_start': {
+                flushDeltas()
                 const now = Date.now()
                 set(s => ({
                   thinkingStartTime: now,
@@ -337,24 +393,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 break
               }
               case 'thinking_delta':
-                set(s => {
-                  const blocks = [...s.streamBlocks]
-                  const lastThinkingIdx = blocks.map((b, i) => b.kind === 'thinking' ? i : -1).filter(i => i >= 0).pop() ?? -1
-                  if (lastThinkingIdx >= 0) {
-                    const b = blocks[lastThinkingIdx] as { kind: 'thinking'; text: string; startTime: number; elapsed: number | null }
-                    blocks[lastThinkingIdx] = { ...b, text: b.text + (event.content ?? '') }
-                  }
-                  return {
-                    currentThinking: s.currentThinking + (event.content ?? ''),
-                    streamBlocks: blocks,
-                  }
-                })
+                // Batch: accumulate and schedule flush
+                pendingThinkingDelta += event.content ?? ''
+                scheduleFlush()
                 break
               case 'thinking_end':
+                flushDeltas() // flush pending thinking text first
                 set(s => {
                   const elapsed = s.thinkingStartTime ? (Date.now() - s.thinkingStartTime) / 1000 : null
                   const blocks = [...s.streamBlocks]
-                  const lastThinkingIdx = blocks.map((b, i) => b.kind === 'thinking' ? i : -1).filter(i => i >= 0).pop() ?? -1
+                  const lastThinkingIdx = findLastIndex(blocks, b => b.kind === 'thinking')
                   if (lastThinkingIdx >= 0) {
                     const b = blocks[lastThinkingIdx] as { kind: 'thinking'; text: string; startTime: number; elapsed: number | null }
                     blocks[lastThinkingIdx] = { ...b, elapsed }
@@ -367,21 +415,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 })
                 break
               case 'text_delta':
-                set(s => {
-                  const blocks = [...s.streamBlocks]
-                  const last = blocks[blocks.length - 1]
-                  if (last && last.kind === 'text') {
-                    blocks[blocks.length - 1] = { ...last, text: last.text + (event.content ?? '') }
-                  } else {
-                    blocks.push({ kind: 'text', text: event.content ?? '' })
-                  }
-                  return {
-                    currentText: s.currentText + (event.content ?? ''),
-                    streamBlocks: blocks,
-                  }
-                })
+                // Batch: accumulate and schedule flush
+                pendingTextDelta += event.content ?? ''
+                scheduleFlush()
                 break
               case 'done': {
+                flushDeltas() // flush any remaining text
+                if (flushTimer) { clearTimeout(flushTimer); flushTimer = null }
                 const { currentThinking, currentText, pendingMemoryResult, pendingMemoryOps, thinkingElapsedTime } = get()
                 const usage = event.usage
                 const tokens = usage ? {
@@ -416,6 +456,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
       } finally {
         clearTimeout(timeoutId)
+        if (flushTimer) { clearTimeout(flushTimer); flushDeltas() }
       }
     } catch {
       set({ isStreaming: false, ...EMPTY_STREAM, lastError: '发送失败，请重试' })
@@ -438,3 +479,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ lastError: null })
   },
 }))
+
+// ─── Utils ───────────────────────────────────────────────────────────────────
+
+function findLastIndex<T>(arr: T[], predicate: (item: T) => boolean): number {
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (predicate(arr[i])) return i
+  }
+  return -1
+}

@@ -1,14 +1,12 @@
-import { useState, useRef, useEffect, KeyboardEvent } from 'react'
-import { Plus, Settings, ArrowUp, ChevronDown, ChevronRight, X, Menu, Copy, Trash2, Check, RotateCcw, Brain } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
-import rehypeHighlight from 'rehype-highlight'
+import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
+import { Plus, Settings, ArrowUp, ChevronDown, X, Menu } from 'lucide-react'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
-import type { MemoryOperation } from '../api/chat'
 import { useAuthStore } from '../stores/authStore'
 import { updateSessionAPI } from '../api/sessions'
 import SettingsPanel from '../components/SettingsPanel'
-import ContextDebugPanel from '../components/ContextDebugPanel'
+import MessageItem from '../components/MessageItem'
+import StreamingMessage from '../components/StreamingMessage'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -41,14 +39,6 @@ const WELCOME_MESSAGES = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatMsgTime(iso: string) {
-  const d = new Date(iso)
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-  return `${month}/${day} ${time}`
-}
-
 function getModelColor(value: string): string {
   const v = value.toLowerCase()
   if (v.includes('claude') || v.includes('opus') || v.includes('sonnet')) return '#002FA7'
@@ -56,154 +46,7 @@ function getModelColor(value: string): string {
   return '#f59e0b'
 }
 
-function formatElapsed(seconds: number): string {
-  return seconds.toFixed(1) + 's'
-}
-
-/** Hook: returns a live elapsed-seconds value that ticks every 100ms while startTime is set */
-function useElapsedTimer(startTime: number | null): number {
-  const [elapsed, setElapsed] = useState(0)
-  useEffect(() => {
-    if (!startTime) { setElapsed(0); return }
-    setElapsed((Date.now() - startTime) / 1000)
-    const id = setInterval(() => setElapsed((Date.now() - startTime) / 1000), 100)
-    return () => clearInterval(id)
-  }, [startTime])
-  return elapsed
-}
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
-function MemoryRefBlock({ query, found, content, elapsed }: { query: string; found: number; content: string; elapsed?: number | null }) {
-  const [open, setOpen] = useState(false)
-  const isActive = found === undefined || found === null  // still searching
-  return (
-    <div
-      className="mb-3 rounded-xl overflow-hidden"
-      style={{ background: 'rgba(0,47,167,0.05)' }}
-    >
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer"
-        style={{ color: '#5a6a8a' }}
-      >
-        {isActive ? <span className="tool-spinner" /> : <span style={{ fontSize: 11 }}>◎</span>}
-        <span className="text-xs font-medium">
-          Memory search「{query}」{found != null && ` · found ${found}`}
-          {elapsed != null && <span style={{ color: '#8a9ab5', marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
-        </span>
-        {!isActive && (open ? <ChevronDown size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} />)}
-      </button>
-      {open && content && (
-        <p className="px-3.5 pb-2.5 text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#8a9ab5' }}>
-          {content || '（无内容）'}
-        </p>
-      )}
-    </div>
-  )
-}
-
-function MemoryOpsBlock({ ops, elapsed }: { ops: MemoryOperation[]; elapsed?: number | null }) {
-  const [open, setOpen] = useState(false)
-  const symbols: Record<string, string> = { saved: '◉', updated: '◎', deleted: '⊗' }
-  const labels: Record<string, string> = { saved: 'saved', updated: 'updated', deleted: 'deleted' }
-  const colors: Record<string, string> = { saved: '#5a6a8a', updated: '#5a6a8a', deleted: '#c05050' }
-  return (
-    <div
-      className="mb-3 rounded-xl overflow-hidden"
-      style={{ background: 'rgba(0,47,167,0.05)' }}
-    >
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer"
-        style={{ color: '#5a6a8a' }}
-      >
-        <span style={{ fontSize: 11 }}>◑</span>
-        <span className="text-xs font-medium">
-          Memory ops · {ops.length}
-          {elapsed != null && <span style={{ color: '#8a9ab5', marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
-        </span>
-        {open ? <ChevronDown size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} />}
-      </button>
-      {open && (
-        <div className="px-3.5 pb-2.5 space-y-1.5">
-          {ops.map((op, i) => (
-            <div key={i} className="flex items-start gap-2 text-xs" style={{ color: '#5a6a8a' }}>
-              <span className="flex-shrink-0" style={{ color: colors[op.type], fontSize: 10 }}>
-                {symbols[op.type]} {labels[op.type]}
-              </span>
-              <span className="leading-relaxed" style={{ color: '#8a9ab5' }}>
-                {op.type === 'deleted' ? `ID: ${op.memory_id?.slice(0, 8)}... ${op.reason ? `(${op.reason})` : ''}` : (op.content || '（内容为空）')}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function ThinkingBlock({ text, defaultOpen = false, thinkingTime, liveElapsed }: { text: string; defaultOpen?: boolean; thinkingTime?: number | null; liveElapsed?: number }) {
-  const [open, setOpen] = useState(defaultOpen)
-  const isActive = liveElapsed != null && liveElapsed > 0 && !thinkingTime
-  const displayTime = thinkingTime ?? liveElapsed
-  return (
-    <div
-      className="mb-3 rounded-xl overflow-hidden"
-      style={{ background: 'rgba(0,47,167,0.05)' }}
-    >
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer"
-        style={{ color: '#5a6a8a' }}
-      >
-        {isActive ? <span className="tool-spinner" /> : <span style={{ fontSize: 11 }}>⊘</span>}
-        <span className="text-xs font-medium">
-          Thinking
-          {displayTime != null && displayTime > 0 && <span style={{ color: '#8a9ab5', marginLeft: 4 }}>({formatElapsed(displayTime)})</span>}
-        </span>
-        {open ? <ChevronDown size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} />}
-      </button>
-      {open && (
-        <p className="px-3.5 pb-2.5 text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#8a9ab5' }}>
-          {text}
-        </p>
-      )}
-    </div>
-  )
-}
-
-function MarkdownContent({ content }: { content: string }) {
-  return (
-    <div className="md-content">
-      <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
-        {content}
-      </ReactMarkdown>
-    </div>
-  )
-}
-
-function UserAvatar() {
-  return (
-    <div
-      className="flex-shrink-0 flex items-center justify-center rounded-full text-xs font-semibold select-none"
-      style={{ width: 28, height: 28, background: '#eef1f8', color: '#002FA7' }}
-    >
-      D
-    </div>
-  )
-}
-
-function AiAvatar() {
-  return (
-    <div
-      className="flex-shrink-0 flex items-center justify-center select-none"
-      style={{ width: 28, height: 28, color: '#002FA7', fontSize: 16, lineHeight: 1 }}
-    >
-      ✦
-    </div>
-  )
-}
 
 function WelcomeScreen({ onSelectScene, currentScene }: { onSelectScene: (scene: string) => void; currentScene: string }) {
   const [greeting] = useState(() => WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)])
@@ -277,7 +120,7 @@ function WelcomeScreen({ onSelectScene, currentScene }: { onSelectScene: (scene:
 export default function ChatPage() {
   const { sessions, currentSession, loading, fetchSessions, createSession, selectSession, deleteSession, updateSessionModel } =
     useSessionStore()
-  const { messages, isStreaming, loadMessages, sendMessage, clearMessages, deleteConversation, lastError, retryLast, clearError, thinkingStartTime, toolStartTime, streamBlocks } =
+  const { messages, isStreaming, loadMessages, sendMessage, clearMessages, deleteConversation, lastError, retryLast, clearError } =
     useChatStore()
   const { token } = useAuthStore()
 
@@ -286,11 +129,9 @@ export default function ChatPage() {
   const [settingsPage, setSettingsPage] = useState<'menu' | 'memory' | 'features' | 'debug'>('menu')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
-  // Message copy state
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null)
   const [debugOpenMsgId, setDebugOpenMsgId] = useState<string | null>(null)
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Toast
   const [toast, setToast] = useState<string | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [showSceneSelect, setShowSceneSelect] = useState(false)
@@ -310,7 +151,32 @@ export default function ChatPage() {
   const swipeStartX = useRef<number | null>(null)
   const swipeStartY = useRef<number | null>(null)
 
-  // Window-level swipe gesture (works through overlays and fixed panels)
+  // ─── Stable callbacks for MessageItem (prevent re-renders) ───
+  const handleCopyMsg = useCallback(async (msgId: string, content: string) => {
+    await navigator.clipboard.writeText(content)
+    setCopiedMsgId(msgId)
+    if (copiedTimer.current) clearTimeout(copiedTimer.current)
+    copiedTimer.current = setTimeout(() => setCopiedMsgId(null), 1500)
+  }, [])
+
+  const handleDeleteConv = useCallback(async (conversationId: string) => {
+    if (!window.confirm('确定删除这轮对话吗？')) return
+    const session = useSessionStore.getState().currentSession
+    if (!session) return
+    try {
+      await deleteConversation(session.id, conversationId)
+    } catch {
+      setToast('删除失败，请重试')
+      if (toastTimer.current) clearTimeout(toastTimer.current)
+      toastTimer.current = setTimeout(() => setToast(null), 1500)
+    }
+  }, [deleteConversation])
+
+  const handleRetry = useCallback((_msgId: string) => {
+    console.log('retry', _msgId)
+  }, [])
+
+  // Window-level swipe gesture
   useEffect(() => {
     function onTouchStart(e: TouchEvent) {
       swipeStartX.current = e.touches[0].clientX
@@ -362,8 +228,8 @@ export default function ChatPage() {
     const dx = e.changedTouches[0].clientX - startX
     itemSwipeRef.current = null
     setTimeout(() => { itemSwipeActive.current = false }, 50)
-    if (!isSwiping) return // tap — let click pass through normally
-    e.preventDefault() // swipe — prevent ghost click
+    if (!isSwiping) return
+    e.preventDefault()
     if (dx < -70) setSwipedId(id)
     else if (dx > 30) setSwipedId(null)
   }
@@ -379,29 +245,7 @@ export default function ChatPage() {
     setSwipedId(null)
   }
 
-  function showToast(msg: string) {
-    setToast(msg)
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setToast(null), 1500)
-  }
-
-  async function handleCopyMsg(msgId: string, content: string) {
-    await navigator.clipboard.writeText(content)
-    setCopiedMsgId(msgId)
-    if (copiedTimer.current) clearTimeout(copiedTimer.current)
-    copiedTimer.current = setTimeout(() => setCopiedMsgId(null), 1500)
-  }
-
-  async function handleDeleteConv(conversationId: string) {
-    if (!window.confirm('确定删除这轮对话吗？')) return
-    try {
-      await deleteConversation(currentSession!.id, conversationId)
-    } catch {
-      showToast('删除失败，请重试')
-    }
-  }
-
-  // iOS keyboard: listen to visualViewport resize to keep input above keyboard
+  // iOS keyboard
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
@@ -417,13 +261,13 @@ export default function ChatPage() {
     }
   }, [])
 
-  // Bug 4: Auto-grow textarea; collapse + reset scroll on blur
+  // Auto-grow textarea
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
     if (!isFocused) {
       el.style.height = '22px'
-      el.scrollTop = 0  // show text from the beginning when collapsed
+      el.scrollTop = 0
       return
     }
     el.style.height = 'auto'
@@ -433,7 +277,7 @@ export default function ChatPage() {
   // Load sessions on mount
   useEffect(() => { if (token) fetchSessions() }, [token, fetchSessions])
 
-  // Clean up swipe/rename state whenever sidebar closes
+  // Clean up swipe/rename state
   useEffect(() => {
     if (!sidebarOpen) { setSwipedId(null); setRenameModal(null) }
   }, [sidebarOpen])
@@ -462,10 +306,6 @@ export default function ChatPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showModelDropdown])
 
-  // Live elapsed timers
-  const liveThinkingElapsed = useElapsedTimer(thinkingStartTime)
-  const liveToolElapsed = useElapsedTimer(toolStartTime)
-
   // When active session changes: load its messages
   useEffect(() => {
     if (currentSession) {
@@ -482,7 +322,7 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages.length])
 
-  // During streaming, scroll periodically instead of on every token
+  // During streaming, scroll periodically
   useEffect(() => {
     if (!isStreaming) return
     const id = setInterval(() => {
@@ -491,7 +331,7 @@ export default function ChatPage() {
     return () => clearInterval(id)
   }, [isStreaming])
 
-  // Restore focus to input after streaming ends
+  // Restore focus after streaming
   useEffect(() => {
     if (!isStreaming) {
       textareaRef.current?.focus()
@@ -517,7 +357,6 @@ export default function ChatPage() {
       await createSession(sceneKey, model)
     }
   }
-
 
   async function handleSend() {
     const text = input.trim()
@@ -571,10 +410,7 @@ export default function ChatPage() {
           </div>
 
           {showSceneSelect && (
-            <div
-              ref={sceneRef}
-              className="grid grid-cols-2 gap-2 mt-3"
-            >
+            <div ref={sceneRef} className="grid grid-cols-2 gap-2 mt-3">
               {SCENES.map(s => {
                 const defaultScene = currentSession?.scene_type || 'daily'
                 const isDefault = s.key === defaultScene
@@ -632,7 +468,6 @@ export default function ChatPage() {
                       className="relative mb-0.5 rounded-md select-none"
                       style={{ overflow: 'hidden' }}
                     >
-                      {/* Swipe-reveal action buttons — only rendered when swiped */}
                       {isSwiped && (
                         <div
                           className="absolute right-0 top-0 bottom-0 flex"
@@ -659,7 +494,6 @@ export default function ChatPage() {
                           </button>
                         </div>
                       )}
-                      {/* Session content — slides left on swipe */}
                       <button
                         onClick={() => {
                           if (isSwiped) { setSwipedId(null); return }
@@ -757,7 +591,7 @@ export default function ChatPage() {
           </>
         )}
 
-        {/* Bug 1: Sidebar bottom — explicit dark background + safe-area bottom padding */}
+        {/* Sidebar bottom */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', background: '#0a1a3a', paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <button
             onClick={() => setShowSettings(true)}
@@ -792,7 +626,6 @@ export default function ChatPage() {
             background: 'transparent',
           }}
         >
-          {/* Left: hamburger */}
           <button
             className="flex md:hidden items-center justify-center rounded-md cursor-pointer"
             style={{ width: 32, height: 32, color: '#7a8399' }}
@@ -880,94 +713,29 @@ export default function ChatPage() {
           ) : (
             <div className="mx-auto w-full px-3 md:px-6 pt-8" style={{ maxWidth: 800, paddingBottom: 90 }}>
 
-              {/* Completed messages */}
+              {/* Completed messages — each item is memo'd */}
               {Array.isArray(messages) && messages.map(msg => (
-                <div key={msg.id} className="flex gap-3 mb-6">
-                  {msg.role === 'user' ? <UserAvatar /> : <AiAvatar />}
-                  <div className="flex-1 min-w-0 pt-0.5">
-                    {msg.role === 'assistant' && (msg.thinking || msg.thinking_summary) && (
-                      <ThinkingBlock text={(msg.thinking ?? msg.thinking_summary)!} thinkingTime={msg.thinkingTime} />
-                    )}
-                    {msg.role === 'assistant' && msg.memoryRef && (
-                      <MemoryRefBlock query={msg.memoryRef.query} found={msg.memoryRef.found} content={msg.memoryRef.content} />
-                    )}
-                    {msg.role === 'assistant' && msg.memoryOps && msg.memoryOps.length > 0 && (
-                      <MemoryOpsBlock ops={msg.memoryOps} />
-                    )}
-                    {msg.role === 'assistant' ? (
-                      <MarkdownContent content={msg.content} />
-                    ) : (
-                      <p className="text-sm leading-7 whitespace-pre-wrap" style={{ color: '#1a1f2e' }}>
-                        {msg.content}
-                      </p>
-                    )}
-                    {/* Action row: time/tokens on one side, buttons on other */}
-                    <div className="flex items-center justify-between mt-1.5" style={{ minHeight: 24 }}>
-                      {msg.role === 'assistant' ? (
-                        <>
-                          <span className="flex items-center gap-1 text-xs" style={{ color: '#b0b8c8', fontSize: 11 }}>
-                            {formatMsgTime(msg.created_at)}
-                            {msg.tokens && (
-                              <>
-                                <span style={{ margin: '0 2px' }}>·</span>
-                                <span>⏱</span>
-                                <span>{msg.tokens.input.toLocaleString()} in</span>
-                                <span style={{ margin: '0 2px' }}>·</span>
-                                <span>{msg.tokens.output.toLocaleString()} out</span>
-                              </>
-                            )}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            {msg.debugInfo && (
-                              <button onClick={() => setDebugOpenMsgId(debugOpenMsgId === msg.id ? null : msg.id)} className="flex items-center justify-center transition-colors cursor-pointer" style={{ color: debugOpenMsgId === msg.id ? '#002FA7' : '#c0c8d8' }} onMouseEnter={e => (e.currentTarget.style.color = '#002FA7')} onMouseLeave={e => { if (debugOpenMsgId !== msg.id) e.currentTarget.style.color = '#c0c8d8' }} title="上下文详情">
-                                <Brain size={14} strokeWidth={1.8} />
-                              </button>
-                            )}
-                            <button onClick={() => handleCopyMsg(msg.id, msg.content)} className="flex items-center justify-center transition-colors cursor-pointer" style={{ color: copiedMsgId === msg.id ? '#22c55e' : '#c0c8d8' }} title="复制">
-                              {copiedMsgId === msg.id ? <Check size={14} strokeWidth={2} /> : <Copy size={14} strokeWidth={1.8} />}
-                            </button>
-                            {msg.conversationId && (
-                              <button onClick={() => handleDeleteConv(msg.conversationId!)} className="flex items-center justify-center transition-colors cursor-pointer" style={{ color: '#c0c8d8' }} onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')} onMouseLeave={e => (e.currentTarget.style.color = '#c0c8d8')} title="删除">
-                                <Trash2 size={14} strokeWidth={1.8} />
-                              </button>
-                            )}
-                            <button onClick={() => console.log('retry', msg.id)} className="flex items-center justify-center transition-colors cursor-pointer" style={{ color: '#c0c8d8' }} onMouseEnter={e => (e.currentTarget.style.color = '#002FA7')} onMouseLeave={e => (e.currentTarget.style.color = '#c0c8d8')} title="重发">
-                              <RotateCcw size={14} strokeWidth={1.8} />
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => handleCopyMsg(msg.id, msg.content)} className="flex items-center justify-center transition-colors cursor-pointer" style={{ color: copiedMsgId === msg.id ? '#22c55e' : '#c0c8d8' }} title="复制">
-                              {copiedMsgId === msg.id ? <Check size={14} strokeWidth={2} /> : <Copy size={14} strokeWidth={1.8} />}
-                            </button>
-                            {msg.conversationId && (
-                              <button onClick={() => handleDeleteConv(msg.conversationId!)} className="flex items-center justify-center transition-colors cursor-pointer" style={{ color: '#c0c8d8' }} onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')} onMouseLeave={e => (e.currentTarget.style.color = '#c0c8d8')} title="删除">
-                                <Trash2 size={14} strokeWidth={1.8} />
-                              </button>
-                            )}
-                            <button onClick={() => console.log('retry', msg.id)} className="flex items-center justify-center transition-colors cursor-pointer" style={{ color: '#c0c8d8' }} onMouseEnter={e => (e.currentTarget.style.color = '#002FA7')} onMouseLeave={e => (e.currentTarget.style.color = '#c0c8d8')} title="重发">
-                              <RotateCcw size={14} strokeWidth={1.8} />
-                            </button>
-                          </div>
-                          <span className="text-xs" style={{ color: '#b0b8c8', fontSize: 11 }}>
-                            {formatMsgTime(msg.created_at)}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    {msg.role === 'assistant' && msg.debugInfo && debugOpenMsgId === msg.id && (
-                      <ContextDebugPanel debugInfo={msg.debugInfo} />
-                    )}
-                  </div>
-                </div>
+                <MessageItem
+                  key={msg.id}
+                  msg={msg}
+                  isDebugOpen={debugOpenMsgId === msg.id}
+                  isCopied={copiedMsgId === msg.id}
+                  onToggleDebug={() => setDebugOpenMsgId(debugOpenMsgId === msg.id ? null : msg.id)}
+                  onCopy={handleCopyMsg}
+                  onDelete={handleDeleteConv}
+                  onRetry={handleRetry}
+                />
               ))}
 
               {/* Error / retry block */}
               {lastError && !isStreaming && (
                 <div className="flex gap-3 mb-6">
-                  <AiAvatar />
+                  <div
+                    className="flex-shrink-0 flex items-center justify-center select-none"
+                    style={{ width: 28, height: 28, color: '#002FA7', fontSize: 16, lineHeight: 1 }}
+                  >
+                    ✦
+                  </div>
                   <div
                     className="flex-1 flex items-center justify-between gap-3 rounded-lg px-3 py-2"
                     style={{ borderLeft: '3px solid rgba(208,64,64,0.2)', background: 'rgba(208,64,64,0.03)' }}
@@ -996,77 +764,14 @@ export default function ChatPage() {
                 </div>
               )}
 
-              {/* Memory search indicator */}
-              {/* (now handled inside streamBlocks below) */}
-
-              {/* Live streaming row — renders blocks in chronological order */}
-              {isStreaming && streamBlocks.length > 0 && (
-                <div className="flex gap-3 mb-8">
-                  <AiAvatar />
-                  <div className="flex-1 min-w-0 pt-0.5">
-                    {streamBlocks.map((block, i) => {
-                      switch (block.kind) {
-                        case 'thinking': {
-                          const isActive = block.elapsed === null
-                          return (
-                            <ThinkingBlock
-                              key={`sb-${i}`}
-                              text={block.text}
-                              defaultOpen={isActive}
-                              thinkingTime={block.elapsed}
-                              liveElapsed={isActive ? liveThinkingElapsed : undefined}
-                            />
-                          )
-                        }
-                        case 'text':
-                          return <MarkdownContent key={`sb-${i}`} content={block.text} />
-                        case 'tool_searching':
-                          return (
-                            <div key={`sb-${i}`} className="mb-3 rounded-xl overflow-hidden" style={{ background: 'rgba(0,47,167,0.05)' }}>
-                              <div className="flex items-center gap-2 px-3.5 py-2.5" style={{ color: '#5a6a8a' }}>
-                                <span className="tool-spinner" />
-                                <span className="text-xs font-medium">
-                                  Memory search{block.query ? `「${block.query}」` : ''}
-                                  <span style={{ color: '#8a9ab5', marginLeft: 4 }}>({formatElapsed(liveToolElapsed)})</span>
-                                </span>
-                              </div>
-                            </div>
-                          )
-                        case 'tool_result':
-                          return (
-                            <MemoryRefBlock
-                              key={`sb-${i}`}
-                              query={block.query}
-                              found={block.found}
-                              content={block.content}
-                              elapsed={block.elapsed}
-                            />
-                          )
-                        case 'memory_op':
-                          return (
-                            <div key={`sb-${i}`} className="mb-3 rounded-xl overflow-hidden" style={{ background: 'rgba(0,47,167,0.05)' }}>
-                              <div className="flex items-center gap-2 px-3.5 py-2.5" style={{ color: '#5a6a8a' }}>
-                                <span style={{ fontSize: 11 }}>{block.op.type === 'saved' ? '◉' : block.op.type === 'updated' ? '◎' : '⊗'}</span>
-                                <span className="text-xs font-medium">
-                                  Memory {block.op.type}
-                                  {block.elapsed != null && <span style={{ color: '#8a9ab5', marginLeft: 4 }}>({formatElapsed(block.elapsed)})</span>}
-                                </span>
-                              </div>
-                            </div>
-                          )
-                        default:
-                          return null
-                      }
-                    })}
-                  </div>
-                </div>
-              )}
+              {/* Live streaming — isolated component */}
+              <StreamingMessage />
 
               <div ref={messagesEndRef} />
             </div>
           )}
 
-          {/* Sticky input — inside scroll container so scrollbar is not covered */}
+          {/* Sticky input */}
           <div style={{
             position: 'sticky',
             bottom: 0,
@@ -1075,7 +780,6 @@ export default function ChatPage() {
             background: '#f2f4fa',
             paddingBottom: keyboardOffset > 0 ? `${keyboardOffset}px` : 'env(safe-area-inset-bottom)',
           }}>
-            {/* Top gradient fade — text fades out smoothly */}
             <div style={{
               position: 'absolute',
               top: -36,
