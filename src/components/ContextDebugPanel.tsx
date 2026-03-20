@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import type { DebugInfo } from '../api/chat'
 
-type Tab = 'memories' | 'search' | 'window' | 'summaries' | 'session_summary'
+type Tab = 'memories' | 'search' | 'window' | 'summaries' | 'session_summary' | 'graph'
 
 const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: 'memories', icon: '📌', label: '记忆' },
@@ -10,6 +10,7 @@ const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: 'window', icon: '💬', label: '历史' },
   { key: 'summaries', icon: '📝', label: '摘要' },
   { key: 'session_summary', icon: '📋', label: 'Session摘要' },
+  { key: 'graph', icon: '🕸️', label: '图谱' },
 ]
 
 const LAYER_COLORS: Record<string, string> = {
@@ -45,6 +46,7 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
   const usageRatio = token_usage.budget > 0 ? token_usage.total / token_usage.budget : 0
 
   const hasSessionSummary = debugInfo.session_summary?.exists ?? false
+  const graphTotal = (debugInfo.graph?.seed_nodes?.length ?? 0) + (debugInfo.graph?.expanded_nodes?.length ?? 0)
 
   const counts: Record<Tab, number | string> = {
     memories: memCount,
@@ -52,6 +54,7 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
     window: windowRounds > 0 ? `${windowRounds}轮` : '0',
     summaries: summaryCount,
     session_summary: hasSessionSummary ? '有' : '无',
+    graph: graphTotal,
   }
 
   return (
@@ -68,7 +71,7 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
       {activeTab === null ? (
         <div className="px-2.5 py-2.5 sm:px-3">
           <div className="flex flex-wrap gap-1.5 mb-2">
-            {TABS.filter(t => t.key !== 'session_summary' || hasSessionSummary).map(t => {
+            {TABS.filter(t => (t.key !== 'session_summary' || hasSessionSummary) && (t.key !== 'graph' || graphTotal > 0)).map(t => {
               const c = counts[t.key]
               const empty = c === 0 || c === '0'
               return (
@@ -129,6 +132,7 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
             {activeTab === 'window' && <WindowDetail debugInfo={debugInfo} />}
             {activeTab === 'summaries' && <SummaryDetail debugInfo={debugInfo} />}
             {activeTab === 'session_summary' && <SessionSummaryDetail debugInfo={debugInfo} />}
+            {activeTab === 'graph' && <GraphDetail debugInfo={debugInfo} />}
           </div>
         </div>
       )}
@@ -281,5 +285,90 @@ function SessionSummaryDetail({ debugInfo }: { debugInfo: DebugInfo }) {
       </span>
       <p className="leading-relaxed mt-1" style={{ color: '#3a4a6a', wordBreak: 'break-word' }}>{content}</p>
     </div>
+  )
+}
+
+const RELATION_LABELS: Record<string, string> = {
+  causal: '因果', echo: '呼应', growth: '成长',
+  same_topic: '同主题', temporal: '时间线',
+}
+
+function GraphDetail({ debugInfo }: { debugInfo: DebugInfo }) {
+  const graph = debugInfo.graph
+  if (!graph) return <p className="text-xs py-2" style={{ color: '#b0b8c8' }}>图谱未启用</p>
+  const [showRaw, setShowRaw] = useState(false)
+
+  return (
+    <>
+      {graph.seed_nodes.map((seed, i) => (
+        <div
+          key={`seed-${i}`}
+          className="rounded-lg px-2.5 py-2 text-xs"
+          style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(0,47,167,0.15)' }}
+        >
+          <div className="flex flex-wrap items-center gap-1.5 mb-1">
+            <span
+              className="px-1.5 py-0.5 rounded text-xs font-medium"
+              style={{ background: 'rgba(0,47,167,0.10)', color: '#002FA7', fontSize: 10 }}
+            >
+              ◆ 种子
+            </span>
+            <span style={{ color: '#8a9ab5', fontSize: 10 }}>
+              相似度: {seed.similarity.toFixed(2)}
+            </span>
+            {seed.base_importance != null && seed.base_importance >= 0.9 && (
+              <span style={{ color: '#e0a030', fontSize: 10 }}>★</span>
+            )}
+          </div>
+          <p style={{ color: '#3a4a6a', wordBreak: 'break-word' }}>{seed.content}</p>
+
+          {/* 展开的邻居节点 */}
+          {graph.expanded_nodes.map((nb, j) => (
+            <div
+              key={`nb-${j}`}
+              className="ml-3 mt-1.5 rounded-lg px-2 py-1.5"
+              style={{ background: 'rgba(0,47,167,0.03)', borderLeft: '2px solid rgba(0,47,167,0.15)' }}
+            >
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span
+                  className="px-1.5 py-0.5 rounded"
+                  style={{ background: 'rgba(136,85,204,0.10)', color: '#8855CC', fontSize: 10 }}
+                >
+                  └─ {RELATION_LABELS[nb.edge_relation_type] || nb.edge_relation_type}
+                </span>
+                {nb.emotion_intensity != null && (
+                  <span style={{ color: '#8a9ab5', fontSize: 10 }}>强度: {nb.emotion_intensity}</span>
+                )}
+                {nb.base_importance != null && nb.base_importance >= 0.9 && (
+                  <span style={{ color: '#e0a030', fontSize: 10 }}>★</span>
+                )}
+              </div>
+              <p style={{ color: '#5a6a8a', wordBreak: 'break-word' }}>{nb.content}</p>
+            </div>
+          ))}
+        </div>
+      ))}
+
+      {/* 注入原文（可折叠） */}
+      {graph.formatted_text && (
+        <div
+          className="rounded-lg px-2.5 py-2 text-xs"
+          style={{ background: 'rgba(255,255,255,0.4)', border: '1px solid rgba(0,47,167,0.06)' }}
+        >
+          <button
+            onClick={() => setShowRaw(!showRaw)}
+            className="cursor-pointer text-xs"
+            style={{ color: '#8a9ab5' }}
+          >
+            {showRaw ? '▼' : '▶'} 注入原文
+          </button>
+          {showRaw && (
+            <pre className="mt-1 whitespace-pre-wrap" style={{ color: '#5a6a8a', fontSize: 11 }}>
+              {graph.formatted_text}
+            </pre>
+          )}
+        </div>
+      )}
+    </>
   )
 }
