@@ -272,8 +272,8 @@ export const useReadingStore = create<ReadingState>((set, get) => ({
 
       try {
         const content = await getReadingContentAPI(sessionId)
-        if (content.ai_bookmarks && content.ai_bookmarks.length > 0) {
-          // 通读完成
+        if (content.ai_bookmarks !== null && content.ai_bookmarks !== undefined) {
+          // 通读完成（包括空数组也算完成）
           if (_pollTimer) clearInterval(_pollTimer)
           _pollTimer = null
           set({

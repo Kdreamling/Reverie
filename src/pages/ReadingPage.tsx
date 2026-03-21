@@ -42,13 +42,15 @@ export default function ReadingPage() {
     if (!sessionId) return
 
     const handleSave = () => saveProgress(sessionId)
-    window.addEventListener('beforeunload', handleSave)
-    document.addEventListener('visibilitychange', () => {
+    const handleVisibility = () => {
       if (document.visibilityState === 'hidden') handleSave()
-    })
+    }
+    window.addEventListener('beforeunload', handleSave)
+    document.addEventListener('visibilitychange', handleVisibility)
 
     return () => {
       window.removeEventListener('beforeunload', handleSave)
+      document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [sessionId, saveProgress])
 
