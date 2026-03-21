@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { Upload, FileText, ClipboardPaste } from 'lucide-react'
+import { Upload, ClipboardPaste } from 'lucide-react'
 import { useReadingStore } from '../../stores/readingStore'
 
 interface ReadingUploadProps {
