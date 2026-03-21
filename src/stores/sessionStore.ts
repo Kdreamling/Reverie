@@ -38,7 +38,7 @@ interface SessionState {
   loading: boolean
 
   fetchSessions: () => Promise<void>
-  createSession: (scene_type: string, model: string) => Promise<void>
+  createSession: (scene_type: string, model: string) => Promise<Session>
   selectSession: (id: string) => void
   deleteSession: (id: string) => Promise<void>
   updateSessionModel: (model: string) => Promise<void>
@@ -65,6 +65,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   async createSession(scene_type, model) {
     const session = await createSessionAPI(scene_type, model)
     set(s => ({ sessions: [session, ...s.sessions], currentSession: session }))
+    return session
   },
 
   selectSession(id) {

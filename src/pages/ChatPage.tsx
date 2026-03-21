@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
 import { Plus, Settings, ArrowUp, ChevronDown, X, Menu } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
 import { useAuthStore } from '../stores/authStore'
@@ -118,6 +119,7 @@ function WelcomeScreen({ onSelectScene, currentScene }: { onSelectScene: (scene:
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ChatPage() {
+  const navigate = useNavigate()
   const { sessions, currentSession, loading, fetchSessions, createSession, selectSession, deleteSession, updateSessionModel } =
     useSessionStore()
   const { messages, isStreaming, loadMessages, sendMessage, clearMessages, deleteConversation, lastError, retryLast, clearError } =
@@ -345,16 +347,27 @@ export default function ChatPage() {
   async function handleCreateWithScene(sceneKey: string) {
     setShowSceneSelect(false)
     setSidebarOpen(false)
-    await createSession(sceneKey, model)
+    const session = await createSession(sceneKey, model)
+    if (sceneKey === 'reading' && session) {
+      navigate(`/read/${session.id}`)
+    }
   }
 
   async function handleWelcomeScene(sceneKey: string) {
     if (currentSession) {
+      if (sceneKey === 'reading') {
+        const session = await createSession(sceneKey, model)
+        if (session) navigate(`/read/${session.id}`)
+        return
+      }
       await updateSessionAPI(currentSession.id, { scene_type: sceneKey })
       await fetchSessions()
       selectSession(currentSession.id)
     } else {
-      await createSession(sceneKey, model)
+      const session = await createSession(sceneKey, model)
+      if (sceneKey === 'reading' && session) {
+        navigate(`/read/${session.id}`)
+      }
     }
   }
 
@@ -497,6 +510,11 @@ export default function ChatPage() {
                       <button
                         onClick={() => {
                           if (isSwiped) { setSwipedId(null); return }
+                          if (session.scene_type === 'reading') {
+                            navigate(`/read/${session.id}`)
+                            setSidebarOpen(false)
+                            return
+                          }
                           selectSession(session.id); setSidebarOpen(false)
                         }}
                         onMouseEnter={() => setHoveredId(session.id)}
