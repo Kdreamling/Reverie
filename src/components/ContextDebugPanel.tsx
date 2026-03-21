@@ -17,6 +17,7 @@ const LAYER_COLORS: Record<string, string> = {
   core_base: '#002FA7',
   core_living: '#3366CC',
   scene: '#6699DD',
+  ai_journal: '#9966CC',
 }
 
 const MATCH_COLORS: Record<string, string> = {
@@ -202,6 +203,16 @@ function SearchDetail({ debugInfo }: { debugInfo: DebugInfo }) {
           </div>
           {r.source === 'summaries' ? (
             <p style={{ color: '#3a4a6a', wordBreak: 'break-word' }}>{r.summary}</p>
+          ) : r.source === 'memories' ? (
+            <>
+              <span
+                className="px-1.5 py-0.5 rounded text-xs"
+                style={{ background: (LAYER_COLORS[r.layer ?? ''] || '#9966CC') + '15', color: LAYER_COLORS[r.layer ?? ''] || '#9966CC', fontSize: 10 }}
+              >
+                {r.layer || 'memory'}
+              </span>
+              <p style={{ color: '#3a4a6a', wordBreak: 'break-word', marginTop: 4 }}>📝 {r.content}</p>
+            </>
           ) : (
             <>
               <p style={{ color: '#3a4a6a', wordBreak: 'break-word' }}>👤 {r.user_msg}</p>

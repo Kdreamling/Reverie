@@ -17,7 +17,8 @@ export interface DebugInfo {
     scene: { id: string; content: string; scene_type: string }[]
   }
   search_results: {
-    user_msg: string; assistant_msg: string; summary?: string
+    user_msg?: string; assistant_msg?: string; summary?: string
+    content?: string; layer?: string
     score: number; match_type: string; source: string
   }[]
   sliding_window: { rounds: number; range: string; messages?: { user_msg?: string; assistant_msg?: string }[] }
