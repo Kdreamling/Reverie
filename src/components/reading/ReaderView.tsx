@@ -1,33 +1,41 @@
-import { memo, useCallback, useEffect, useRef } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useReadingStore, type BubbleState } from '../../stores/readingStore'
 import type { ReadingSection, AiBookmark } from '../../api/reading'
 import SelectionToolbar from './SelectionToolbar'
 import ReadingChatView from './ReadingChatView'
-
-// ---- SectionBlock ----
+import MobileSelectionSheet from './MobileSelectionSheet'
 
 interface SectionBlockProps {
   section: ReadingSection
   isActive: boolean
+  isPressing: boolean
+  isTouchDevice: boolean
   bookmark: AiBookmark | undefined
   bubble: BubbleState | undefined
-  onClickSection: (index: number) => void
+  onMouseDownSection: (index: number) => void
+  onTouchStartSection: (index: number) => void
+  onTouchEndSection: (index: number) => void
+  onTouchMoveSection: () => void
   onClickBookmark: (index: number) => void
 }
 
 export const SectionBlock = memo(function SectionBlock({
   section,
   isActive,
+  isPressing,
+  isTouchDevice,
   bookmark,
   bubble,
-  onClickSection,
+  onMouseDownSection,
+  onTouchStartSection,
+  onTouchEndSection,
+  onTouchMoveSection,
   onClickBookmark,
 }: SectionBlockProps) {
   const isHeading = section.type === 'heading'
 
   return (
     <div className="relative group" data-section-id={section.id} style={{ marginBottom: isHeading ? 8 : 20 }}>
-      {/* AI bookmark dot */}
       {bookmark && !bubble && (
         <button
           onClick={(e) => { e.stopPropagation(); onClickBookmark(section.id) }}
@@ -46,9 +54,12 @@ export const SectionBlock = memo(function SectionBlock({
         />
       )}
 
-      {/* Section text */}
       <div
-        onClick={() => onClickSection(section.id)}
+        onMouseDown={isTouchDevice ? undefined : () => onMouseDownSection(section.id)}
+        onTouchStart={isTouchDevice ? () => onTouchStartSection(section.id) : undefined}
+        onTouchEnd={isTouchDevice ? () => onTouchEndSection(section.id) : undefined}
+        onTouchCancel={isTouchDevice ? onTouchMoveSection : undefined}
+        onTouchMove={isTouchDevice ? onTouchMoveSection : undefined}
         className="cursor-pointer transition-all duration-150 rounded-lg"
         style={{
           padding: isHeading ? '4px 0' : '6px 8px',
@@ -56,6 +67,7 @@ export const SectionBlock = memo(function SectionBlock({
           marginRight: -8,
           background: isActive ? 'rgba(0,47,167,0.04)' : 'transparent',
           borderLeft: isActive ? '2px solid rgba(0,47,167,0.3)' : '2px solid transparent',
+          transform: isPressing ? 'scale(0.985)' : 'scale(1)',
         }}
       >
         {isHeading ? (
@@ -100,15 +112,10 @@ export const SectionBlock = memo(function SectionBlock({
         )}
       </div>
 
-      {/* AI Bubble */}
-      {bubble && (
-        <AiBubbleInline bubble={bubble} />
-      )}
+      {bubble && <AiBubbleInline bubble={bubble} />}
     </div>
   )
 })
-
-// ---- AiBubble (inline under section) ----
 
 function AiBubbleInline({ bubble }: { bubble: BubbleState }) {
   return (
@@ -123,7 +130,7 @@ function AiBubbleInline({ bubble }: { bubble: BubbleState }) {
       }}
     >
       <div className="flex items-center gap-1.5 mb-1">
-        <span style={{ fontSize: 11, color: '#002FA7', opacity: 0.6 }}>✦</span>
+        <span style={{ fontSize: 11, color: '#002FA7', opacity: 0.6 }}>·</span>
         <span style={{ fontSize: 11, color: '#8a95aa', letterSpacing: '0.03em' }}>小克的纸条</span>
         {bubble.isStreaming && (
           <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#002FA7' }} />
@@ -139,8 +146,6 @@ function AiBubbleInline({ bubble }: { bubble: BubbleState }) {
     </div>
   )
 }
-
-// ---- ChapterEndCard ----
 
 interface ChapterEndCardProps {
   bookmark: AiBookmark
@@ -181,16 +186,26 @@ export const ChapterEndCard = memo(function ChapterEndCard({ bookmark, onChat }:
         >
           聊聊
         </button>
-        <span style={{ fontSize: '0.75rem', color: '#a0aac0' }}>或继续读 ↓</span>
+        <span style={{ fontSize: '0.75rem', color: '#a0aac0' }}>或继续读 →</span>
       </div>
     </div>
   )
 })
 
-// ---- ReaderView (main reading area) ----
-
 interface ReaderViewProps {
   sessionId: string
+}
+
+interface DesktopIntentState {
+  timer: ReturnType<typeof setTimeout> | null
+  sectionIndex: number | null
+  selectionDetected: boolean
+}
+
+interface TouchIntentState {
+  timer: ReturnType<typeof setTimeout> | null
+  sectionIndex: number | null
+  fired: boolean
 }
 
 export default function ReaderView({ sessionId }: ReaderViewProps) {
@@ -208,35 +223,93 @@ export default function ReaderView({ sessionId }: ReaderViewProps) {
   const isReadThrough = useReadingStore(s => s.isReadThrough)
   const readProgress = useReadingStore(s => s.readProgress)
 
+  const [isTouchDevice, setIsTouchDevice] = useState(false)
+  const [pressingSectionId, setPressingSectionId] = useState<number | null>(null)
+  const [mobileSheetSectionId, setMobileSheetSectionId] = useState<number | null>(null)
+
   const scrollRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const hasRestoredScrollRef = useRef(false)
+  const desktopIntentRef = useRef<DesktopIntentState>({
+    timer: null,
+    sectionIndex: null,
+    selectionDetected: false,
+  })
+  const touchIntentRef = useRef<TouchIntentState>({
+    timer: null,
+    sectionIndex: null,
+    fired: false,
+  })
 
-  // Build bookmark map for O(1) lookup
-  const bookmarkMap = useRef(new Map<number, AiBookmark>())
-  if (aiBookmarks) {
-    bookmarkMap.current.clear()
-    for (const bm of aiBookmarks) {
-      // Only show proactive bookmarks as dots (chapter_end shown as cards)
+  const bookmarkMap = useMemo(() => {
+    const map = new Map<number, AiBookmark>()
+    for (const bm of aiBookmarks ?? []) {
       if (bm.type === 'proactive') {
-        bookmarkMap.current.set(bm.section_index, bm)
+        map.set(bm.section_index, bm)
       }
     }
-  }
+    return map
+  }, [aiBookmarks])
 
-  const handleClickSection = useCallback((sectionIndex: number) => {
-    if (pendingBubble) return  // don't interrupt current stream
+  const chapterEndBookmarks = useMemo(
+    () => (aiBookmarks ?? []).filter(b => b.type === 'chapter_end'),
+    [aiBookmarks],
+  )
+
+  const lastSectionByChapter = useMemo(() => {
+    const map = new Map<number, number>()
+    for (const sec of sections) {
+      map.set(sec.chapter_index ?? 0, sec.id)
+    }
+    return map
+  }, [sections])
+
+  const sectionMap = useMemo(
+    () => new Map(sections.map(section => [section.id, section])),
+    [sections],
+  )
+
+  const clearDesktopIntent = useCallback(() => {
+    if (desktopIntentRef.current.timer) {
+      clearTimeout(desktopIntentRef.current.timer)
+    }
+    desktopIntentRef.current = {
+      timer: null,
+      sectionIndex: null,
+      selectionDetected: false,
+    }
+  }, [])
+
+  const clearTouchIntent = useCallback(() => {
+    if (touchIntentRef.current.timer) {
+      clearTimeout(touchIntentRef.current.timer)
+    }
+    touchIntentRef.current = {
+      timer: null,
+      sectionIndex: null,
+      fired: false,
+    }
+    setPressingSectionId(null)
+  }, [])
+
+  const triggerParagraphComment = useCallback((sectionIndex: number) => {
+    if (pendingBubble) return
     setCurrentSection(sectionIndex)
     setActiveSectionIndex(sectionIndex)
     requestComment(sessionId, sectionIndex)
-  }, [sessionId, pendingBubble, setActiveSectionIndex, setCurrentSection, requestComment])
+  }, [pendingBubble, requestComment, sessionId, setActiveSectionIndex, setCurrentSection])
+
+  const openSectionDiscussion = useCallback((sectionIndex: number) => {
+    setCurrentSection(sectionIndex)
+    setActiveSelection(null)
+    setActiveSectionIndex(sectionIndex)
+    setView('chat', sectionIndex)
+  }, [setActiveSectionIndex, setActiveSelection, setCurrentSection, setView])
 
   const handleClickBookmark = useCallback((sectionIndex: number) => {
-    // Show the pre-generated bookmark content as a bubble
-    const bm = bookmarkMap.current.get(sectionIndex)
+    const bm = bookmarkMap.get(sectionIndex)
     if (!bm) return
 
-    // Set bubble directly from bookmark content (no API call needed)
     const store = useReadingStore.getState()
     const newBubbles = new Map(store.bubbles)
     newBubbles.set(sectionIndex, {
@@ -252,35 +325,90 @@ export default function ReaderView({ sessionId }: ReaderViewProps) {
         current_section: sectionIndex,
       },
     })
-  }, [])
+  }, [bookmarkMap])
 
-  // Selection toolbar: user selects text → open chat
   const handleDiscussSelection = useCallback((text: string, sectionIndex: number) => {
     setCurrentSection(sectionIndex)
     setActiveSelection(text)
     setActiveSectionIndex(sectionIndex)
     setView('chat', sectionIndex)
-  }, [setCurrentSection, setActiveSelection, setActiveSectionIndex, setView])
+    setMobileSheetSectionId(null)
+  }, [setActiveSectionIndex, setActiveSelection, setCurrentSection, setView])
 
   const handleChapterChat = useCallback((sectionIndex: number) => {
-    setCurrentSection(sectionIndex)
-    setActiveSelection(null)
-    setView('chat', sectionIndex)
-  }, [setCurrentSection, setActiveSelection, setView])
+    openSectionDiscussion(sectionIndex)
+  }, [openSectionDiscussion])
 
   const handleCloseChat = useCallback(() => {
     setView('reader')
     setActiveSelection(null)
-  }, [setView, setActiveSelection])
+  }, [setActiveSelection, setView])
 
-  // Group sections by chapter for chapter_end cards
-  const chapterEndBookmarks = (aiBookmarks ?? []).filter(b => b.type === 'chapter_end')
-  // Find last section index per chapter
-  const lastSectionByChapter = new Map<number, number>()
-  for (const sec of sections) {
-    const ch = sec.chapter_index ?? 0
-    lastSectionByChapter.set(ch, sec.id)
-  }
+  const handleDesktopMouseDown = useCallback((sectionIndex: number) => {
+    if (isTouchDevice) return
+
+    clearDesktopIntent()
+    desktopIntentRef.current.sectionIndex = sectionIndex
+    desktopIntentRef.current.selectionDetected = false
+    desktopIntentRef.current.timer = setTimeout(() => {
+      const selectionText = window.getSelection()?.toString().trim() ?? ''
+      const shouldCancel = desktopIntentRef.current.selectionDetected || selectionText.length > 0
+      const targetSection = desktopIntentRef.current.sectionIndex
+      clearDesktopIntent()
+      if (!shouldCancel && targetSection !== null) {
+        triggerParagraphComment(targetSection)
+      }
+    }, 300)
+  }, [clearDesktopIntent, isTouchDevice, triggerParagraphComment])
+
+  const handleTouchStartSection = useCallback((sectionIndex: number) => {
+    if (!isTouchDevice) return
+
+    clearTouchIntent()
+    setPressingSectionId(sectionIndex)
+    touchIntentRef.current.sectionIndex = sectionIndex
+    touchIntentRef.current.timer = setTimeout(() => {
+      touchIntentRef.current.fired = true
+      setPressingSectionId(null)
+      setMobileSheetSectionId(sectionIndex)
+    }, 650)
+  }, [clearTouchIntent, isTouchDevice])
+
+  const handleTouchEndSection = useCallback((sectionIndex: number) => {
+    if (!isTouchDevice) return
+
+    const { fired, sectionIndex: pendingIndex } = touchIntentRef.current
+    const shouldOpenSheet = fired && pendingIndex === sectionIndex
+    clearTouchIntent()
+    if (!shouldOpenSheet) {
+      triggerParagraphComment(sectionIndex)
+    }
+  }, [clearTouchIntent, isTouchDevice, triggerParagraphComment])
+
+  const handleTouchMoveSection = useCallback(() => {
+    if (!isTouchDevice) return
+    clearTouchIntent()
+  }, [clearTouchIntent, isTouchDevice])
+
+  useEffect(() => {
+    setIsTouchDevice(typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0))
+  }, [])
+
+  useEffect(() => {
+    if (isTouchDevice) return
+
+    const handleSelectionChange = () => {
+      if (!desktopIntentRef.current.timer) return
+      const text = window.getSelection()?.toString().trim() ?? ''
+      if (text.length > 0) {
+        desktopIntentRef.current.selectionDetected = true
+        clearDesktopIntent()
+      }
+    }
+
+    document.addEventListener('selectionchange', handleSelectionChange)
+    return () => document.removeEventListener('selectionchange', handleSelectionChange)
+  }, [clearDesktopIntent, isTouchDevice])
 
   useEffect(() => {
     hasRestoredScrollRef.current = false
@@ -332,7 +460,16 @@ export default function ReaderView({ sessionId }: ReaderViewProps) {
         target.scrollIntoView({ block: 'center', behavior: 'auto' })
       })
     }
-  }, [sections, readProgress.current_section])
+  }, [readProgress.current_section, sections])
+
+  useEffect(() => () => {
+    clearDesktopIntent()
+    clearTouchIntent()
+  }, [clearDesktopIntent, clearTouchIntent])
+
+  const mobileSheetSection = mobileSheetSectionId !== null
+    ? sectionMap.get(mobileSheetSectionId) ?? null
+    : null
 
   return (
     <div
@@ -342,15 +479,13 @@ export default function ReaderView({ sessionId }: ReaderViewProps) {
         background: '#faf9f7',
       }}
     >
-      {/* Reading header area */}
       {isReadThrough && (
         <div className="flex items-center justify-center gap-2 py-3" style={{ color: '#8a95aa', fontSize: '0.8rem' }}>
           <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: '#002FA7' }} />
-          小克正在通读全文…
+          小克正在通读全文...
         </div>
       )}
 
-      {/* Sections */}
       <div
         ref={contentRef}
         className="relative mx-auto px-6 md:px-10 py-8"
@@ -359,12 +494,7 @@ export default function ReaderView({ sessionId }: ReaderViewProps) {
         {sections.map((section) => {
           const isLastOfChapter = lastSectionByChapter.get(section.chapter_index ?? 0) === section.id
           const chapterEndBm = isLastOfChapter
-            ? chapterEndBookmarks.find(b => {
-                // Find chapter_end bookmark closest to this chapter's last section
-                const chapterSections = sections.filter(s => s.chapter_index === section.chapter_index)
-                const lastId = chapterSections[chapterSections.length - 1]?.id
-                return b.section_index === lastId || b.section_index === section.id
-              })
+            ? chapterEndBookmarks.find(b => b.section_index === section.id)
             : undefined
 
           return (
@@ -372,9 +502,14 @@ export default function ReaderView({ sessionId }: ReaderViewProps) {
               <SectionBlock
                 section={section}
                 isActive={activeSectionIndex === section.id}
-                bookmark={bookmarkMap.current.get(section.id)}
+                isPressing={pressingSectionId === section.id}
+                isTouchDevice={isTouchDevice}
+                bookmark={bookmarkMap.get(section.id)}
                 bubble={bubbles.get(section.id)}
-                onClickSection={handleClickSection}
+                onMouseDownSection={handleDesktopMouseDown}
+                onTouchStartSection={handleTouchStartSection}
+                onTouchEndSection={handleTouchEndSection}
+                onTouchMoveSection={handleTouchMoveSection}
                 onClickBookmark={handleClickBookmark}
               />
               {chapterEndBm && (
@@ -387,19 +522,30 @@ export default function ReaderView({ sessionId }: ReaderViewProps) {
           )
         })}
 
-        {/* Selection toolbar */}
-        <SelectionToolbar
-          containerRef={contentRef}
-          onDiscuss={handleDiscussSelection}
-        />
+        {!isTouchDevice && (
+          <SelectionToolbar
+            containerRef={contentRef}
+            onDiscuss={handleDiscussSelection}
+          />
+        )}
 
-        {/* Bottom spacer */}
         <div style={{ height: 120 }} />
       </div>
 
-      {/* Chat slide-in panel */}
       {view === 'chat' && (
         <ReadingChatView sessionId={sessionId} onClose={handleCloseChat} />
+      )}
+
+      {isTouchDevice && mobileSheetSection && (
+        <MobileSelectionSheet
+          section={mobileSheetSection}
+          onClose={() => setMobileSheetSectionId(null)}
+          onDiscussSection={(sectionIndex) => {
+            openSectionDiscussion(sectionIndex)
+            setMobileSheetSectionId(null)
+          }}
+          onDiscussSelection={handleDiscussSelection}
+        />
       )}
     </div>
   )
