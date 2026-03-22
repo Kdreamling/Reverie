@@ -1,5 +1,13 @@
 import { create } from 'zustand'
-import { fetchMessagesAPI, deleteConversationAPI, streamChat, type ChatMessage, type MemoryOperation, type DebugInfo } from '../api/chat'
+import {
+  fetchMessagesAPI,
+  deleteConversationAPI,
+  streamChat,
+  type ChatMessage,
+  type MemoryOperation,
+  type DebugInfo,
+  type StreamChatOptions,
+} from '../api/chat'
 import { updateSessionAPI } from '../api/sessions'
 import { useSessionStore } from './sessionStore'
 
@@ -23,6 +31,8 @@ interface MemorySearchResult {
   content: string
 }
 
+type SendMessageOptions = StreamChatOptions
+
 /** Ordered stream block — rendered chronologically in the streaming UI */
 export type StreamBlock =
   | { kind: 'thinking'; text: string; startTime: number; elapsed: number | null }
@@ -42,6 +52,7 @@ interface ChatState {
   pendingMemoryOps: MemoryOperation[]
   lastError: string | null
   retryContent: string | null
+  retryOptions: SendMessageOptions | null
   thinkingStartTime: number | null
   thinkingElapsedTime: number | null
   toolStartTime: number | null
@@ -49,7 +60,7 @@ interface ChatState {
   streamBlocks: StreamBlock[]
 
   loadMessages: (sessionId: string) => Promise<void>
-  sendMessage: (sessionId: string, model: string, content: string) => Promise<void>
+  sendMessage: (sessionId: string, model: string, content: string, options?: SendMessageOptions) => Promise<void>
   deleteConversation: (sessionId: string, conversationId: string) => Promise<void>
   clearMessages: () => void
   retryLast: (sessionId: string, model: string) => void
@@ -72,6 +83,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   ...EMPTY_STREAM,
   lastError: null,
   retryContent: null,
+  retryOptions: null,
 
   async loadMessages(sessionId) {
     try {
@@ -167,7 +179,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }))
   },
 
-  async sendMessage(sessionId, model, content) {
+  async sendMessage(sessionId, model, content, options) {
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -180,6 +192,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       ...EMPTY_STREAM,
       lastError: null,
       retryContent: content,
+      retryOptions: options ?? null,
     }))
 
     // 自动命名
@@ -194,7 +207,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     const token = localStorage.getItem('token') ?? ''
     try {
-      const res = await streamChat(sessionId, model, content, token)
+      const res = await streamChat(sessionId, model, content, token, options)
 
       if (res.status === 401) {
         window.dispatchEvent(new Event('auth:unauthorized'))
@@ -469,10 +482,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   retryLast(sessionId, model) {
-    const { retryContent } = get()
+    const { retryContent, retryOptions } = get()
     if (!retryContent) return
     set(s => ({ messages: s.messages.slice(0, -1), lastError: null }))
-    get().sendMessage(sessionId, model, retryContent)
+    get().sendMessage(sessionId, model, retryContent, retryOptions ?? undefined)
   },
 
   clearError() {

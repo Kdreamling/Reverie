@@ -1,6 +1,7 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { ApiError } from '../api/client'
 import { useReadingStore } from '../stores/readingStore'
 import { useSessionStore } from '../stores/sessionStore'
 import ReaderView from '../components/reading/ReaderView'
@@ -9,6 +10,10 @@ import ReadingUpload from '../components/reading/ReadingUpload'
 export default function ReadingPage() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
+
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [missingContent, setMissingContent] = useState(false)
+  const [reloadNonce, setReloadNonce] = useState(0)
 
   const sections = useReadingStore(s => s.sections)
   const title = useReadingStore(s => s.title)
@@ -20,24 +25,42 @@ export default function ReadingPage() {
   const currentSession = useSessionStore(s => s.currentSession)
   const selectSession = useSessionStore(s => s.selectSession)
 
-  // Load content on mount
   useEffect(() => {
     if (!sessionId) return
-    // Select session in sessionStore if not already
+    let isActive = true
+
+    setLoadError(null)
+    setMissingContent(false)
+
     if (!currentSession || currentSession.id !== sessionId) {
       selectSession(sessionId)
     }
-    loadContent(sessionId).catch(() => {
-      // No content yet — show upload screen
+
+    loadContent(sessionId).catch((error) => {
+      if (!isActive) return
+
+      if (error instanceof ApiError) {
+        if (error.status === 401) {
+          navigate('/login')
+          return
+        }
+        if (error.status === 404) {
+          setMissingContent(true)
+          return
+        }
+        setLoadError(error.message)
+        return
+      }
+
+      setLoadError(error instanceof Error ? error.message : '加载失败，请稍后重试')
     })
 
     return () => {
-      // Save progress on unmount
-      if (sessionId) saveProgress(sessionId)
+      isActive = false
+      saveProgress(sessionId)
     }
-  }, [sessionId])
+  }, [sessionId, currentSession, selectSession, loadContent, saveProgress, navigate, reloadNonce])
 
-  // Save progress on page hide / beforeunload
   useEffect(() => {
     if (!sessionId) return
 
@@ -54,17 +77,17 @@ export default function ReadingPage() {
     }
   }, [sessionId, saveProgress])
 
-  // Cleanup on session change
   useEffect(() => {
     return () => reset()
-  }, [sessionId])
+  }, [sessionId, reset])
 
   const handleBack = useCallback(() => {
     navigate('/')
   }, [navigate])
 
   const handleUploaded = useCallback(() => {
-    // Content is now loaded in readingStore via uploadContent
+    setLoadError(null)
+    setMissingContent(false)
   }, [])
 
   if (!sessionId) {
@@ -75,11 +98,10 @@ export default function ReadingPage() {
     )
   }
 
-  const hasContent = sections.length > 0
+  const hasContent = sections.length > 0 && !missingContent
 
   return (
     <div className="flex flex-col h-screen" style={{ background: '#faf9f7' }}>
-      {/* Header */}
       <div
         className="flex items-center gap-3 px-4 py-3 shrink-0"
         style={{
@@ -99,7 +121,7 @@ export default function ReadingPage() {
         </button>
 
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span style={{ fontSize: 14, color: '#002FA7', opacity: 0.5 }}>✦</span>
+          <span style={{ fontSize: 14, color: '#002FA7', opacity: 0.5 }}>·</span>
           <span
             className="truncate"
             style={{
@@ -119,14 +141,26 @@ export default function ReadingPage() {
         )}
       </div>
 
-      {/* Main content */}
       {isLoadingContent ? (
         <div className="flex flex-col items-center justify-center flex-1 gap-3">
           <div
             className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
             style={{ borderColor: '#002FA7', borderTopColor: 'transparent' }}
           />
-          <p style={{ color: '#8a95aa', fontSize: '0.85rem' }}>加载中…</p>
+          <p style={{ color: '#8a95aa', fontSize: '0.85rem' }}>加载中...</p>
+        </div>
+      ) : loadError ? (
+        <div className="flex flex-col items-center justify-center flex-1 gap-4 px-6">
+          <p style={{ color: '#8a95aa', fontSize: '0.9rem', textAlign: 'center', lineHeight: 1.7 }}>
+            {loadError}
+          </p>
+          <button
+            onClick={() => setReloadNonce(value => value + 1)}
+            className="px-5 py-2 rounded-full text-sm font-medium cursor-pointer"
+            style={{ background: '#002FA7', color: '#fff', border: 'none' }}
+          >
+            重试
+          </button>
         </div>
       ) : hasContent ? (
         <ReaderView sessionId={sessionId} />

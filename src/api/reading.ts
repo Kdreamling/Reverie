@@ -83,10 +83,12 @@ export function streamReadingComment(
   sectionIndex: number,
   token: string,
   selectedText?: string,
+  signal?: AbortSignal,
 ): Promise<Response> {
   const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
   return fetch(`${BASE_URL}/sessions/${sessionId}/reading-comment`, {
     method: 'POST',
+    signal,
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
@@ -95,5 +97,21 @@ export function streamReadingComment(
       section_index: sectionIndex,
       selected_text: selectedText,
     }),
+  })
+}
+
+/**
+ * 读完章节/全书 → 生成 scene 记忆
+ */
+export async function completeChapterAPI(
+  sessionId: string,
+  chapterIndex: number,
+  chapterTitle?: string,
+  isBookComplete: boolean = false,
+): Promise<{ ok: boolean; memory_id: string }> {
+  return client.post(`/sessions/${sessionId}/reading-chapter-complete`, {
+    chapter_index: chapterIndex,
+    chapter_title: chapterTitle,
+    is_book_complete: isBookComplete,
   })
 }

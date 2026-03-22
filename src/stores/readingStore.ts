@@ -52,6 +52,7 @@ interface ReadingState {
   cancelComment: () => void
   saveProgress: (sessionId: string) => Promise<void>
   setActiveSectionIndex: (index: number | null) => void
+  setCurrentSection: (index: number) => void
   setActiveSelection: (text: string | null) => void
   setView: (view: 'reader' | 'chat', sectionIndex?: number) => void
   pollReadthrough: (sessionId: string) => void
@@ -150,7 +151,7 @@ export const useReadingStore = create<ReadingState>((set, get) => ({
 
     try {
       const token = localStorage.getItem('token') ?? ''
-      const res = await streamReadingComment(sessionId, sectionIndex, token, selectedText)
+      const res = await streamReadingComment(sessionId, sectionIndex, token, selectedText, abort.signal)
 
       if (!res.ok || !res.body) {
         throw new Error(`HTTP ${res.status}`)
@@ -241,6 +242,15 @@ export const useReadingStore = create<ReadingState>((set, get) => ({
 
   setActiveSectionIndex(index) {
     set({ activeSectionIndex: index })
+  },
+
+  setCurrentSection(index) {
+    set(state => ({
+      readProgress: {
+        ...state.readProgress,
+        current_section: index,
+      },
+    }))
   },
 
   setActiveSelection(text) {

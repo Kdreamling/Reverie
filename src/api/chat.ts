@@ -53,6 +53,16 @@ export interface ChatMessage {
   debugInfo?: DebugInfo | null
 }
 
+export interface ReadingContextPayload {
+  section_index?: number
+  selected_text?: string
+  section_excerpt?: string
+}
+
+export interface StreamChatOptions {
+  readingContext?: ReadingContextPayload
+}
+
 export async function fetchMessagesAPI(sessionId: string): Promise<ChatMessage[]> {
   return client.get<ChatMessage[]>(`/sessions/${sessionId}/messages`)
 }
@@ -66,6 +76,7 @@ export function streamChat(
   model: string,
   content: string,
   token: string,
+  options?: StreamChatOptions,
 ): Promise<Response> {
   return fetch('/v1/chat/completions', {
     method: 'POST',
@@ -78,6 +89,7 @@ export function streamChat(
       model,
       messages: [{ role: 'user', content }],
       stream: true,
+      ...(options?.readingContext ? { reading_context: options.readingContext } : {}),
     }),
   })
 }

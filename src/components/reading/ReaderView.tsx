@@ -1,6 +1,8 @@
-import { memo, useCallback, useRef } from 'react'
+import { memo, useCallback, useEffect, useRef } from 'react'
 import { useReadingStore, type BubbleState } from '../../stores/readingStore'
 import type { ReadingSection, AiBookmark } from '../../api/reading'
+import SelectionToolbar from './SelectionToolbar'
+import ReadingChatView from './ReadingChatView'
 
 // ---- SectionBlock ----
 
@@ -24,7 +26,7 @@ export const SectionBlock = memo(function SectionBlock({
   const isHeading = section.type === 'heading'
 
   return (
-    <div className="relative group" style={{ marginBottom: isHeading ? 8 : 20 }}>
+    <div className="relative group" data-section-id={section.id} style={{ marginBottom: isHeading ? 8 : 20 }}>
       {/* AI bookmark dot */}
       {bookmark && !bubble && (
         <button
@@ -199,10 +201,16 @@ export default function ReaderView({ sessionId }: ReaderViewProps) {
   const pendingBubble = useReadingStore(s => s.pendingBubble)
   const requestComment = useReadingStore(s => s.requestComment)
   const setActiveSectionIndex = useReadingStore(s => s.setActiveSectionIndex)
+  const setCurrentSection = useReadingStore(s => s.setCurrentSection)
+  const setActiveSelection = useReadingStore(s => s.setActiveSelection)
   const setView = useReadingStore(s => s.setView)
+  const view = useReadingStore(s => s.view)
   const isReadThrough = useReadingStore(s => s.isReadThrough)
+  const readProgress = useReadingStore(s => s.readProgress)
 
   const scrollRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const hasRestoredScrollRef = useRef(false)
 
   // Build bookmark map for O(1) lookup
   const bookmarkMap = useRef(new Map<number, AiBookmark>())
@@ -218,9 +226,10 @@ export default function ReaderView({ sessionId }: ReaderViewProps) {
 
   const handleClickSection = useCallback((sectionIndex: number) => {
     if (pendingBubble) return  // don't interrupt current stream
+    setCurrentSection(sectionIndex)
     setActiveSectionIndex(sectionIndex)
     requestComment(sessionId, sectionIndex)
-  }, [sessionId, pendingBubble, setActiveSectionIndex, requestComment])
+  }, [sessionId, pendingBubble, setActiveSectionIndex, setCurrentSection, requestComment])
 
   const handleClickBookmark = useCallback((sectionIndex: number) => {
     // Show the pre-generated bookmark content as a bubble
@@ -235,26 +244,95 @@ export default function ReaderView({ sessionId }: ReaderViewProps) {
       text: bm.content,
       isStreaming: false,
     })
-    useReadingStore.setState({ bubbles: newBubbles, activeSectionIndex: sectionIndex })
+    useReadingStore.setState({
+      bubbles: newBubbles,
+      activeSectionIndex: sectionIndex,
+      readProgress: {
+        ...store.readProgress,
+        current_section: sectionIndex,
+      },
+    })
   }, [])
 
-  const handleChapterChat = useCallback((sectionIndex: number) => {
+  // Selection toolbar: user selects text → open chat
+  const handleDiscussSelection = useCallback((text: string, sectionIndex: number) => {
+    setCurrentSection(sectionIndex)
+    setActiveSelection(text)
+    setActiveSectionIndex(sectionIndex)
     setView('chat', sectionIndex)
-  }, [setView])
+  }, [setCurrentSection, setActiveSelection, setActiveSectionIndex, setView])
+
+  const handleChapterChat = useCallback((sectionIndex: number) => {
+    setCurrentSection(sectionIndex)
+    setActiveSelection(null)
+    setView('chat', sectionIndex)
+  }, [setCurrentSection, setActiveSelection, setView])
+
+  const handleCloseChat = useCallback(() => {
+    setView('reader')
+    setActiveSelection(null)
+  }, [setView, setActiveSelection])
 
   // Group sections by chapter for chapter_end cards
   const chapterEndBookmarks = (aiBookmarks ?? []).filter(b => b.type === 'chapter_end')
-  const chapterEndMap = new Map<number, AiBookmark>()
-  for (const bm of chapterEndBookmarks) {
-    chapterEndMap.set(bm.section_index, bm)
-  }
-
   // Find last section index per chapter
   const lastSectionByChapter = new Map<number, number>()
   for (const sec of sections) {
     const ch = sec.chapter_index ?? 0
     lastSectionByChapter.set(ch, sec.id)
   }
+
+  useEffect(() => {
+    hasRestoredScrollRef.current = false
+  }, [sessionId])
+
+  useEffect(() => {
+    const root = scrollRef.current
+    const container = contentRef.current
+    if (!root || !container || sections.length === 0) return
+
+    const nodes = Array.from(container.querySelectorAll<HTMLElement>('[data-section-id]'))
+    if (nodes.length === 0) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter(entry => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)
+        const topEntry = visible[0]
+        if (!topEntry) return
+
+        const sectionId = Number((topEntry.target as HTMLElement).dataset.sectionId)
+        if (!Number.isNaN(sectionId)) {
+          setCurrentSection(sectionId)
+        }
+      },
+      {
+        root,
+        threshold: [0.35, 0.6, 0.85],
+      },
+    )
+
+    nodes.forEach(node => observer.observe(node))
+    return () => observer.disconnect()
+  }, [sections, setCurrentSection])
+
+  useEffect(() => {
+    if (hasRestoredScrollRef.current || sections.length === 0) return
+
+    const targetSection = readProgress.current_section
+    const container = contentRef.current
+    if (!container) return
+
+    const target = container.querySelector<HTMLElement>(`[data-section-id="${targetSection}"]`)
+    hasRestoredScrollRef.current = true
+
+    if (target && targetSection > 0) {
+      requestAnimationFrame(() => {
+        target.scrollIntoView({ block: 'center', behavior: 'auto' })
+      })
+    }
+  }, [sections, readProgress.current_section])
 
   return (
     <div
@@ -274,7 +352,8 @@ export default function ReaderView({ sessionId }: ReaderViewProps) {
 
       {/* Sections */}
       <div
-        className="mx-auto px-6 md:px-10 py-8"
+        ref={contentRef}
+        className="relative mx-auto px-6 md:px-10 py-8"
         style={{ maxWidth: 720 }}
       >
         {sections.map((section) => {
@@ -308,9 +387,20 @@ export default function ReaderView({ sessionId }: ReaderViewProps) {
           )
         })}
 
+        {/* Selection toolbar */}
+        <SelectionToolbar
+          containerRef={contentRef}
+          onDiscuss={handleDiscussSelection}
+        />
+
         {/* Bottom spacer */}
         <div style={{ height: 120 }} />
       </div>
+
+      {/* Chat slide-in panel */}
+      {view === 'chat' && (
+        <ReadingChatView sessionId={sessionId} onClose={handleCloseChat} />
+      )}
     </div>
   )
 }
