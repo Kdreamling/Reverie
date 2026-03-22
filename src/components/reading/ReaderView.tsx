@@ -1,96 +1,44 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useReadingStore, type BubbleState } from '../../stores/readingStore'
-import type { ReadingSection, AiBookmark } from '../../api/reading'
-import SelectionToolbar from './SelectionToolbar'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { useReadingStore } from '../../stores/readingStore'
+import type { ReadingSection } from '../../api/reading'
+import FloatingChatButton from './FloatingChatButton'
 import ReadingChatView from './ReadingChatView'
-import MobileSelectionSheet from './MobileSelectionSheet'
 
 interface SectionBlockProps {
   section: ReadingSection
-  isActive: boolean
-  isPressing: boolean
-  isTouchDevice: boolean
-  bookmark: AiBookmark | undefined
-  bubble: BubbleState | undefined
-  onMouseDownSection: (index: number) => void
-  onTouchStartSection: (index: number) => void
-  onTouchEndSection: (index: number) => void
-  onTouchMoveSection: () => void
-  onClickBookmark: (index: number) => void
 }
 
-export const SectionBlock = memo(function SectionBlock({
-  section,
-  isActive,
-  isPressing,
-  isTouchDevice,
-  bookmark,
-  bubble,
-  onMouseDownSection,
-  onTouchStartSection,
-  onTouchEndSection,
-  onTouchMoveSection,
-  onClickBookmark,
-}: SectionBlockProps) {
+const SectionBlock = memo(function SectionBlock({ section }: SectionBlockProps) {
   const isHeading = section.type === 'heading'
 
   return (
-    <div className="relative group" data-section-id={section.id} style={{ marginBottom: isHeading ? 8 : 20 }}>
-      {bookmark && !bubble && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onClickBookmark(section.id) }}
-          className="absolute transition-all duration-200 hover:scale-150"
+    <div data-section-id={section.id} style={{ marginBottom: isHeading ? 10 : 22 }}>
+      {isHeading ? (
+        <h2
           style={{
-            left: -20,
-            top: isHeading ? 8 : 6,
-            width: 7,
-            height: 7,
-            borderRadius: '50%',
-            background: 'rgba(0,47,167,0.35)',
-            border: 'none',
-            cursor: 'pointer',
-          }}
-          title="小克想说的话"
-        />
-      )}
-
-      <div
-        onMouseDown={isTouchDevice ? undefined : () => onMouseDownSection(section.id)}
-        onTouchStart={isTouchDevice ? () => onTouchStartSection(section.id) : undefined}
-        onTouchEnd={isTouchDevice ? () => onTouchEndSection(section.id) : undefined}
-        onTouchCancel={isTouchDevice ? onTouchMoveSection : undefined}
-        onTouchMove={isTouchDevice ? onTouchMoveSection : undefined}
-        className="cursor-pointer transition-all duration-150 rounded-lg"
-        style={{
-          padding: isHeading ? '4px 0' : '6px 8px',
-          marginLeft: -8,
-          marginRight: -8,
-          background: isActive ? 'rgba(0,47,167,0.04)' : 'transparent',
-          borderLeft: isActive ? '2px solid rgba(0,47,167,0.3)' : '2px solid transparent',
-          transform: isPressing ? 'scale(0.985)' : 'scale(1)',
-        }}
-      >
-        {isHeading ? (
-          <h2 style={{
             fontSize: section.content.startsWith('##') ? '1.15rem' : '1.3rem',
             fontWeight: 600,
             color: '#2a3347',
-            lineHeight: 1.5,
-          }}>
-            {section.content.replace(/^#{1,3}\s*/, '')}
-          </h2>
-        ) : section.type === 'blockquote' ? (
-          <blockquote style={{
+            lineHeight: 1.55,
+          }}
+        >
+          {section.content.replace(/^#{1,3}\s*/, '')}
+        </h2>
+      ) : section.type === 'blockquote' ? (
+        <blockquote
+          style={{
             borderLeft: '3px solid #d0d7e5',
             paddingLeft: 14,
             color: '#5a6477',
             fontStyle: 'italic',
             lineHeight: 2,
-          }}>
-            {section.content.replace(/^>\s*/gm, '')}
-          </blockquote>
-        ) : section.type === 'code' ? (
-          <pre style={{
+          }}
+        >
+          {section.content.replace(/^>\s*/gm, '')}
+        </blockquote>
+      ) : section.type === 'code' ? (
+        <pre
+          style={{
             background: '#f5f7fa',
             borderRadius: 8,
             padding: 14,
@@ -98,96 +46,21 @@ export const SectionBlock = memo(function SectionBlock({
             lineHeight: 1.6,
             overflow: 'auto',
             color: '#3a4559',
-          }}>
-            {section.content.replace(/^```\w*\n?/, '').replace(/\n?```$/, '')}
-          </pre>
-        ) : (
-          <p style={{
+          }}
+        >
+          {section.content.replace(/^```\w*\n?/, '').replace(/\n?```$/, '')}
+        </pre>
+      ) : (
+        <p
+          style={{
             lineHeight: 2,
             color: '#3a4559',
             fontSize: '1.05rem',
-          }}>
-            {section.content}
-          </p>
-        )}
-      </div>
-
-      {bubble && <AiBubbleInline bubble={bubble} />}
-    </div>
-  )
-})
-
-function AiBubbleInline({ bubble }: { bubble: BubbleState }) {
-  return (
-    <div
-      className="mt-2 ml-4 transition-all duration-300"
-      style={{
-        background: 'rgba(0,47,167,0.03)',
-        border: '1px solid rgba(0,47,167,0.1)',
-        borderRadius: 12,
-        padding: '10px 14px',
-        maxWidth: '85%',
-      }}
-    >
-      <div className="flex items-center gap-1.5 mb-1">
-        <span style={{ fontSize: 11, color: '#002FA7', opacity: 0.6 }}>·</span>
-        <span style={{ fontSize: 11, color: '#8a95aa', letterSpacing: '0.03em' }}>小克的纸条</span>
-        {bubble.isStreaming && (
-          <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#002FA7' }} />
-        )}
-      </div>
-      <p style={{
-        fontSize: '0.92rem',
-        lineHeight: 1.7,
-        color: '#4a5568',
-      }}>
-        {bubble.text || '...'}
-      </p>
-    </div>
-  )
-}
-
-interface ChapterEndCardProps {
-  bookmark: AiBookmark
-  onChat: () => void
-}
-
-export const ChapterEndCard = memo(function ChapterEndCard({ bookmark, onChat }: ChapterEndCardProps) {
-  return (
-    <div
-      className="mx-auto my-8"
-      style={{
-        maxWidth: 420,
-        background: 'rgba(0,47,167,0.02)',
-        border: '1px dashed rgba(0,47,167,0.15)',
-        borderRadius: 14,
-        padding: '16px 20px',
-        textAlign: 'center',
-      }}
-    >
-      <p style={{
-        fontSize: '0.9rem',
-        color: '#5a6477',
-        lineHeight: 1.6,
-        marginBottom: 12,
-        fontStyle: 'italic',
-      }}>
-        {bookmark.content}
-      </p>
-      <div className="flex items-center justify-center gap-3">
-        <button
-          onClick={onChat}
-          className="px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-150 cursor-pointer"
-          style={{
-            background: '#002FA7',
-            color: '#fff',
-            border: 'none',
           }}
         >
-          聊聊
-        </button>
-        <span style={{ fontSize: '0.75rem', color: '#a0aac0' }}>或继续读 →</span>
-      </div>
+          {section.content}
+        </p>
+      )}
     </div>
   )
 })
@@ -196,219 +69,79 @@ interface ReaderViewProps {
   sessionId: string
 }
 
-interface DesktopIntentState {
-  timer: ReturnType<typeof setTimeout> | null
-  sectionIndex: number | null
-  selectionDetected: boolean
+function findSectionIdForNode(node: Node | null, container: HTMLElement): number | null {
+  let current: Node | null = node
+
+  while (current && current !== container) {
+    if (current instanceof HTMLElement && current.dataset.sectionId !== undefined) {
+      const sectionId = Number(current.dataset.sectionId)
+      return Number.isNaN(sectionId) ? null : sectionId
+    }
+    current = current.parentNode
+  }
+
+  return null
 }
 
-interface TouchIntentState {
-  timer: ReturnType<typeof setTimeout> | null
-  sectionIndex: number | null
-  fired: boolean
+function truncateSelection(text: string, limit: number = 15): string {
+  const normalized = text.replace(/\s+/g, ' ').trim()
+  if (normalized.length <= limit) return normalized
+  return `${normalized.slice(0, limit)}...`
 }
 
 export default function ReaderView({ sessionId }: ReaderViewProps) {
   const sections = useReadingStore(s => s.sections)
-  const aiBookmarks = useReadingStore(s => s.aiBookmarks)
-  const activeSectionIndex = useReadingStore(s => s.activeSectionIndex)
-  const bubbles = useReadingStore(s => s.bubbles)
-  const pendingBubble = useReadingStore(s => s.pendingBubble)
-  const requestComment = useReadingStore(s => s.requestComment)
-  const setActiveSectionIndex = useReadingStore(s => s.setActiveSectionIndex)
+  const readProgress = useReadingStore(s => s.readProgress)
+  const isReadThrough = useReadingStore(s => s.isReadThrough)
   const setCurrentSection = useReadingStore(s => s.setCurrentSection)
   const setActiveSelection = useReadingStore(s => s.setActiveSelection)
+  const setActiveSectionIndex = useReadingStore(s => s.setActiveSectionIndex)
   const setView = useReadingStore(s => s.setView)
   const view = useReadingStore(s => s.view)
-  const isReadThrough = useReadingStore(s => s.isReadThrough)
-  const readProgress = useReadingStore(s => s.readProgress)
 
-  const [isTouchDevice, setIsTouchDevice] = useState(false)
-  const [pressingSectionId, setPressingSectionId] = useState<number | null>(null)
-  const [mobileSheetSectionId, setMobileSheetSectionId] = useState<number | null>(null)
+  const [selectionPreview, setSelectionPreview] = useState('')
+  const [selectionSectionIndex, setSelectionSectionIndex] = useState<number | null>(null)
+  const [showFloatingButton, setShowFloatingButton] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const hasRestoredScrollRef = useRef(false)
-  const desktopIntentRef = useRef<DesktopIntentState>({
-    timer: null,
-    sectionIndex: null,
-    selectionDetected: false,
-  })
-  const touchIntentRef = useRef<TouchIntentState>({
-    timer: null,
-    sectionIndex: null,
-    fired: false,
-  })
+  const selectionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const bookmarkMap = useMemo(() => {
-    const map = new Map<number, AiBookmark>()
-    for (const bm of aiBookmarks ?? []) {
-      if (bm.type === 'proactive') {
-        map.set(bm.section_index, bm)
-      }
+  const clearSelectionState = useCallback((clearStoredSelection: boolean) => {
+    if (selectionDebounceRef.current) {
+      clearTimeout(selectionDebounceRef.current)
+      selectionDebounceRef.current = null
     }
-    return map
-  }, [aiBookmarks])
 
-  const chapterEndBookmarks = useMemo(
-    () => (aiBookmarks ?? []).filter(b => b.type === 'chapter_end'),
-    [aiBookmarks],
-  )
+    setShowFloatingButton(false)
+    setSelectionPreview('')
+    setSelectionSectionIndex(null)
 
-  const lastSectionByChapter = useMemo(() => {
-    const map = new Map<number, number>()
-    for (const sec of sections) {
-      map.set(sec.chapter_index ?? 0, sec.id)
+    if (clearStoredSelection) {
+      setActiveSelection(null)
     }
-    return map
-  }, [sections])
+  }, [setActiveSelection])
 
-  const sectionMap = useMemo(
-    () => new Map(sections.map(section => [section.id, section])),
-    [sections],
-  )
+  const openSelectionDiscussion = useCallback(() => {
+    const selectedText = useReadingStore.getState().activeSelection?.trim()
+    if (!selectedText || selectionSectionIndex === null) return
 
-  const clearDesktopIntent = useCallback(() => {
-    if (desktopIntentRef.current.timer) {
-      clearTimeout(desktopIntentRef.current.timer)
+    setCurrentSection(selectionSectionIndex)
+    setActiveSectionIndex(selectionSectionIndex)
+    setView('chat', selectionSectionIndex)
+    setShowFloatingButton(false)
+
+    if (typeof window !== 'undefined') {
+      window.getSelection()?.removeAllRanges()
     }
-    desktopIntentRef.current = {
-      timer: null,
-      sectionIndex: null,
-      selectionDetected: false,
-    }
-  }, [])
-
-  const clearTouchIntent = useCallback(() => {
-    if (touchIntentRef.current.timer) {
-      clearTimeout(touchIntentRef.current.timer)
-    }
-    touchIntentRef.current = {
-      timer: null,
-      sectionIndex: null,
-      fired: false,
-    }
-    setPressingSectionId(null)
-  }, [])
-
-  const triggerParagraphComment = useCallback((sectionIndex: number) => {
-    if (pendingBubble) return
-    setCurrentSection(sectionIndex)
-    setActiveSectionIndex(sectionIndex)
-    requestComment(sessionId, sectionIndex)
-  }, [pendingBubble, requestComment, sessionId, setActiveSectionIndex, setCurrentSection])
-
-  const openSectionDiscussion = useCallback((sectionIndex: number) => {
-    setCurrentSection(sectionIndex)
-    setActiveSelection(null)
-    setActiveSectionIndex(sectionIndex)
-    setView('chat', sectionIndex)
-  }, [setActiveSectionIndex, setActiveSelection, setCurrentSection, setView])
-
-  const handleClickBookmark = useCallback((sectionIndex: number) => {
-    const bm = bookmarkMap.get(sectionIndex)
-    if (!bm) return
-
-    const store = useReadingStore.getState()
-    const newBubbles = new Map(store.bubbles)
-    newBubbles.set(sectionIndex, {
-      sectionIndex,
-      text: bm.content,
-      isStreaming: false,
-    })
-    useReadingStore.setState({
-      bubbles: newBubbles,
-      activeSectionIndex: sectionIndex,
-      readProgress: {
-        ...store.readProgress,
-        current_section: sectionIndex,
-      },
-    })
-  }, [bookmarkMap])
-
-  const handleDiscussSelection = useCallback((text: string, sectionIndex: number) => {
-    setCurrentSection(sectionIndex)
-    setActiveSelection(text)
-    setActiveSectionIndex(sectionIndex)
-    setView('chat', sectionIndex)
-    setMobileSheetSectionId(null)
-  }, [setActiveSectionIndex, setActiveSelection, setCurrentSection, setView])
-
-  const handleChapterChat = useCallback((sectionIndex: number) => {
-    openSectionDiscussion(sectionIndex)
-  }, [openSectionDiscussion])
+  }, [selectionSectionIndex, setActiveSectionIndex, setCurrentSection, setView])
 
   const handleCloseChat = useCallback(() => {
     setView('reader')
-    setActiveSelection(null)
-  }, [setActiveSelection, setView])
-
-  const handleDesktopMouseDown = useCallback((sectionIndex: number) => {
-    if (isTouchDevice) return
-
-    clearDesktopIntent()
-    desktopIntentRef.current.sectionIndex = sectionIndex
-    desktopIntentRef.current.selectionDetected = false
-    desktopIntentRef.current.timer = setTimeout(() => {
-      const selectionText = window.getSelection()?.toString().trim() ?? ''
-      const shouldCancel = desktopIntentRef.current.selectionDetected || selectionText.length > 0
-      const targetSection = desktopIntentRef.current.sectionIndex
-      clearDesktopIntent()
-      if (!shouldCancel && targetSection !== null) {
-        triggerParagraphComment(targetSection)
-      }
-    }, 300)
-  }, [clearDesktopIntent, isTouchDevice, triggerParagraphComment])
-
-  const handleTouchStartSection = useCallback((sectionIndex: number) => {
-    if (!isTouchDevice) return
-
-    clearTouchIntent()
-    setPressingSectionId(sectionIndex)
-    touchIntentRef.current.sectionIndex = sectionIndex
-    touchIntentRef.current.timer = setTimeout(() => {
-      touchIntentRef.current.fired = true
-      setPressingSectionId(null)
-      setMobileSheetSectionId(sectionIndex)
-    }, 650)
-  }, [clearTouchIntent, isTouchDevice])
-
-  const handleTouchEndSection = useCallback((sectionIndex: number) => {
-    if (!isTouchDevice) return
-
-    const { fired, sectionIndex: pendingIndex } = touchIntentRef.current
-    const shouldOpenSheet = fired && pendingIndex === sectionIndex
-    clearTouchIntent()
-    if (!shouldOpenSheet) {
-      triggerParagraphComment(sectionIndex)
-    }
-  }, [clearTouchIntent, isTouchDevice, triggerParagraphComment])
-
-  const handleTouchMoveSection = useCallback(() => {
-    if (!isTouchDevice) return
-    clearTouchIntent()
-  }, [clearTouchIntent, isTouchDevice])
-
-  useEffect(() => {
-    setIsTouchDevice(typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0))
-  }, [])
-
-  useEffect(() => {
-    if (isTouchDevice) return
-
-    const handleSelectionChange = () => {
-      if (!desktopIntentRef.current.timer) return
-      const text = window.getSelection()?.toString().trim() ?? ''
-      if (text.length > 0) {
-        desktopIntentRef.current.selectionDetected = true
-        clearDesktopIntent()
-      }
-    }
-
-    document.addEventListener('selectionchange', handleSelectionChange)
-    return () => document.removeEventListener('selectionchange', handleSelectionChange)
-  }, [clearDesktopIntent, isTouchDevice])
+    setActiveSectionIndex(null)
+    clearSelectionState(true)
+  }, [clearSelectionState, setActiveSectionIndex, setView])
 
   useEffect(() => {
     hasRestoredScrollRef.current = false
@@ -462,22 +195,64 @@ export default function ReaderView({ sessionId }: ReaderViewProps) {
     }
   }, [readProgress.current_section, sections])
 
-  useEffect(() => () => {
-    clearDesktopIntent()
-    clearTouchIntent()
-  }, [clearDesktopIntent, clearTouchIntent])
+  useEffect(() => {
+    const container = contentRef.current
+    if (!container) return
 
-  const mobileSheetSection = mobileSheetSectionId !== null
-    ? sectionMap.get(mobileSheetSectionId) ?? null
-    : null
+    const handleSelectionChange = () => {
+      if (view === 'chat') return
+
+      if (selectionDebounceRef.current) {
+        clearTimeout(selectionDebounceRef.current)
+      }
+
+      selectionDebounceRef.current = setTimeout(() => {
+        const selection = window.getSelection()
+        const text = selection?.toString().trim() ?? ''
+
+        if (!selection || selection.isCollapsed || text.length === 0 || selection.rangeCount === 0) {
+          clearSelectionState(true)
+          return
+        }
+
+        const range = selection.getRangeAt(0)
+        if (!container.contains(range.commonAncestorContainer)) {
+          clearSelectionState(true)
+          return
+        }
+
+        const sectionId =
+          findSectionIdForNode(range.startContainer, container) ??
+          findSectionIdForNode(range.commonAncestorContainer, container)
+
+        if (sectionId === null) {
+          clearSelectionState(true)
+          return
+        }
+
+        setActiveSelection(text)
+        setActiveSectionIndex(sectionId)
+        setSelectionSectionIndex(sectionId)
+        setSelectionPreview(truncateSelection(text))
+        setShowFloatingButton(true)
+      }, 200)
+    }
+
+    document.addEventListener('selectionchange', handleSelectionChange)
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange)
+      if (selectionDebounceRef.current) {
+        clearTimeout(selectionDebounceRef.current)
+        selectionDebounceRef.current = null
+      }
+    }
+  }, [clearSelectionState, setActiveSectionIndex, setActiveSelection, view])
 
   return (
     <div
       ref={scrollRef}
       className="flex-1 overflow-y-auto"
-      style={{
-        background: '#faf9f7',
-      }}
+      style={{ background: '#faf9f7' }}
     >
       {isReadThrough && (
         <div className="flex items-center justify-center gap-2 py-3" style={{ color: '#8a95aa', fontSize: '0.8rem' }}>
@@ -488,64 +263,24 @@ export default function ReaderView({ sessionId }: ReaderViewProps) {
 
       <div
         ref={contentRef}
-        className="relative mx-auto px-6 md:px-10 py-8"
+        className="mx-auto px-6 md:px-10 py-8"
         style={{ maxWidth: 720 }}
       >
-        {sections.map((section) => {
-          const isLastOfChapter = lastSectionByChapter.get(section.chapter_index ?? 0) === section.id
-          const chapterEndBm = isLastOfChapter
-            ? chapterEndBookmarks.find(b => b.section_index === section.id)
-            : undefined
-
-          return (
-            <div key={section.id}>
-              <SectionBlock
-                section={section}
-                isActive={activeSectionIndex === section.id}
-                isPressing={pressingSectionId === section.id}
-                isTouchDevice={isTouchDevice}
-                bookmark={bookmarkMap.get(section.id)}
-                bubble={bubbles.get(section.id)}
-                onMouseDownSection={handleDesktopMouseDown}
-                onTouchStartSection={handleTouchStartSection}
-                onTouchEndSection={handleTouchEndSection}
-                onTouchMoveSection={handleTouchMoveSection}
-                onClickBookmark={handleClickBookmark}
-              />
-              {chapterEndBm && (
-                <ChapterEndCard
-                  bookmark={chapterEndBm}
-                  onChat={() => handleChapterChat(section.id)}
-                />
-              )}
-            </div>
-          )
-        })}
-
-        {!isTouchDevice && (
-          <SelectionToolbar
-            containerRef={contentRef}
-            onDiscuss={handleDiscussSelection}
-          />
-        )}
+        {sections.map(section => (
+          <SectionBlock key={section.id} section={section} />
+        ))}
 
         <div style={{ height: 120 }} />
       </div>
 
+      <FloatingChatButton
+        visible={showFloatingButton && view !== 'chat'}
+        preview={selectionPreview}
+        onClick={openSelectionDiscussion}
+      />
+
       {view === 'chat' && (
         <ReadingChatView sessionId={sessionId} onClose={handleCloseChat} />
-      )}
-
-      {isTouchDevice && mobileSheetSection && (
-        <MobileSelectionSheet
-          section={mobileSheetSection}
-          onClose={() => setMobileSheetSectionId(null)}
-          onDiscussSection={(sectionIndex) => {
-            openSectionDiscussion(sectionIndex)
-            setMobileSheetSectionId(null)
-          }}
-          onDiscussSelection={handleDiscussSelection}
-        />
       )}
     </div>
   )

@@ -21,6 +21,7 @@ export default function ReadingChatView({ sessionId, onClose }: ReadingChatViewP
   const loadMessages = useChatStore(s => s.loadMessages)
 
   const [input, setInput] = useState('')
+  const [isMobile, setIsMobile] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const hasLoadedRef = useRef(false)
@@ -38,6 +39,16 @@ export default function ReadingChatView({ sessionId, onClose }: ReadingChatViewP
 
   useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 300)
+  }, [])
+
+  useEffect(() => {
+    const syncLayout = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+
+    syncLayout()
+    window.addEventListener('resize', syncLayout)
+    return () => window.removeEventListener('resize', syncLayout)
   }, [])
 
   const contextSection = chatSectionIndex !== null
@@ -77,14 +88,18 @@ export default function ReadingChatView({ sessionId, onClose }: ReadingChatViewP
       />
 
       <div
-        className="fixed top-0 right-0 bottom-0 z-50 flex flex-col transition-transform duration-300"
+        className="fixed z-50 flex flex-col transition-transform duration-300"
         style={{
-          width: '40%',
-          minWidth: 360,
-          maxWidth: 560,
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: isMobile ? 0 : 'auto',
+          width: isMobile ? '100%' : '40%',
+          minWidth: isMobile ? 0 : 360,
+          maxWidth: isMobile ? '100%' : 560,
           background: '#faf9f7',
-          borderLeft: '1px solid rgba(0,0,0,0.06)',
-          boxShadow: '-8px 0 32px rgba(0,0,0,0.08)',
+          borderLeft: isMobile ? 'none' : '1px solid rgba(0,0,0,0.06)',
+          boxShadow: isMobile ? 'none' : '-8px 0 32px rgba(0,0,0,0.08)',
         }}
       >
         <div
@@ -104,11 +119,12 @@ export default function ReadingChatView({ sessionId, onClose }: ReadingChatViewP
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg transition-colors duration-150 cursor-pointer"
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors duration-150 cursor-pointer"
             style={{ color: '#8a95aa' }}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.04)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
+            <span style={{ fontSize: '0.8rem' }}>返回阅读</span>
             <X size={16} />
           </button>
         </div>
