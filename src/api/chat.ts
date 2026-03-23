@@ -88,6 +88,7 @@ export function streamChat(
   content: string,
   token: string,
   options?: StreamChatOptions,
+  signal?: AbortSignal,
 ): Promise<Response> {
   return fetch('/v1/chat/completions', {
     method: 'POST',
@@ -103,5 +104,6 @@ export function streamChat(
       ...(options?.readingContext ? { reading_context: options.readingContext } : {}),
       ...(options?.attachmentIds?.length ? { attachment_ids: options.attachmentIds } : {}),
     }),
+    signal,
   })
 }

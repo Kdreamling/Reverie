@@ -61,9 +61,12 @@ interface ChatState {
   toolStartTime: number | null
   toolElapsedTime: number | null
   streamBlocks: StreamBlock[]
+  _abortController: AbortController | null
+  _reader: ReadableStreamDefaultReader<Uint8Array> | null
 
   loadMessages: (sessionId: string) => Promise<void>
   sendMessage: (sessionId: string, model: string, content: string, options?: SendMessageOptions) => Promise<void>
+  stopStreaming: () => void
   deleteConversation: (sessionId: string, conversationId: string) => Promise<void>
   clearMessages: () => void
   retryLast: (sessionId: string, model: string) => void
@@ -86,6 +89,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   ...EMPTY_STREAM,
   lastError: null,
   retryContent: null,
+  _abortController: null,
+  _reader: null,
   retryOptions: null,
 
   async loadMessages(sessionId) {
@@ -210,20 +215,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     const token = localStorage.getItem('token') ?? ''
+    const abortController = new AbortController()
+    set({ _abortController: abortController })
     try {
-      const res = await streamChat(sessionId, model, content, token, options)
+      const res = await streamChat(sessionId, model, content, token, options, abortController.signal)
 
       if (res.status === 401) {
         window.dispatchEvent(new Event('auth:unauthorized'))
-        set({ isStreaming: false })
+        set({ isStreaming: false, _abortController: null })
         return
       }
       if (!res.ok || !res.body) {
-        set({ isStreaming: false })
+        set({ isStreaming: false, _abortController: null })
         return
       }
 
       const reader = res.body.getReader()
+      set({ _reader: reader })
       const decoder = new TextDecoder()
       let buffer = ''
       let gotFirstChunk = false
@@ -475,13 +483,44 @@ export const useChatStore = create<ChatState>((set, get) => ({
         clearTimeout(timeoutId)
         if (flushTimer) { clearTimeout(flushTimer); flushDeltas() }
       }
-    } catch {
-      set({ isStreaming: false, ...EMPTY_STREAM, lastError: '发送失败，请重试' })
+    } catch (e) {
+      // 如果是用户主动停止（abort），不显示错误
+      if (e instanceof DOMException && e.name === 'AbortError') return
+      set({ isStreaming: false, ...EMPTY_STREAM, _abortController: null, _reader: null, lastError: '发送失败，请重试' })
       return
     } finally {
       if (get().isStreaming) {
-        set({ isStreaming: false, ...EMPTY_STREAM, lastError: '连接中断，请重试' })
+        set({ isStreaming: false, ...EMPTY_STREAM, _abortController: null, _reader: null, lastError: '连接中断，请重试' })
       }
+    }
+  },
+
+  stopStreaming() {
+    const { _abortController, _reader, isStreaming, currentText, currentThinking, pendingMemoryResult, pendingMemoryOps, thinkingElapsedTime } = get()
+    if (!isStreaming) return
+    try { _reader?.cancel() } catch { /* ignore */ }
+    try { _abortController?.abort() } catch { /* ignore */ }
+    // 保留已收到的内容作为消息
+    if (currentText || currentThinking) {
+      const partialMsg: ChatMessage = {
+        id: `ai-${Date.now()}`,
+        role: 'assistant',
+        content: currentText + '\n\n*（已停止生成）*',
+        thinking: currentThinking || null,
+        created_at: new Date().toISOString(),
+        memoryRef: pendingMemoryResult ?? null,
+        memoryOps: pendingMemoryOps.length > 0 ? pendingMemoryOps : null,
+        thinkingTime: thinkingElapsedTime,
+      }
+      set(s => ({
+        messages: [...s.messages, partialMsg],
+        isStreaming: false,
+        ...EMPTY_STREAM,
+        _abortController: null,
+        _reader: null,
+      }))
+    } else {
+      set({ isStreaming: false, ...EMPTY_STREAM, _abortController: null, _reader: null })
     }
   },
 

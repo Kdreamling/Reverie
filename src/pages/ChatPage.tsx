@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
-import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2 } from 'lucide-react'
+import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
@@ -134,7 +134,7 @@ export default function ChatPage() {
   const navigate = useNavigate()
   const { sessions, currentSession, loading, fetchSessions, createSession, selectSession, deleteSession, updateSessionModel } =
     useSessionStore()
-  const { messages, isStreaming, loadMessages, sendMessage, clearMessages, deleteConversation, lastError, retryLast, clearError } =
+  const { messages, isStreaming, loadMessages, sendMessage, clearMessages, deleteConversation, lastError, retryLast, clearError, stopStreaming } =
     useChatStore()
   const { token } = useAuthStore()
 
@@ -159,6 +159,8 @@ export default function ChatPage() {
   const [attachments, setAttachments] = useState<PendingAttachment[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const userScrolledUpRef = useRef(false)
+  const mainRef = useRef<HTMLElement>(null)
   const [keyboardOffset, setKeyboardOffset] = useState(0)
   const [showModelDropdown, setShowModelDropdown] = useState(false)
   const modelDropdownRef = useRef<HTMLDivElement>(null)
@@ -334,19 +336,35 @@ export default function ChatPage() {
     }
   }, [currentSession?.id, loadMessages, clearMessages])
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom on new messages (reset user scroll state)
   useEffect(() => {
+    userScrolledUpRef.current = false
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages.length])
 
-  // During streaming, scroll periodically
+  // During streaming, scroll periodically — but only if user hasn't scrolled up
   useEffect(() => {
     if (!isStreaming) return
     const id = setInterval(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      if (!userScrolledUpRef.current) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }
     }, 300)
     return () => clearInterval(id)
   }, [isStreaming])
+
+  // Track user scroll: if they scroll up, pause auto-scroll
+  useEffect(() => {
+    const el = mainRef.current
+    if (!el) return
+    function onScroll() {
+      if (!el) return
+      const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+      userScrolledUpRef.current = distFromBottom > 150
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
 
   // Restore focus after streaming
   useEffect(() => {
@@ -824,11 +842,11 @@ export default function ChatPage() {
         </header>
 
         {/* Messages */}
-        <main className="flex-1 overflow-y-auto flex flex-col">
+        <main ref={mainRef} className="flex-1 overflow-y-auto flex flex-col">
           {showWelcome ? (
           <WelcomeScreen onSelectScene={handleWelcomeScene} currentScene={currentSession?.scene_type || 'daily'} />
           ) : (
-            <div className="mx-auto w-full px-3 md:px-6 pt-8" style={{ maxWidth: 800, paddingBottom: 90 }}>
+            <div className="mx-auto w-full px-3 md:px-6 pt-8" style={{ maxWidth: 800, paddingBottom: 16 }}>
 
               {/* Completed messages — each item is memo'd */}
               {Array.isArray(messages) && messages.map(msg => (
@@ -895,7 +913,7 @@ export default function ChatPage() {
             zIndex: 10,
             marginTop: 'auto',
             background: '#f2f4fa',
-            paddingBottom: keyboardOffset > 0 ? `${keyboardOffset}px` : 'env(safe-area-inset-bottom)',
+            paddingBottom: keyboardOffset > 0 ? `${keyboardOffset}px` : 'max(8px, env(safe-area-inset-bottom))',
           }}>
             <div style={{
               position: 'absolute',
@@ -989,20 +1007,33 @@ export default function ChatPage() {
                   className="flex-1 resize-none bg-transparent text-sm outline-none leading-relaxed disabled:opacity-40"
                   style={{ color: '#1a1f2e', minHeight: 22, maxHeight: 150, overflowY: 'auto', scrollbarWidth: 'none' }}
                 />
-                <button
-                  onClick={handleSend}
-                  disabled={isStreaming || isUploading || (!input.trim() && attachments.length === 0) || !currentSession}
-                  className="flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 disabled:cursor-not-allowed"
-                  style={{
-                    width: 30, height: 30, flexShrink: 0,
-                    background: (input.trim() || attachments.length > 0) && !isStreaming && !isUploading ? '#002FA7' : '#e8ecf5',
-                    color: (input.trim() || attachments.length > 0) && !isStreaming && !isUploading ? '#fff' : '#aab2c8',
-                  }}
-                  onMouseEnter={e => { if ((input.trim() || attachments.length > 0) && !isStreaming && !isUploading) e.currentTarget.style.background = '#001f80' }}
-                  onMouseLeave={e => { if ((input.trim() || attachments.length > 0) && !isStreaming && !isUploading) e.currentTarget.style.background = '#002FA7' }}
-                >
-                  {isUploading ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={14} strokeWidth={2.5} />}
-                </button>
+                {isStreaming ? (
+                  <button
+                    onClick={stopStreaming}
+                    className="flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer"
+                    style={{ width: 30, height: 30, flexShrink: 0, background: '#1a1f2e', color: '#fff' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#374151')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '#1a1f2e')}
+                    title="停止生成"
+                  >
+                    <Square size={10} strokeWidth={0} fill="currentColor" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSend}
+                    disabled={isUploading || (!input.trim() && attachments.length === 0) || !currentSession}
+                    className="flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 disabled:cursor-not-allowed"
+                    style={{
+                      width: 30, height: 30, flexShrink: 0,
+                      background: (input.trim() || attachments.length > 0) && !isUploading ? '#002FA7' : '#e8ecf5',
+                      color: (input.trim() || attachments.length > 0) && !isUploading ? '#fff' : '#aab2c8',
+                    }}
+                    onMouseEnter={e => { if ((input.trim() || attachments.length > 0) && !isUploading) e.currentTarget.style.background = '#001f80' }}
+                    onMouseLeave={e => { if ((input.trim() || attachments.length > 0) && !isUploading) e.currentTarget.style.background = '#002FA7' }}
+                  >
+                    {isUploading ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={14} strokeWidth={2.5} />}
+                  </button>
+                )}
               </div>
               <p className="hidden md:block text-center text-xs mt-2" style={{ color: '#aab2c8' }}>
                 Press Enter to send · Shift+Enter for new line
