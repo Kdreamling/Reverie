@@ -505,7 +505,7 @@ export default function ChatPage() {
   const showWelcome = !isStreaming && !isLoadingMessages && (!Array.isArray(messages) || messages.length === 0)
 
   return (
-    <div className="flex overflow-hidden" style={{ background: '#fafbfd', height: '100%', overscrollBehavior: 'none' }}>
+    <div className="flex overflow-hidden" style={{ background: '#fafbfd', height: '100dvh', overscrollBehavior: 'none' }}>
 
       {/* ── Mobile overlay ── */}
       {sidebarOpen && (
@@ -519,7 +519,7 @@ export default function ChatPage() {
       {/* ── Sidebar ── */}
       <aside
         className={`fixed md:relative left-0 top-0 z-40 md:z-auto flex flex-col flex-shrink-0 transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
-        style={{ width: 260, height: '100%', background: '#0a1a3a', color: '#c8d4e8' }}
+        style={{ width: 260, height: '100dvh', background: '#0a1a3a', color: '#c8d4e8' }}
       >
         {/* Sidebar top */}
         <div className="px-4 py-4" style={{ paddingTop: 'calc(16px + env(safe-area-inset-top))' }}>
