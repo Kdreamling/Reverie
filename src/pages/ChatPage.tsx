@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
-import { Plus, Settings, ArrowUp, ChevronDown, X, Menu } from 'lucide-react'
+import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
 import { useAuthStore } from '../stores/authStore'
 import { updateSessionAPI } from '../api/sessions'
+import { uploadAttachment, type AttachmentInfo } from '../api/attachments'
 import SettingsPanel from '../components/SettingsPanel'
 import MessageItem from '../components/MessageItem'
 import StreamingMessage from '../components/StreamingMessage'
@@ -31,6 +32,16 @@ const SCENES = [
   { key: 'roleplay', icon: '🎭', label: '剧本' },
   { key: 'reading', icon: '📚', label: '学习' },
 ]
+
+const ACCEPTED_FILE_TYPES = 'image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,text/markdown,text/csv'
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+const CLAUDE_MODELS = ['claude', 'opus', 'sonnet', 'dzzi', '按量']
+
+interface PendingAttachment {
+  file: File
+  preview?: string // data URL for images
+  info?: AttachmentInfo // filled after upload
+}
 
 const WELCOME_MESSAGES = [
   'I ache for you.',
@@ -144,6 +155,9 @@ export default function ChatPage() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [input, setInput] = useState('')
   const [isFocused, setIsFocused] = useState(false)
+  const [attachments, setAttachments] = useState<PendingAttachment[]>([])
+  const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [keyboardOffset, setKeyboardOffset] = useState(0)
   const [showModelDropdown, setShowModelDropdown] = useState(false)
   const modelDropdownRef = useRef<HTMLDivElement>(null)
@@ -371,11 +385,82 @@ export default function ChatPage() {
     }
   }
 
+  function isClaudeModel(m: string): boolean {
+    const lower = m.toLowerCase()
+    return CLAUDE_MODELS.some(k => lower.includes(k))
+  }
+
+  function handleFileSelect(files: FileList | null) {
+    if (!files || files.length === 0) return
+    if (!isClaudeModel(model)) {
+      setToast('当前模型不支持文件上传，请切换到 Claude')
+      if (toastTimer.current) clearTimeout(toastTimer.current)
+      toastTimer.current = setTimeout(() => setToast(null), 2500)
+      return
+    }
+    const newAttachments: PendingAttachment[] = []
+    for (const file of Array.from(files)) {
+      if (file.size > MAX_FILE_SIZE) {
+        setToast(`${file.name} 超过 5MB 限制`)
+        if (toastTimer.current) clearTimeout(toastTimer.current)
+        toastTimer.current = setTimeout(() => setToast(null), 2500)
+        continue
+      }
+      if (attachments.length + newAttachments.length >= 3) {
+        setToast('最多 3 个附件')
+        if (toastTimer.current) clearTimeout(toastTimer.current)
+        toastTimer.current = setTimeout(() => setToast(null), 2500)
+        break
+      }
+      const att: PendingAttachment = { file }
+      if (file.type.startsWith('image/')) {
+        att.preview = URL.createObjectURL(file)
+      }
+      newAttachments.push(att)
+    }
+    if (newAttachments.length > 0) {
+      setAttachments(prev => [...prev, ...newAttachments])
+    }
+  }
+
+  function removeAttachment(index: number) {
+    setAttachments(prev => {
+      const removed = prev[index]
+      if (removed.preview) URL.revokeObjectURL(removed.preview)
+      return prev.filter((_, i) => i !== index)
+    })
+  }
+
   async function handleSend() {
     const text = input.trim()
-    if (!text || isStreaming || !currentSession) return
+    if ((!text && attachments.length === 0) || isStreaming || !currentSession) return
+
+    // 有附件时先上传
+    let attachmentIds: string[] = []
+    if (attachments.length > 0) {
+      setIsUploading(true)
+      try {
+        const results = await Promise.all(
+          attachments.map(att => uploadAttachment(att.file, currentSession.id))
+        )
+        attachmentIds = results.map(r => r.id)
+      } catch (err) {
+        setIsUploading(false)
+        setToast(err instanceof Error ? err.message : '文件上传失败')
+        if (toastTimer.current) clearTimeout(toastTimer.current)
+        toastTimer.current = setTimeout(() => setToast(null), 2500)
+        return
+      }
+      setIsUploading(false)
+    }
+
+    // 清理预览 URL
+    attachments.forEach(att => { if (att.preview) URL.revokeObjectURL(att.preview) })
+    setAttachments([])
     setInput('')
-    await sendMessage(currentSession.id, model, text)
+
+    const options = attachmentIds.length > 0 ? { attachmentIds } : undefined
+    await sendMessage(currentSession.id, model, text || '(附件)', options)
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -808,14 +893,75 @@ export default function ChatPage() {
               pointerEvents: 'none',
             }} />
             <div className="mx-auto px-3 md:px-6 py-3 relative" style={{ maxWidth: 800 }}>
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPTED_FILE_TYPES}
+                multiple
+                className="hidden"
+                onChange={e => { handleFileSelect(e.target.files); e.target.value = '' }}
+              />
+
+              {/* Attachment preview */}
+              {attachments.length > 0 && (
+                <div className="flex gap-2 mb-2 px-1 flex-wrap">
+                  {attachments.map((att, i) => (
+                    <div
+                      key={i}
+                      className="relative group rounded-lg overflow-hidden flex items-center gap-2"
+                      style={{
+                        background: '#f0f2f8',
+                        border: '1px solid #e2e6f0',
+                        ...(att.preview ? { width: 64, height: 64 } : { padding: '6px 10px' }),
+                      }}
+                    >
+                      {att.preview ? (
+                        <img src={att.preview} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <>
+                          {att.file.type === 'application/pdf' ? (
+                            <FileText size={14} style={{ color: '#e74c3c', flexShrink: 0 }} />
+                          ) : (
+                            <FileIcon size={14} style={{ color: '#7a8399', flexShrink: 0 }} />
+                          )}
+                          <span className="text-xs truncate" style={{ color: '#5a6a8a', maxWidth: 120 }}>
+                            {att.file.name}
+                          </span>
+                        </>
+                      )}
+                      <button
+                        onClick={() => removeAttachment(i)}
+                        className="absolute -top-0.5 -right-0.5 flex items-center justify-center rounded-full cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                        style={{ width: 18, height: 18, background: 'rgba(0,0,0,0.6)', color: '#fff' }}
+                      >
+                        <X size={10} strokeWidth={2.5} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div
-                className={`flex gap-3 px-4 transition-all duration-200 ${isFocused || input ? 'rounded-2xl items-end py-3' : 'rounded-full items-center py-2.5'}`}
+                className={`flex gap-3 px-4 transition-all duration-200 ${isFocused || input || attachments.length > 0 ? 'rounded-2xl items-end py-3' : 'rounded-full items-center py-2.5'}`}
                 style={{
                   background: '#fff',
                   boxShadow: '0 1px 6px rgba(0,0,0,0.07)',
                   border: '1px solid rgba(0,0,0,0.07)',
                 }}
               >
+                {/* Attach button */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isStreaming || isUploading || !currentSession}
+                  className="flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                  style={{ width: 30, height: 30, color: '#7a8399' }}
+                  onMouseEnter={e => { if (!isStreaming) e.currentTarget.style.color = '#002FA7' }}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#7a8399')}
+                  title="上传文件"
+                >
+                  <Paperclip size={16} strokeWidth={1.8} />
+                </button>
                 <textarea
                   ref={textareaRef}
                   value={input}
@@ -831,17 +977,17 @@ export default function ChatPage() {
                 />
                 <button
                   onClick={handleSend}
-                  disabled={isStreaming || !input.trim() || !currentSession}
+                  disabled={isStreaming || isUploading || (!input.trim() && attachments.length === 0) || !currentSession}
                   className="flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 disabled:cursor-not-allowed"
                   style={{
                     width: 30, height: 30, flexShrink: 0,
-                    background: input.trim() && !isStreaming ? '#002FA7' : '#e8ecf5',
-                    color: input.trim() && !isStreaming ? '#fff' : '#aab2c8',
+                    background: (input.trim() || attachments.length > 0) && !isStreaming && !isUploading ? '#002FA7' : '#e8ecf5',
+                    color: (input.trim() || attachments.length > 0) && !isStreaming && !isUploading ? '#fff' : '#aab2c8',
                   }}
-                  onMouseEnter={e => { if (input.trim() && !isStreaming) e.currentTarget.style.background = '#001f80' }}
-                  onMouseLeave={e => { if (input.trim() && !isStreaming) e.currentTarget.style.background = '#002FA7' }}
+                  onMouseEnter={e => { if ((input.trim() || attachments.length > 0) && !isStreaming && !isUploading) e.currentTarget.style.background = '#001f80' }}
+                  onMouseLeave={e => { if ((input.trim() || attachments.length > 0) && !isStreaming && !isUploading) e.currentTarget.style.background = '#002FA7' }}
                 >
-                  <ArrowUp size={14} strokeWidth={2.5} />
+                  {isUploading ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={14} strokeWidth={2.5} />}
                 </button>
               </div>
               <p className="hidden md:block text-center text-xs mt-2" style={{ color: '#aab2c8' }}>

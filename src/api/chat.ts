@@ -61,6 +61,7 @@ export interface ReadingContextPayload {
 
 export interface StreamChatOptions {
   readingContext?: ReadingContextPayload
+  attachmentIds?: string[]
 }
 
 export async function fetchMessagesAPI(sessionId: string): Promise<ChatMessage[]> {
@@ -90,6 +91,7 @@ export function streamChat(
       messages: [{ role: 'user', content }],
       stream: true,
       ...(options?.readingContext ? { reading_context: options.readingContext } : {}),
+      ...(options?.attachmentIds?.length ? { attachment_ids: options.attachmentIds } : {}),
     }),
   })
 }
