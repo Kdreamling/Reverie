@@ -38,6 +38,15 @@ export interface DebugInfo {
   } | null
 }
 
+export interface MessageAttachment {
+  id: string
+  file_type: 'image' | 'pdf' | 'text'
+  mime_type: string
+  original_filename: string
+  file_size: number
+  preview?: string // local preview URL for images
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
@@ -51,6 +60,7 @@ export interface ChatMessage {
   tokens?: { input: number; output: number } | null
   thinkingTime?: number | null
   debugInfo?: DebugInfo | null
+  attachments?: MessageAttachment[] | null
 }
 
 export interface ReadingContextPayload {

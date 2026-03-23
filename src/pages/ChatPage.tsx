@@ -6,6 +6,7 @@ import { useChatStore } from '../stores/chatStore'
 import { useAuthStore } from '../stores/authStore'
 import { updateSessionAPI } from '../api/sessions'
 import { uploadAttachment, type AttachmentInfo } from '../api/attachments'
+import type { MessageAttachment } from '../api/chat'
 import SettingsPanel from '../components/SettingsPanel'
 import MessageItem from '../components/MessageItem'
 import StreamingMessage from '../components/StreamingMessage'
@@ -454,13 +455,26 @@ export default function ChatPage() {
       setIsUploading(false)
     }
 
-    // 清理预览 URL
-    attachments.forEach(att => { if (att.preview) URL.revokeObjectURL(att.preview) })
+    // 构建附件信息用于消息气泡显示
+    const msgAttachments: MessageAttachment[] = attachments.map((att, i) => ({
+      id: attachmentIds[i] ?? '',
+      file_type: att.file.type.startsWith('image/') ? 'image' as const
+        : att.file.type === 'application/pdf' ? 'pdf' as const
+        : 'text' as const,
+      mime_type: att.file.type,
+      original_filename: att.file.name,
+      file_size: att.file.size,
+      preview: att.preview, // 图片本地预览 URL，保留给气泡渲染
+    }))
+
     setAttachments([])
     setInput('')
 
-    const options = attachmentIds.length > 0 ? { attachmentIds } : undefined
-    await sendMessage(currentSession.id, model, text || '(附件)', options)
+    const options = {
+      ...(attachmentIds.length > 0 ? { attachmentIds } : {}),
+      ...(msgAttachments.length > 0 ? { attachments: msgAttachments } : {}),
+    }
+    await sendMessage(currentSession.id, model, text || '(附件)', Object.keys(options).length > 0 ? options : undefined)
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {

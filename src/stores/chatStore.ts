@@ -4,6 +4,7 @@ import {
   deleteConversationAPI,
   streamChat,
   type ChatMessage,
+  type MessageAttachment,
   type MemoryOperation,
   type DebugInfo,
   type StreamChatOptions,
@@ -31,7 +32,9 @@ interface MemorySearchResult {
   content: string
 }
 
-type SendMessageOptions = StreamChatOptions
+type SendMessageOptions = StreamChatOptions & {
+  attachments?: MessageAttachment[]
+}
 
 /** Ordered stream block — rendered chronologically in the streaming UI */
 export type StreamBlock =
@@ -185,6 +188,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       role: 'user',
       content,
       created_at: new Date().toISOString(),
+      attachments: options?.attachments ?? null,
     }
     set(s => ({
       messages: [...s.messages, userMsg],

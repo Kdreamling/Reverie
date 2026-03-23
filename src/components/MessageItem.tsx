@@ -1,6 +1,6 @@
 import { memo, useState } from 'react'
-import { ChevronDown, ChevronRight, Copy, Trash2, Check, RotateCcw, Brain } from 'lucide-react'
-import type { ChatMessage, MemoryOperation } from '../api/chat'
+import { ChevronDown, ChevronRight, Copy, Trash2, Check, RotateCcw, Brain, FileText, File as FileIcon } from 'lucide-react'
+import type { ChatMessage, MessageAttachment, MemoryOperation } from '../api/chat'
 import ContextDebugPanel from './ContextDebugPanel'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -95,6 +95,48 @@ const ThinkingBlock = memo(function ThinkingBlock({ text, thinkingTime }: { text
   )
 })
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + 'B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + 'KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + 'MB'
+}
+
+const AttachmentsBlock = memo(function AttachmentsBlock({ attachments }: { attachments: MessageAttachment[] }) {
+  return (
+    <div className="flex gap-2 mb-2 flex-wrap">
+      {attachments.map(att => (
+        <div key={att.id}>
+          {att.file_type === 'image' && att.preview ? (
+            <img
+              src={att.preview}
+              alt={att.original_filename}
+              className="rounded-lg object-cover"
+              style={{ maxWidth: 200, maxHeight: 200 }}
+            />
+          ) : (
+            <div
+              className="flex items-center gap-2 rounded-lg px-3 py-2"
+              style={{ background: '#f0f2f8', border: '1px solid #e2e6f0' }}
+            >
+              {att.file_type === 'pdf' ? (
+                <FileText size={14} style={{ color: '#e74c3c', flexShrink: 0 }} />
+              ) : (
+                <FileIcon size={14} style={{ color: '#7a8399', flexShrink: 0 }} />
+              )}
+              <span className="text-xs" style={{ color: '#5a6a8a' }}>
+                {att.original_filename}
+              </span>
+              <span className="text-xs" style={{ color: '#aab2c8' }}>
+                {formatFileSize(att.file_size)}
+              </span>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+})
+
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 
@@ -159,9 +201,14 @@ const MessageItem = memo(function MessageItem({ msg, isDebugOpen, isCopied, onTo
         {msg.role === 'assistant' ? (
           <MarkdownContent content={msg.content} />
         ) : (
-          <p className="text-sm leading-7 whitespace-pre-wrap" style={{ color: '#1a1f2e' }}>
-            {msg.content}
-          </p>
+          <>
+            {msg.attachments && msg.attachments.length > 0 && (
+              <AttachmentsBlock attachments={msg.attachments} />
+            )}
+            <p className="text-sm leading-7 whitespace-pre-wrap" style={{ color: '#1a1f2e' }}>
+              {msg.content}
+            </p>
+          </>
         )}
         {/* Action row */}
         <div className="flex items-center justify-between mt-1.5" style={{ minHeight: 24 }}>
