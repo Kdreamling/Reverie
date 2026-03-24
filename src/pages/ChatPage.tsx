@@ -620,7 +620,7 @@ export default function ChatPage() {
                         >
                           <button
                             className="flex-1 flex items-center justify-center text-xs cursor-pointer"
-                            style={{ background: '#1e4a8a', color: '#c8d4e8' }}
+                            style={{ background: '#e8ecf5', color: '#5a6a8a' }}
                             onClick={e => { e.stopPropagation(); setSwipedId(null); setRenameModal({ id: session.id, title: session.title || '' }) }}
                             onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); setSwipedId(null); setRenameModal({ id: session.id, title: session.title || '' }) }}
                           >
@@ -628,7 +628,7 @@ export default function ChatPage() {
                           </button>
                           <button
                             className="flex-1 flex items-center justify-center text-xs cursor-pointer"
-                            style={{ background: '#8a1e1e', color: '#f0c0c0' }}
+                            style={{ background: '#f0e0e0', color: '#c05050' }}
                             onClick={e => { e.stopPropagation(); setSwipedId(null); if (window.confirm('确定要删除这个对话吗？')) deleteSession(session.id) }}
                             onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); setSwipedId(null); if (window.confirm('确定要删除这个对话吗？')) deleteSession(session.id) }}
                           >
