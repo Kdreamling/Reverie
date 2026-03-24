@@ -507,40 +507,58 @@ export default function ChatPage() {
   return (
     <div className="flex overflow-hidden" style={{ background: '#fafbfd', height: '100%', overscrollBehavior: 'none' }}>
 
-      {/* ── Mobile overlay ── */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-30 md:hidden"
-          style={{ background: 'rgba(0,0,0,0.5)' }}
-          onClick={() => { setSidebarOpen(false) }}
-        />
-      )}
-
       {/* ── Sidebar ── */}
       <aside
-        className={`fixed md:relative left-0 top-0 z-40 md:z-auto flex flex-col flex-shrink-0 transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
-        style={{ width: 260, height: '100%', background: '#0a1a3a', color: '#c8d4e8' }}
+        className={`
+          fixed inset-0 z-40
+          md:relative md:inset-auto md:z-auto
+          flex flex-col flex-shrink-0
+          transition-all duration-300 ease-in-out
+          ${sidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full md:translate-x-0 opacity-0 md:opacity-100'}
+        `}
+        style={{
+          width: undefined,  // 手机端全屏，由 inset-0 控制
+          height: '100%',
+          background: '#fafbfd',  // 手机端浅色
+          color: '#1a1f2e',       // 手机端深色文字
+        }}
+        // 桌面端通过内联类覆盖：md 断点下恢复 260px 深蓝
       >
+        {/* 桌面端覆盖样式（通过隐藏的 style 标签注入） */}
+        <style>{`
+          @media (min-width: 768px) {
+            aside { width: 260px !important; background: #0a1a3a !important; color: #c8d4e8 !important; }
+          }
+        `}</style>
+
         {/* Sidebar top */}
-        <div className="px-4 py-4" style={{ paddingTop: 'calc(16px + env(safe-area-inset-top))' }}>
+        <div className="px-5 py-4 md:px-4" style={{ paddingTop: 'calc(16px + env(safe-area-inset-top))' }}>
           <div className="flex items-center justify-between">
+            {/* 手机端：关闭按钮 */}
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="flex md:hidden items-center justify-center rounded-md cursor-pointer"
+              style={{ width: 32, height: 32, color: '#7a8399' }}
+            >
+              <X size={18} strokeWidth={1.8} />
+            </button>
+
             <span className="text-sm font-medium select-none" style={{ letterSpacing: '0.15em' }}>
-              ✦ REVERIE
+              <span className="hidden md:inline" style={{ color: '#c8d4e8' }}>✦ REVERIE</span>
+              <span className="md:hidden" style={{ color: '#1a1f2e' }}>REVERIE</span>
             </span>
+
             <button
               onClick={() => setShowSceneSelect(s => !s)}
               className="flex items-center justify-center rounded-md transition-colors duration-150 cursor-pointer"
-              style={{ width: 28, height: 28, border: '1px solid rgba(255,255,255,0.2)', color: '#c8d4e8' }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.07)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              title="New chat"
+              style={{ width: 32, height: 32 }}
             >
-              <Plus size={14} strokeWidth={1.8} />
+              <Plus size={16} strokeWidth={1.8} />
             </button>
           </div>
 
           {showSceneSelect && (
-            <div ref={sceneRef} className="grid grid-cols-2 gap-2 mt-3">
+            <div ref={sceneRef} className="grid grid-cols-4 md:grid-cols-2 gap-2 mt-3">
               {SCENES.map(s => {
                 const defaultScene = currentSession?.scene_type || 'daily'
                 const isDefault = s.key === defaultScene
@@ -548,21 +566,15 @@ export default function ChatPage() {
                   <button
                     key={s.key}
                     onClick={() => handleCreateWithScene(s.key)}
-                    className="flex flex-col items-center gap-1 py-3 rounded-lg transition-colors duration-150 cursor-pointer"
+                    className="flex flex-col items-center gap-1.5 py-3 rounded-xl md:rounded-lg transition-colors duration-150 cursor-pointer"
                     style={{
-                      background: isDefault ? 'rgba(0,47,167,0.3)' : 'rgba(255,255,255,0.05)',
-                      border: isDefault ? '1px solid rgba(0,47,167,0.6)' : '1px solid rgba(255,255,255,0.1)',
-                      color: '#c8d4e8',
-                    }}
-                    onMouseEnter={e => {
-                      if (!isDefault) e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
-                    }}
-                    onMouseLeave={e => {
-                      if (!isDefault) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
+                      background: isDefault ? 'rgba(0,47,167,0.08)' : 'rgba(0,0,0,0.02)',
+                      border: isDefault ? '1px solid rgba(0,47,167,0.25)' : '1px solid #e8ecf5',
+                      color: isDefault ? '#002FA7' : '#7a8399',
                     }}
                   >
-                    <span style={{ fontSize: 20 }}>{s.icon}</span>
-                    <span className="text-xs">{s.label}</span>
+                    <span style={{ fontSize: 22 }}>{s.icon}</span>
+                    <span className="text-xs font-medium">{s.label}</span>
                   </button>
                 )
               })}
@@ -571,9 +583,9 @@ export default function ChatPage() {
         </div>
 
         {/* Session list */}
-        <nav className="flex-1 overflow-y-auto px-2 pb-2" style={{ scrollbarWidth: 'none' }}>
+        <nav className="flex-1 overflow-y-auto px-3 md:px-2 pb-2" style={{ scrollbarWidth: 'none' }}>
           {loading && !sessions.length && (
-            <p className="px-3 py-4 text-xs" style={{ color: 'rgba(200,212,232,0.35)' }}>
+            <p className="px-3 py-4 text-sm md:text-xs" style={{ color: '#9aa3b8' }}>
               Loading…
             </p>
           )}
@@ -583,8 +595,8 @@ export default function ChatPage() {
             return (
               <div key={key} className="mb-4">
                 <p
-                  className="px-2 pb-1.5 uppercase tracking-wider select-none"
-                  style={{ color: 'rgba(200,212,232,0.4)', fontSize: 10 }}
+                  className="px-2 pb-2 uppercase tracking-wider select-none text-xs md:text-xs"
+                  style={{ color: '#9aa3b8', fontSize: undefined }}
                 >
                   {label}
                 </p>
@@ -639,25 +651,33 @@ export default function ChatPage() {
                         onTouchStart={e => { e.nativeEvent.stopImmediatePropagation(); handleItemTouchStart(e, session.id) }}
                         onTouchMove={e => { e.nativeEvent.stopImmediatePropagation(); handleItemTouchMove(e) }}
                         onTouchEnd={e => { e.nativeEvent.stopImmediatePropagation(); handleItemTouchEnd(e) }}
-                        className="relative w-full text-left rounded-md px-3 py-2.5 transition-colors duration-150 cursor-pointer"
+                        className="relative w-full text-left rounded-xl md:rounded-md px-4 py-3.5 md:px-3 md:py-2.5 transition-colors duration-150 cursor-pointer"
                         style={{
-                          background: isActive ? 'rgba(0,47,167,0.3)' : isHovered ? 'rgba(255,255,255,0.05)' : '#0a1a3a',
-                          borderLeft: isActive ? '2px solid #002FA7' : '2px solid transparent',
-                          color: isActive ? '#e8edf8' : '#c8d4e8',
+                          background: isActive ? 'rgba(0,47,167,0.08)' : isHovered ? 'rgba(0,0,0,0.02)' : 'transparent',
+                          borderLeft: isActive ? '3px solid #002FA7' : '3px solid transparent',
+                          color: isActive ? '#002FA7' : '#1a1f2e',
                           transform: isSwiped ? 'translateX(-130px)' : 'translateX(0)',
                           transition: 'transform 0.25s ease',
                         }}
                       >
+                        {/* 桌面端覆盖颜色 */}
+                        <style>{`
+                          @media (min-width: 768px) {
+                            .session-item-active { background: rgba(0,47,167,0.3) !important; color: #e8edf8 !important; }
+                            .session-item { color: #c8d4e8 !important; }
+                            .session-item:hover { background: rgba(255,255,255,0.05) !important; }
+                          }
+                        `}</style>
                         <p
-                          className="text-xs leading-snug"
+                          className="text-sm md:text-xs leading-snug font-medium md:font-normal"
                           style={{ paddingRight: 32, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                           onDoubleClick={e => { e.stopPropagation(); setRenameModal({ id: session.id, title: session.title || '' }) }}
                         >
                           {session.title || 'New Chat'}
                         </p>
                         <p
-                          className="text-xs mt-0.5"
-                          style={{ color: 'rgba(200,212,232,0.4)', fontSize: 10 }}
+                          className="text-xs mt-1 md:mt-0.5"
+                          style={{ color: '#9aa3b8', fontSize: 12 }}
                         >
                           {formatSessionTime(session.updated_at)}
                         </p>
@@ -727,15 +747,14 @@ export default function ChatPage() {
         )}
 
         {/* Sidebar bottom */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', background: '#0a1a3a', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div style={{ borderTop: '1px solid #e8ecf5', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <style>{`@media (min-width: 768px) { .sidebar-bottom { border-color: rgba(255,255,255,0.07) !important; background: #0a1a3a !important; } }`}</style>
           <button
             onClick={() => setShowSettings(true)}
-            className="flex items-center gap-2.5 w-full px-4 py-4 text-sm transition-colors duration-150 cursor-pointer"
-            style={{ color: 'rgba(200,212,232,0.55)' }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#c8d4e8')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'rgba(200,212,232,0.55)')}
+            className="flex items-center gap-2.5 w-full px-5 md:px-4 py-4 text-sm transition-colors duration-150 cursor-pointer"
+            style={{ color: '#7a8399' }}
           >
-            <Settings size={14} strokeWidth={1.6} />
+            <Settings size={15} strokeWidth={1.6} />
             <span>Settings</span>
           </button>
         </div>
