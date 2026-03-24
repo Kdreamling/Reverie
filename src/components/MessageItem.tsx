@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useState, useSyncExternalStore } from 'react'
 import { ChevronDown, ChevronRight, Copy, Trash2, Check, RotateCcw, Brain, FileText, File as FileIcon } from 'lucide-react'
 import type { ChatMessage, MessageAttachment, MemoryOperation } from '../api/chat'
 import ContextDebugPanel from './ContextDebugPanel'
@@ -150,8 +150,22 @@ const MarkdownContent = memo(function MarkdownContent({ content }: { content: st
   )
 })
 
+// 监听 localStorage 头像变化
+let _avatarVersion = 0
+function subscribeAvatar(cb: () => void) {
+  const handler = () => { _avatarVersion++; cb() }
+  window.addEventListener('avatar:changed', handler)
+  window.addEventListener('storage', handler)
+  return () => { window.removeEventListener('avatar:changed', handler); window.removeEventListener('storage', handler) }
+}
+function getAvatarSnapshot() { return _avatarVersion }
+
 function UserAvatar() {
-  return (
+  useSyncExternalStore(subscribeAvatar, getAvatarSnapshot)
+  const src = localStorage.getItem('avatar_dream')
+  return src ? (
+    <img src={src} alt="D" className="flex-shrink-0 rounded-full object-cover" style={{ width: 28, height: 28 }} />
+  ) : (
     <div
       className="flex-shrink-0 flex items-center justify-center rounded-full text-xs font-semibold select-none"
       style={{ width: 28, height: 28, background: '#eef1f8', color: '#002FA7' }}
@@ -162,7 +176,11 @@ function UserAvatar() {
 }
 
 function AiAvatar() {
-  return (
+  useSyncExternalStore(subscribeAvatar, getAvatarSnapshot)
+  const src = localStorage.getItem('avatar_claude')
+  return src ? (
+    <img src={src} alt="✦" className="flex-shrink-0 rounded-full object-cover" style={{ width: 28, height: 28 }} />
+  ) : (
     <div
       className="flex-shrink-0 flex items-center justify-center select-none"
       style={{ width: 28, height: 28, color: '#002FA7', fontSize: 16, lineHeight: 1 }}

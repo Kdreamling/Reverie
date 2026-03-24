@@ -1,4 +1,5 @@
-import { ChevronLeft, Brain, Settings, LogOut } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { ChevronLeft, Brain, Settings, LogOut, Camera } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import MemoryPanel from './MemoryPanel'
 import FeaturesPanel from './FeaturesPanel'
@@ -9,6 +10,88 @@ interface Props {
   page: Page
   onPageChange: (page: Page) => void
   onClose: () => void
+}
+
+function readFileAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+function AvatarEditor({ label, storageKey, fallback }: { label: string; storageKey: string; fallback: React.ReactNode }) {
+  const [avatar, setAvatar] = useState<string | null>(() => localStorage.getItem(storageKey))
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  async function handleFile(file: File) {
+    if (file.size > 500 * 1024) { alert('图片不能超过 500KB'); return }
+    if (!file.type.startsWith('image/')) { alert('请选择图片文件'); return }
+    const dataUrl = await readFileAsDataURL(file)
+    localStorage.setItem(storageKey, dataUrl)
+    setAvatar(dataUrl)
+    // 通知其他组件刷新
+    window.dispatchEvent(new Event('avatar:changed'))
+  }
+
+  function handleRemove() {
+    localStorage.removeItem(storageKey)
+    setAvatar(null)
+    window.dispatchEvent(new Event('avatar:changed'))
+  }
+
+  return (
+    <div className="flex items-center gap-4">
+      <div
+        className="relative rounded-full overflow-hidden flex-shrink-0 cursor-pointer"
+        style={{ width: 56, height: 56 }}
+        onClick={() => fileRef.current?.click()}
+      >
+        {avatar ? (
+          <img src={avatar} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center" style={{ background: '#eef1f8' }}>
+            {fallback}
+          </div>
+        )}
+        <div
+          className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
+          style={{ background: 'rgba(0,0,0,0.4)' }}
+        >
+          <Camera size={18} style={{ color: '#fff' }} />
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = '' }}
+        />
+      </div>
+      <div className="flex-1">
+        <p className="text-sm font-medium" style={{ color: '#1a1f2e' }}>{label}</p>
+        <div className="flex gap-2 mt-1">
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="text-xs cursor-pointer"
+            style={{ color: '#002FA7' }}
+          >
+            更换
+          </button>
+          {avatar && (
+            <button
+              onClick={handleRemove}
+              className="text-xs cursor-pointer"
+              style={{ color: '#9aa3b8' }}
+            >
+              移除
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
@@ -40,8 +123,6 @@ export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
       className="fixed md:absolute inset-0 flex flex-col z-50 md:z-10"
       style={{ background: '#fafbfd', color: '#1a1f2e' }}
     >
-      <style>{`@media (min-width: 768px) { .settings-root { background: #0a1a3a !important; color: #c8d4e8 !important; } }`}</style>
-
       {/* Header */}
       <button
         onClick={onClose}
@@ -58,31 +139,50 @@ export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
         </span>
       </button>
 
-      {/* Menu items */}
-      <nav className="flex-1 overflow-y-auto px-3 md:px-2 py-4 md:py-3">
-        {menuItems.map(item => (
-          <button
-            key={item.key}
-            onClick={() => onPageChange(item.key)}
-            className="flex items-center gap-4 md:gap-3 w-full px-4 md:px-3 py-4 md:py-3 rounded-xl md:rounded-lg transition-colors duration-150 cursor-pointer text-left mb-1"
-            style={{ background: 'transparent' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,47,167,0.04)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-          >
-            <div
-              className="flex items-center justify-center rounded-xl"
-              style={{ width: 40, height: 40, background: '#eef1f8', flexShrink: 0 }}
+      <div className="flex-1 overflow-y-auto">
+        {/* Avatar section */}
+        <div className="px-5 md:px-4 py-5" style={{ borderBottom: '1px solid #e8ecf5' }}>
+          <p className="text-xs font-medium uppercase tracking-wider mb-4" style={{ color: '#9aa3b8' }}>头像</p>
+          <div className="flex flex-col gap-5">
+            <AvatarEditor
+              label="Dream"
+              storageKey="avatar_dream"
+              fallback={<span className="text-lg font-semibold" style={{ color: '#002FA7' }}>D</span>}
+            />
+            <AvatarEditor
+              label="Claude"
+              storageKey="avatar_claude"
+              fallback={<span style={{ color: '#002FA7', fontSize: 20 }}>✦</span>}
+            />
+          </div>
+        </div>
+
+        {/* Menu items */}
+        <nav className="px-3 md:px-2 py-4 md:py-3">
+          {menuItems.map(item => (
+            <button
+              key={item.key}
+              onClick={() => onPageChange(item.key)}
+              className="flex items-center gap-4 md:gap-3 w-full px-4 md:px-3 py-4 md:py-3 rounded-xl md:rounded-lg transition-colors duration-150 cursor-pointer text-left mb-1"
+              style={{ background: 'transparent' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,47,167,0.04)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
-              <item.icon size={18} strokeWidth={1.5} style={{ color: '#002FA7' }} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium" style={{ color: '#1a1f2e' }}>{item.label}</p>
-              <p className="text-xs mt-0.5" style={{ color: '#9aa3b8' }}>{item.desc}</p>
-            </div>
-            <ChevronLeft size={14} strokeWidth={2} style={{ color: '#c0c8d8', transform: 'rotate(180deg)', marginLeft: 'auto', flexShrink: 0 }} />
-          </button>
-        ))}
-      </nav>
+              <div
+                className="flex items-center justify-center rounded-xl"
+                style={{ width: 40, height: 40, background: '#eef1f8', flexShrink: 0 }}
+              >
+                <item.icon size={18} strokeWidth={1.5} style={{ color: '#002FA7' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium" style={{ color: '#1a1f2e' }}>{item.label}</p>
+                <p className="text-xs mt-0.5" style={{ color: '#9aa3b8' }}>{item.desc}</p>
+              </div>
+              <ChevronLeft size={14} strokeWidth={2} style={{ color: '#c0c8d8', transform: 'rotate(180deg)', marginLeft: 'auto', flexShrink: 0 }} />
+            </button>
+          ))}
+        </nav>
+      </div>
 
       {/* Logout */}
       <div style={{ borderTop: '1px solid #e8ecf5', paddingBottom: 'env(safe-area-inset-bottom)' }}>

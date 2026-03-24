@@ -1,4 +1,4 @@
-import { memo, useRef, useEffect } from 'react'
+import { memo, useRef, useEffect, useSyncExternalStore } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { useChatStore, type StreamBlock } from '../stores/chatStore'
@@ -180,9 +180,20 @@ const StreamBlockRenderer = memo(function StreamBlockRenderer({ block }: { block
 })
 
 // ─── AiAvatar (duplicated to avoid circular import)
+let _avVer = 0
+function _subAv(cb: () => void) {
+  const h = () => { _avVer++; cb() }
+  window.addEventListener('avatar:changed', h); window.addEventListener('storage', h)
+  return () => { window.removeEventListener('avatar:changed', h); window.removeEventListener('storage', h) }
+}
+function _snapAv() { return _avVer }
 
 function AiAvatar() {
-  return (
+  useSyncExternalStore(_subAv, _snapAv)
+  const src = localStorage.getItem('avatar_claude')
+  return src ? (
+    <img src={src} alt="✦" className="flex-shrink-0 rounded-full object-cover" style={{ width: 28, height: 28 }} />
+  ) : (
     <div
       className="flex-shrink-0 flex items-center justify-center select-none"
       style={{ width: 28, height: 28, color: '#002FA7', fontSize: 16, lineHeight: 1 }}
