@@ -140,7 +140,7 @@ export default function ChatPage() {
 
   const model = currentSession?.model ?? MODELS[0].value
   const [showSettings, setShowSettings] = useState(false)
-  const [settingsPage, setSettingsPage] = useState<'menu' | 'memory' | 'features' | 'debug'>('menu')
+  const [settingsPage, setSettingsPage] = useState<'menu' | 'memory' | 'features'>('menu')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null)

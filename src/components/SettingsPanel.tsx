@@ -1,10 +1,9 @@
-import { ChevronLeft, Brain, Settings, LogOut, Bug } from 'lucide-react'
+import { ChevronLeft, Brain, Settings, LogOut } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import MemoryPanel from './MemoryPanel'
-import DebugPanel from './DebugPanel'
 import FeaturesPanel from './FeaturesPanel'
 
-type Page = 'menu' | 'memory' | 'features' | 'debug'
+type Page = 'menu' | 'memory' | 'features'
 
 interface Props {
   page: Page
@@ -18,7 +17,6 @@ export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
   const menuItems = [
     { key: 'memory' as Page, icon: Brain, label: 'Memory', desc: '查看和管理记忆' },
     { key: 'features' as Page, icon: Settings, label: 'Features', desc: '功能开关' },
-    { key: 'debug' as Page, icon: Bug, label: 'Context Debug', desc: '查看注入给 AI 的上下文' },
   ]
 
   if (page === 'memory') {
@@ -37,68 +35,64 @@ export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
     )
   }
 
-  if (page === 'debug') {
-    return (
-      <div className="fixed md:absolute inset-0 z-50 md:z-10">
-        <DebugPanel onBack={() => onPageChange('menu')} />
-      </div>
-    )
-  }
-
   return (
     <div
       className="fixed md:absolute inset-0 flex flex-col z-50 md:z-10"
-      style={{ background: '#0a1a3a', color: '#c8d4e8' }}
+      style={{ background: '#fafbfd', color: '#1a1f2e' }}
     >
+      <style>{`@media (min-width: 768px) { .settings-root { background: #0a1a3a !important; color: #c8d4e8 !important; } }`}</style>
+
       {/* Header */}
       <button
         onClick={onClose}
-        className="flex items-center gap-2 px-4 w-full text-left transition-colors duration-150 cursor-pointer"
+        className="flex items-center gap-2.5 px-5 md:px-4 w-full text-left transition-colors duration-150 cursor-pointer"
         style={{
           paddingTop: 'calc(16px + env(safe-area-inset-top))',
           paddingBottom: 16,
-          borderBottom: '1px solid rgba(255,255,255,0.07)',
-          color: '#c8d4e8',
+          borderBottom: '1px solid #e8ecf5',
         }}
-        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
-        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
       >
-        <ChevronLeft size={16} strokeWidth={1.8} />
-        <span className="text-sm font-medium select-none" style={{ letterSpacing: '0.05em' }}>
+        <ChevronLeft size={18} strokeWidth={1.8} style={{ color: '#7a8399' }} />
+        <span className="text-base md:text-sm font-medium select-none" style={{ letterSpacing: '0.05em' }}>
           Settings
         </span>
       </button>
 
       {/* Menu items */}
-      <nav className="flex-1 overflow-y-auto px-2 py-3">
+      <nav className="flex-1 overflow-y-auto px-3 md:px-2 py-4 md:py-3">
         {menuItems.map(item => (
           <button
             key={item.key}
             onClick={() => onPageChange(item.key)}
-            className="flex items-center gap-3 w-full px-3 py-3 rounded-lg transition-colors duration-150 cursor-pointer text-left"
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+            className="flex items-center gap-4 md:gap-3 w-full px-4 md:px-3 py-4 md:py-3 rounded-xl md:rounded-lg transition-colors duration-150 cursor-pointer text-left mb-1"
+            style={{ background: 'transparent' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,47,167,0.04)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
-            <item.icon size={18} strokeWidth={1.5} style={{ color: 'rgba(200,212,232,0.7)', flexShrink: 0 }} />
-            <div className="min-w-0">
-              <p className="text-sm" style={{ color: '#c8d4e8' }}>{item.label}</p>
-              <p className="text-xs mt-0.5" style={{ color: 'rgba(200,212,232,0.4)' }}>{item.desc}</p>
+            <div
+              className="flex items-center justify-center rounded-xl"
+              style={{ width: 40, height: 40, background: '#eef1f8', flexShrink: 0 }}
+            >
+              <item.icon size={18} strokeWidth={1.5} style={{ color: '#002FA7' }} />
             </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium" style={{ color: '#1a1f2e' }}>{item.label}</p>
+              <p className="text-xs mt-0.5" style={{ color: '#9aa3b8' }}>{item.desc}</p>
+            </div>
+            <ChevronLeft size={14} strokeWidth={2} style={{ color: '#c0c8d8', transform: 'rotate(180deg)', marginLeft: 'auto', flexShrink: 0 }} />
           </button>
         ))}
       </nav>
 
       {/* Logout */}
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+      <div style={{ borderTop: '1px solid #e8ecf5', paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <button
           onClick={() => { logout() }}
           className="flex items-center gap-3 w-full px-5 py-4 text-sm transition-colors duration-150 cursor-pointer"
-          style={{ color: 'rgba(220,140,140,0.8)' }}
-          onMouseEnter={e => (e.currentTarget.style.color = '#e88')}
-          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(220,140,140,0.8)')}
+          style={{ color: '#c05050' }}
         >
           <LogOut size={15} strokeWidth={1.6} />
-          <span>Logout</span>
+          <span>退出登录</span>
         </button>
       </div>
     </div>

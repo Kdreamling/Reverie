@@ -3,9 +3,12 @@ import { client } from './client'
 export interface Memory {
   id: string
   content: string
-  layer: 'core_base' | 'core_living' | 'scene'
+  layer: 'core_base' | 'core_living' | 'scene' | 'ai_journal'
   scene_type?: string
-  source: 'manual' | 'auto' | 'diary'
+  source: 'manual' | 'auto' | 'diary' | 'ai_tool'
+  tags?: string[]
+  ai_weight?: number
+  base_importance?: number
   created_at: string
   updated_at: string
 }
