@@ -186,7 +186,7 @@ interface MessageItemProps {
 
 const MessageItem = memo(function MessageItem({ msg, isDebugOpen, isCopied, onToggleDebug, onCopy, onDelete, onRetry }: MessageItemProps) {
   return (
-    <div className="flex gap-3 mb-6">
+    <div className="flex gap-3 mb-6 msg-fade-in">
       {msg.role === 'user' ? <UserAvatar /> : <AiAvatar />}
       <div className="flex-1 min-w-0 pt-0.5">
         {msg.role === 'assistant' && (msg.thinking || msg.thinking_summary) && (
@@ -214,7 +214,7 @@ const MessageItem = memo(function MessageItem({ msg, isDebugOpen, isCopied, onTo
         <div className="flex items-center justify-between mt-1.5" style={{ minHeight: 24 }}>
           {msg.role === 'assistant' ? (
             <>
-              <span className="flex items-center gap-1 text-xs" style={{ color: '#b0b8c8', fontSize: 11 }}>
+              <span className="flex items-center gap-1 text-xs" style={{ color: '#9aa3b8', fontSize: 12 }}>
                 {formatMsgTime(msg.created_at)}
                 {msg.tokens && (
                   <>
@@ -260,7 +260,7 @@ const MessageItem = memo(function MessageItem({ msg, isDebugOpen, isCopied, onTo
                   <RotateCcw size={14} strokeWidth={1.8} />
                 </button>
               </div>
-              <span className="text-xs" style={{ color: '#b0b8c8', fontSize: 11 }}>
+              <span className="text-xs" style={{ color: '#9aa3b8', fontSize: 12 }}>
                 {formatMsgTime(msg.created_at)}
               </span>
             </>

@@ -83,6 +83,15 @@ body { touch-action: none; }
   background: linear-gradient(90deg, transparent, rgba(0,20,60,0.08), transparent);
 }
 
+/* ── Message fade-in animation ─────────────────────────────────────────────── */
+@keyframes msgFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.msg-fade-in {
+  animation: msgFadeIn 0.3s ease-out;
+}
+
 /* ── Spinner animation for thinking/tool blocks ────────────────────────────── */
 @keyframes spin {
   to { transform: rotate(360deg); }
