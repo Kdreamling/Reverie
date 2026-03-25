@@ -143,15 +143,21 @@ export default function ArtifactPanel() {
 
   return (
     <div
-      className="flex flex-col h-full animate-slide-in-right"
+      className="flex flex-col h-full animate-slide-in-right fixed md:relative inset-0 md:inset-auto z-50 md:z-auto"
       style={{
-        width: 500,
-        maxWidth: '50vw',
+        width: undefined,
+        minWidth: 0,
         borderLeft: '1px solid #e8ecf5',
         background: '#fafbfd',
         flexShrink: 0,
       }}
     >
+      {/* Desktop: 500px width, Mobile: full screen overlay */}
+      <style>{`
+        @media (min-width: 768px) {
+          .animate-slide-in-right { width: 500px !important; max-width: 50vw !important; }
+        }
+      `}</style>
       {/* Header */}
       <div
         className="flex items-center gap-3 px-4 py-3 flex-shrink-0"

@@ -23,6 +23,46 @@ function useElapsedTimer(startTime: number | null): number {
   return elapsed
 }
 
+// ─── Artifact streaming helpers ──────────────────────────────────────────────
+
+/** Strip artifact blocks from streaming text and return clean text + whether an artifact is in progress */
+function stripArtifacts(text: string): { clean: string; hasPartialArtifact: boolean; artifactTitle?: string } {
+  // Remove complete artifacts, replace with placeholder
+  let clean = text.replace(/<artifact\s+[^>]*?title="([^"]*)"[^>]*>[\s\S]*?<\/artifact>/g, '')
+
+  // Check for partial (unclosed) artifact tag
+  const partialMatch = clean.match(/<artifact\s+[^>]*?title="([^"]*)"[^>]*>[\s\S]*$/)
+  if (partialMatch) {
+    clean = clean.slice(0, partialMatch.index)
+    return { clean: clean.trim(), hasPartialArtifact: true, artifactTitle: partialMatch[1] }
+  }
+
+  // Check for very start of artifact tag (not yet closed >)
+  const startMatch = clean.match(/<artifact[\s\S]*$/)
+  if (startMatch) {
+    clean = clean.slice(0, startMatch.index)
+    return { clean: clean.trim(), hasPartialArtifact: true }
+  }
+
+  return { clean: clean.trim(), hasPartialArtifact: false }
+}
+
+function ArtifactGeneratingCard({ title }: { title?: string }) {
+  return (
+    <div
+      className="my-3 rounded-xl p-4"
+      style={{ background: '#fff', border: '1px solid #e8ecf5', maxWidth: 400 }}
+    >
+      <div className="flex items-center gap-2">
+        <span className="tool-spinner" />
+        <span className="text-sm font-medium" style={{ color: '#5a6a8a' }}>
+          {title ? `正在生成「${title}」...` : '正在生成 artifact...'}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 // ─── Streaming text: update DOM directly via ref, render markdown only when idle
 
 function StreamingTextBlock({ text }: { text: string }) {
@@ -31,12 +71,14 @@ function StreamingTextBlock({ text }: { text: string }) {
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [renderMarkdown, setRenderMarkdown] = useState(false)
 
+  const { clean, hasPartialArtifact, artifactTitle } = stripArtifacts(text)
+
   useEffect(() => {
     // If text grew by a small delta, update DOM directly (skip React re-render of markdown)
     if (!renderMarkdown && containerRef.current) {
-      containerRef.current.textContent = text
+      containerRef.current.textContent = clean
     }
-    lastLenRef.current = text.length
+    lastLenRef.current = clean.length
 
     // Debounce: render markdown after 300ms of no updates
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
@@ -47,33 +89,33 @@ function StreamingTextBlock({ text }: { text: string }) {
     return () => {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
     }
-  }, [text, renderMarkdown])
+  }, [clean, renderMarkdown])
 
   // Reset renderMarkdown when text changes after markdown was rendered
   useEffect(() => {
     if (renderMarkdown) {
-      // If text keeps changing, switch back to plain text mode
       const timer = setTimeout(() => {}, 0)
       return () => clearTimeout(timer)
     }
-  }, [text, renderMarkdown])
-
-  if (renderMarkdown) {
-    return (
-      <div className="md-content">
-        <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
-          {text}
-        </ReactMarkdown>
-      </div>
-    )
-  }
+  }, [clean, renderMarkdown])
 
   return (
-    <div
-      ref={containerRef}
-      className="text-sm leading-7 whitespace-pre-wrap"
-      style={{ color: '#1a1f2e' }}
-    />
+    <div>
+      {renderMarkdown ? (
+        <div className="md-content">
+          <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
+            {clean}
+          </ReactMarkdown>
+        </div>
+      ) : (
+        <div
+          ref={containerRef}
+          className="text-sm leading-7 whitespace-pre-wrap"
+          style={{ color: '#1a1f2e' }}
+        />
+      )}
+      {hasPartialArtifact && <ArtifactGeneratingCard title={artifactTitle} />}
+    </div>
   )
 }
 
