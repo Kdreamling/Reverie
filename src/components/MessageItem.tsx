@@ -139,13 +139,38 @@ const AttachmentsBlock = memo(function AttachmentsBlock({ attachments }: { attac
 
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
+import { parseArtifacts } from './artifact/parseArtifacts'
+import ArtifactCard from './artifact/ArtifactCard'
 
 const MarkdownContent = memo(function MarkdownContent({ content }: { content: string }) {
+  const { artifacts, cleanContent } = parseArtifacts(content)
+
+  if (artifacts.length === 0) {
+    return (
+      <div className="md-content">
+        <ReactMarkdown rehypePlugins={[rehypeHighlight]}>{content}</ReactMarkdown>
+      </div>
+    )
+  }
+
+  // Split content by artifact placeholders and render inline
+  const parts = cleanContent.split(/\{\{ARTIFACT_(\d+)\}\}/)
   return (
-    <div className="md-content">
-      <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
-        {content}
-      </ReactMarkdown>
+    <div>
+      {parts.map((part, i) => {
+        if (i % 2 === 0) {
+          // Text part
+          return part.trim() ? (
+            <div key={i} className="md-content">
+              <ReactMarkdown rehypePlugins={[rehypeHighlight]}>{part}</ReactMarkdown>
+            </div>
+          ) : null
+        }
+        // Artifact placeholder
+        const artIndex = parseInt(part)
+        const artifact = artifacts[artIndex]
+        return artifact ? <ArtifactCard key={`art-${i}`} artifact={artifact} index={artIndex} /> : null
+      })}
     </div>
   )
 })

@@ -10,6 +10,7 @@ import type { MessageAttachment } from '../api/chat'
 import SettingsPanel from '../components/SettingsPanel'
 import MessageItem from '../components/MessageItem'
 import StreamingMessage from '../components/StreamingMessage'
+import ArtifactPanel from '../components/artifact/ArtifactPanel'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1060,6 +1061,9 @@ export default function ChatPage() {
             </div>
           </div>
         </main>
+
+        {/* Artifact Panel */}
+        <ArtifactPanel />
 
         {/* Toast */}
         {toast && (
