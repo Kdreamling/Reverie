@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { X, Copy, Check, Download, Code, Eye } from 'lucide-react'
 import { useArtifactStore } from '../../stores/artifactStore'
 import ReactMarkdown from 'react-markdown'
@@ -7,22 +7,12 @@ import rehypeHighlight from 'rehype-highlight'
 // ─── Preview renderers ───────────────────────────────────────────────────────
 
 function HTMLPreview({ content }: { content: string }) {
-  const ref = useRef<HTMLIFrameElement>(null)
-  useEffect(() => {
-    const doc = ref.current?.contentDocument
-    if (doc) {
-      doc.open()
-      doc.write(content)
-      doc.close()
-    }
-  }, [content])
-
   return (
     <iframe
-      ref={ref}
+      srcDoc={content}
       sandbox="allow-scripts allow-modals"
-      className="w-full h-full border-0"
-      style={{ background: '#fff', minHeight: 400 }}
+      className="w-full border-0"
+      style={{ minHeight: '100%', height: '100%', background: '#fff' }}
     />
   )
 }
