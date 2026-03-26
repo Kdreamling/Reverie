@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowUp, BookOpen, ChevronLeft, ChevronRight, Loader2, RotateCcw } from 'lucide-react'
-import { generateQuestions, explainChat, saveErrorsBatch, createStudySession, getStudySession, updateStudySession, listStudySessions, type Question, type ChatMessage as StudyChatMessage, type StudySession } from '../api/study'
+import { generateQuestions, explainChat, saveErrorsBatch, createStudySession, getStudySession, updateStudySession, listStudySessions, type Question, type ChatMessage as StudyChatMessage, type StudySession, type ExplainData } from '../api/study'
 import ReactMarkdown from 'react-markdown'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -438,27 +438,34 @@ function ResultScreen({ questions, answers, onExplain, onRestart }: {
 
 // ─── Explanation Chat Screen ──────────────────────────────────────────────────
 
-function ExplanationScreen({ wrongQuestions, onBack }: {
+function ExplanationScreen({ wrongQuestions, onBack, sessionId, initialExplainData }: {
   wrongQuestions: Array<Question & { userAnswer: string }>
   onBack: () => void
+  sessionId: string | null
+  initialExplainData?: ExplainData
 }) {
-  const [currentIdx, setCurrentIdx] = useState(0)
-  const [chatHistory, setChatHistory] = useState<StudyChatMessage[]>([])
-  const [loading, setLoading] = useState(true)
+  const [currentIdx, setCurrentIdx] = useState(initialExplainData?.current_index ?? 0)
+  const [allHistories, setAllHistories] = useState<Record<string, StudyChatMessage[]>>(initialExplainData?.histories ?? {})
+  const [loading, setLoading] = useState(false)
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const q = wrongQuestions[currentIdx]
   const total = wrongQuestions.length
+  const qKey = String(q?.id ?? currentIdx)
+  const chatHistory = allHistories[qKey] || []
 
   // Auto-scroll
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [chatHistory, loading])
 
-  // Load explanation for current question
+  // Load explanation for current question if no history exists
   useEffect(() => {
-    setChatHistory([])
+    if (!q) return
+    const key = String(q.id ?? currentIdx)
+    if (allHistories[key] && allHistories[key].length > 0) return // Already has history
+
     setLoading(true)
     explainChat({
       question: q.passage ? `[文章] ${q.passage.slice(0, 200)}...\n[题目] ${q.question}` : q.question,
@@ -466,18 +473,30 @@ function ExplanationScreen({ wrongQuestions, onBack }: {
       correct_answer: q.answer,
       knowledge: q.knowledge || '',
     }).then(res => {
-      setChatHistory(res.messages)
+      setAllHistories(prev => {
+        const updated = { ...prev, [key]: res.messages }
+        saveExplainProgress(currentIdx, updated)
+        return updated
+      })
     }).catch(() => {
-      setChatHistory([{ role: 'assistant', content: '讲解加载失败，请重试' }])
+      setAllHistories(prev => ({ ...prev, [key]: [{ role: 'assistant' as const, content: '讲解加载失败，请重试' }] }))
     }).finally(() => setLoading(false))
   }, [currentIdx])
+
+  // Save progress to DB
+  const saveExplainProgress = useCallback((idx: number, histories: Record<string, StudyChatMessage[]>) => {
+    if (!sessionId) return
+    updateStudySession(sessionId, {
+      explain_data: { current_index: idx, histories },
+    }).catch(() => {})
+  }, [sessionId])
 
   const handleSend = async () => {
     if (!input.trim() || loading) return
     const msg = input.trim()
     setInput('')
     const newHistory = [...chatHistory, { role: 'user' as const, content: msg }]
-    setChatHistory(newHistory)
+    setAllHistories(prev => ({ ...prev, [qKey]: newHistory }))
     setLoading(true)
 
     try {
@@ -486,16 +505,31 @@ function ExplanationScreen({ wrongQuestions, onBack }: {
         newHistory,
         msg,
       )
-      setChatHistory(res.messages)
+      setAllHistories(prev => {
+        const updated = { ...prev, [qKey]: res.messages }
+        saveExplainProgress(currentIdx, updated)
+        return updated
+      })
     } catch {
-      setChatHistory([...newHistory, { role: 'assistant', content: '回复失败，请重试' }])
+      setAllHistories(prev => ({ ...prev, [qKey]: [...newHistory, { role: 'assistant', content: '回复失败，请重试' }] }))
     } finally {
       setLoading(false)
     }
   }
 
   const goNext = () => {
-    if (currentIdx < total - 1) setCurrentIdx(i => i + 1)
+    if (currentIdx < total - 1) {
+      const newIdx = currentIdx + 1
+      setCurrentIdx(newIdx)
+      saveExplainProgress(newIdx, allHistories)
+    }
+  }
+  const goPrev = () => {
+    if (currentIdx > 0) {
+      const newIdx = currentIdx - 1
+      setCurrentIdx(newIdx)
+      saveExplainProgress(newIdx, allHistories)
+    }
   }
 
   return (
@@ -503,17 +537,24 @@ function ExplanationScreen({ wrongQuestions, onBack }: {
       {/* Question header */}
       <div className="px-4 py-3 shrink-0" style={{ borderBottom: '1px solid #e8ecf5', background: 'rgba(239,68,68,0.03)' }}>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-medium" style={{ color: '#ef4444' }}>❌ 错题 {currentIdx + 1}/{total}</span>
-          {currentIdx < total - 1 && (
-            <button onClick={goNext} className="text-xs font-medium cursor-pointer" style={{ color: '#002FA7' }}>
-              下一题 →
+          <div className="flex items-center gap-3">
+            {currentIdx > 0 && (
+              <button onClick={goPrev} className="text-xs font-medium cursor-pointer" style={{ color: '#5a6a8a' }}>
+                ← 上一题
+              </button>
+            )}
+            <span className="text-xs font-medium" style={{ color: '#ef4444' }}>❌ 错题 {currentIdx + 1}/{total}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            {currentIdx < total - 1 && (
+              <button onClick={goNext} className="text-xs font-medium cursor-pointer" style={{ color: '#002FA7' }}>
+                下一题 →
+              </button>
+            )}
+            <button onClick={onBack} className="text-xs font-medium cursor-pointer" style={{ color: '#9aa3b8' }}>
+              返回
             </button>
-          )}
-          {currentIdx === total - 1 && (
-            <button onClick={onBack} className="text-xs font-medium cursor-pointer" style={{ color: '#5a6a8a' }}>
-              返回成绩
-            </button>
-          )}
+          </div>
         </div>
         <p className="text-sm" style={{ color: '#3a4255' }}>{q.question}</p>
         <p className="text-xs mt-1" style={{ color: '#9aa3b8' }}>
@@ -587,6 +628,7 @@ export default function StudyPage() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [answers, setAnswers] = useState<Map<number, string>>(new Map())
   const [wrongQuestions, setWrongQuestions] = useState<Array<Question & { userAnswer: string }>>([])
+  const [explainData, setExplainData] = useState<ExplainData | undefined>()
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [pendingSessions, setPendingSessions] = useState<StudySession[]>([])
 
@@ -623,7 +665,12 @@ export default function StudyPage() {
             : userAns.trim().toLowerCase() !== q.answer.trim().toLowerCase()
         }).map((q: Question) => ({ ...q, userAnswer: ansMap.get(q.id) || '' }))
         setWrongQuestions(wrongs)
-        setStep('result')
+        if (session.explain_data && session.explain_data.current_index !== undefined) {
+          setExplainData(session.explain_data)
+          setStep('explain')
+        } else {
+          setStep('result')
+        }
       } else {
         setStep('quiz')
       }
@@ -746,7 +793,9 @@ export default function StudyPage() {
       {step === 'explain' && wrongQuestions.length > 0 && (
         <ExplanationScreen
           wrongQuestions={wrongQuestions}
-          onBack={() => setStep('result')}
+          onBack={() => { setExplainData(undefined); setStep('result') }}
+          sessionId={sessionId}
+          initialExplainData={explainData}
         />
       )}
     </div>

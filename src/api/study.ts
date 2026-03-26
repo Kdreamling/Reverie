@@ -71,6 +71,11 @@ export function getErrorStats() {
 }
 
 // Study sessions
+export interface ExplainData {
+  current_index: number
+  histories: Record<string, ChatMessage[]>
+}
+
 export interface StudySession {
   id: string
   questions: Question[]
@@ -78,6 +83,7 @@ export interface StudySession {
   score?: number
   total: number
   status: 'in_progress' | 'completed'
+  explain_data?: ExplainData
   created_at: string
   updated_at: string
 }
@@ -95,6 +101,6 @@ export function getStudySession(id: string) {
   return client.get<StudySession>(`/study/sessions/${id}`)
 }
 
-export function updateStudySession(id: string, data: { answers?: Record<string, string>; score?: number; status?: string }) {
+export function updateStudySession(id: string, data: { answers?: Record<string, string>; score?: number; status?: string; explain_data?: ExplainData }) {
   return client.patch<{ ok: boolean }>(`/study/sessions/${id}`, data)
 }
