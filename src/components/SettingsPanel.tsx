@@ -101,7 +101,7 @@ function ExportButton({ format }: { format: 'json' | 'md' }) {
   const currentSession = useSessionStore(s => s.currentSession)
 
   const handleExport = async () => {
-    if (!currentSession) return
+    if (!currentSession) { alert('请先选择一个对话'); return }
     setLoading(true)
     try {
       const content = await exportSession(currentSession.id, format)
@@ -110,6 +110,7 @@ function ExportButton({ format }: { format: 'json' | 'md' }) {
       downloadText(typeof content === 'string' ? content : JSON.stringify(content, null, 2), `${title}${ext}`)
     } catch (e) {
       console.error('Export failed:', e)
+      alert('导出失败: ' + (e instanceof Error ? e.message : '未知错误'))
     } finally {
       setLoading(false)
     }

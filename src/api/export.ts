@@ -22,6 +22,12 @@ export function downloadText(content: string, filename: string, mimeType = 'text
   const a = document.createElement('a')
   a.href = url
   a.download = filename
+  a.style.display = 'none'
+  document.body.appendChild(a)
   a.click()
-  URL.revokeObjectURL(url)
+  // Delay cleanup for iOS Safari
+  setTimeout(() => {
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, 1000)
 }
