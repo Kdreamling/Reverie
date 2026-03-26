@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowUp, BookOpen, ChevronLeft, ChevronRight, Loader2, RotateCcw } from 'lucide-react'
-import { generateQuestions, explainChat, saveErrorsBatch, type Question, type ChatMessage as StudyChatMessage } from '../api/study'
+import { generateQuestions, explainChat, saveErrorsBatch, createStudySession, getStudySession, updateStudySession, listStudySessions, type Question, type ChatMessage as StudyChatMessage, type StudySession } from '../api/study'
 import ReactMarkdown from 'react-markdown'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -17,7 +17,11 @@ const COUNT_OPTIONS = [5, 10, 15, 20]
 
 // ─── Setup Screen ─────────────────────────────────────────────────────────────
 
-function SetupScreen({ onStart }: { onStart: (questions: Question[]) => void }) {
+function SetupScreen({ onStart, pendingSessions, onResume }: {
+  onStart: (questions: Question[]) => void
+  pendingSessions?: StudySession[]
+  onResume?: (id: string) => void
+}) {
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['choice'])
   const [count, setCount] = useState(10)
   const [loading, setLoading] = useState(false)
@@ -60,6 +64,25 @@ function SetupScreen({ onStart }: { onStart: (questions: Question[]) => void }) 
           <h2 className="text-xl font-semibold mt-4" style={{ color: '#1a1f2e' }}>英语练习</h2>
           <p className="text-sm mt-2" style={{ color: '#9aa3b8' }}>选择题型，AI 为你出题</p>
         </div>
+
+        {/* Resume banner */}
+        {pendingSessions && pendingSessions.length > 0 && onResume && (
+          <button
+            onClick={() => onResume(pendingSessions[0].id)}
+            className="w-full mb-6 px-4 py-3.5 rounded-xl text-left cursor-pointer transition-all"
+            style={{ background: 'rgba(0,47,167,0.06)', border: '1px solid rgba(0,47,167,0.15)' }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: '#002FA7' }}>继续上次的练习</p>
+                <p className="text-xs mt-0.5" style={{ color: '#7a8399' }}>
+                  {pendingSessions[0].total} 题 · 进行中
+                </p>
+              </div>
+              <ChevronRight size={16} style={{ color: '#002FA7' }} />
+            </div>
+          </button>
+        )}
 
         <p className="text-xs font-medium mb-2.5" style={{ color: '#5a6a8a' }}>题型</p>
         <div className="grid grid-cols-2 gap-2.5 mb-6">
@@ -560,14 +583,65 @@ function ExplanationScreen({ wrongQuestions, onBack }: {
 
 export default function StudyPage() {
   const navigate = useNavigate()
-  const [step, setStep] = useState<'setup' | 'quiz' | 'result' | 'explain'>('setup')
+  const [step, setStep] = useState<'setup' | 'quiz' | 'result' | 'explain' | 'loading'>('loading')
   const [questions, setQuestions] = useState<Question[]>([])
   const [answers, setAnswers] = useState<Map<number, string>>(new Map())
   const [wrongQuestions, setWrongQuestions] = useState<Array<Question & { userAnswer: string }>>([])
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [pendingSessions, setPendingSessions] = useState<StudySession[]>([])
 
-  const handleStart = useCallback((qs: Question[]) => {
+  // Check for in-progress sessions on load
+  useEffect(() => {
+    listStudySessions('in_progress').then(res => {
+      if (res.sessions.length > 0) {
+        setPendingSessions(res.sessions)
+      }
+      setStep('setup')
+    }).catch(() => setStep('setup'))
+  }, [])
+
+  const resumeSession = useCallback(async (id: string) => {
+    try {
+      const session = await getStudySession(id)
+      setQuestions(session.questions)
+      setSessionId(id)
+      const ansMap = new Map<number, string>()
+      if (session.answers) {
+        for (const [k, v] of Object.entries(session.answers)) {
+          ansMap.set(Number(k), v as string)
+        }
+      }
+      setAnswers(ansMap)
+
+      if (session.status === 'completed') {
+        // Compute wrongs for review
+        const wrongs = session.questions.filter((q: Question) => {
+          const userAns = ansMap.get(q.id) || ''
+          const isChoice = q.type === 'choice' || q.type === 'reading'
+          return isChoice
+            ? userAns.toUpperCase() !== q.answer.toUpperCase().charAt(0)
+            : userAns.trim().toLowerCase() !== q.answer.trim().toLowerCase()
+        }).map((q: Question) => ({ ...q, userAnswer: ansMap.get(q.id) || '' }))
+        setWrongQuestions(wrongs)
+        setStep('result')
+      } else {
+        setStep('quiz')
+      }
+    } catch {
+      setStep('setup')
+    }
+  }, [])
+
+  const handleStart = useCallback(async (qs: Question[]) => {
     setQuestions(qs)
     setAnswers(new Map())
+    // Save to DB
+    try {
+      const { id } = await createStudySession(qs)
+      setSessionId(id)
+    } catch (e) {
+      console.error('Failed to save session:', e)
+    }
     setStep('quiz')
   }, [])
 
@@ -586,6 +660,19 @@ export default function StudyPage() {
 
     setWrongQuestions(wrongs)
 
+    const correct = questions.length - wrongs.length
+    const ansObj: Record<string, string> = {}
+    ans.forEach((v, k) => { ansObj[String(k)] = v })
+
+    // Update DB
+    if (sessionId) {
+      try {
+        await updateStudySession(sessionId, { answers: ansObj, score: correct, status: 'completed' })
+      } catch (e) {
+        console.error('Failed to update session:', e)
+      }
+    }
+
     // Save wrong answers to error book
     if (wrongs.length > 0) {
       try {
@@ -600,7 +687,7 @@ export default function StudyPage() {
         console.error('Failed to save errors:', e)
       }
     }
-  }, [questions])
+  }, [questions, sessionId])
 
   const handleExplain = useCallback(() => {
     setStep('explain')
@@ -611,6 +698,7 @@ export default function StudyPage() {
     setQuestions([])
     setAnswers(new Map())
     setWrongQuestions([])
+    setSessionId(null)
   }, [])
 
   return (
@@ -634,7 +722,18 @@ export default function StudyPage() {
         )}
       </div>
 
-      {step === 'setup' && <SetupScreen onStart={handleStart} />}
+      {step === 'loading' && (
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 size={24} className="animate-spin" style={{ color: '#002FA7' }} />
+        </div>
+      )}
+      {step === 'setup' && (
+        <SetupScreen
+          onStart={handleStart}
+          pendingSessions={pendingSessions}
+          onResume={resumeSession}
+        />
+      )}
       {step === 'quiz' && <QuizScreen questions={questions} onSubmit={handleSubmit} />}
       {step === 'result' && (
         <ResultScreen

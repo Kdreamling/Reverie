@@ -69,3 +69,32 @@ export function listErrors(params?: { mastered?: boolean }) {
 export function getErrorStats() {
   return client.get<{ total: number; mastered: number; unmastered: number }>('/study/errors/stats')
 }
+
+// Study sessions
+export interface StudySession {
+  id: string
+  questions: Question[]
+  answers: Record<string, string>
+  score?: number
+  total: number
+  status: 'in_progress' | 'completed'
+  created_at: string
+  updated_at: string
+}
+
+export function listStudySessions(status?: string) {
+  const qs = status ? `?status=${status}` : ''
+  return client.get<{ sessions: StudySession[] }>(`/study/sessions${qs}`)
+}
+
+export function createStudySession(questions: Question[]) {
+  return client.post<{ id: string }>('/study/sessions', { questions, status: 'in_progress' })
+}
+
+export function getStudySession(id: string) {
+  return client.get<StudySession>(`/study/sessions/${id}`)
+}
+
+export function updateStudySession(id: string, data: { answers?: Record<string, string>; score?: number; status?: string }) {
+  return client.patch<{ ok: boolean }>(`/study/sessions/${id}`, data)
+}
