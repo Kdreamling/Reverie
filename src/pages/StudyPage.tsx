@@ -254,7 +254,7 @@ function QuizScreen({ questions, onSubmit }: {
       </div>
 
       {/* Navigation */}
-      <div className="px-6 pb-4 pt-2" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+      <div className="px-6 pb-4 pt-2" style={{ paddingBottom: 'max(40px, calc(env(safe-area-inset-bottom) + 16px))' }}>
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
             onClick={goPrev}
@@ -529,7 +529,7 @@ function ExplanationScreen({ wrongQuestions, onBack }: {
       </div>
 
       {/* Input */}
-      <div className="px-4 pt-2" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+      <div className="px-4 pt-2" style={{ paddingBottom: 'max(40px, calc(env(safe-area-inset-bottom) + 16px))' }}>
         <div className="max-w-lg mx-auto flex gap-3 items-end">
           <div className="flex-1 flex items-end rounded-2xl px-4 py-2.5" style={{ background: '#fff', border: '1px solid #e8ecf5' }}>
             <input
