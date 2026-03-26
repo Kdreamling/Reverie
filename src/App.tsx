@@ -27,7 +27,7 @@ export default function App() {
           <Route path="/" element={<ChatPage />} />
           <Route path="/:sessionId" element={<ChatPage />} />
           <Route path="/read/:sessionId" element={<ReadingPage />} />
-          <Route path="/study/:sessionId" element={<StudyPage />} />
+          <Route path="/study" element={<StudyPage />} />
           <Route path="/graph" element={<GraphPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

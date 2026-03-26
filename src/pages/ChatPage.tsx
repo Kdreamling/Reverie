@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
-import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square, BookOpen } from 'lucide-react'
+import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
@@ -11,7 +11,6 @@ import SettingsPanel from '../components/SettingsPanel'
 import MessageItem from '../components/MessageItem'
 import StreamingMessage from '../components/StreamingMessage'
 import ArtifactPanel from '../components/artifact/ArtifactPanel'
-import StudyPanel from '../components/StudyPanel'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -161,7 +160,6 @@ export default function ChatPage() {
   const [isFocused, setIsFocused] = useState(false)
   const [attachments, setAttachments] = useState<PendingAttachment[]>([])
   const [isUploading, setIsUploading] = useState(false)
-  const [showStudyPanel, setShowStudyPanel] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const userScrolledUpRef = useRef(false)
   const mainRef = useRef<HTMLElement>(null)
@@ -384,11 +382,13 @@ export default function ChatPage() {
   async function handleCreateWithScene(sceneKey: string) {
     setShowSceneSelect(false)
     setSidebarOpen(false)
+    if (sceneKey === 'study') {
+      navigate('/study')
+      return
+    }
     const session = await createSession(sceneKey, model)
     if (sceneKey === 'reading' && session) {
       navigate(`/read/${session.id}`)
-    } else if (sceneKey === 'study' && session) {
-      navigate(`/study/${session.id}`)
     }
   }
 
@@ -400,19 +400,20 @@ export default function ChatPage() {
         return
       }
       if (sceneKey === 'study') {
-        const session = await createSession(sceneKey, model)
-        if (session) navigate(`/study/${session.id}`)
+        navigate('/study')
         return
       }
       await updateSessionAPI(currentSession.id, { scene_type: sceneKey })
       await fetchSessions()
       selectSession(currentSession.id)
     } else {
+      if (sceneKey === 'study') {
+        navigate('/study')
+        return
+      }
       const session = await createSession(sceneKey, model)
       if (sceneKey === 'reading' && session) {
         navigate(`/read/${session.id}`)
-      } else if (sceneKey === 'study' && session) {
-        navigate(`/study/${session.id}`)
       }
     }
   }
@@ -1006,17 +1007,6 @@ export default function ChatPage() {
                 </div>
               )}
 
-              {/* Study Panel */}
-              {showStudyPanel && currentSession && (
-                <StudyPanel
-                  onGenerate={(prompt) => {
-                    setShowStudyPanel(false)
-                    setInput(prompt)
-                  }}
-                  onClose={() => setShowStudyPanel(false)}
-                />
-              )}
-
               <div
                 className={`flex gap-3 px-4 transition-all duration-200 ${isFocused || input || attachments.length > 0 ? 'rounded-2xl items-end py-3' : 'rounded-full items-center py-2.5'}`}
                 style={{
@@ -1036,18 +1026,6 @@ export default function ChatPage() {
                   title="上传文件"
                 >
                   <Paperclip size={16} strokeWidth={1.8} />
-                </button>
-                {/* Study mode button */}
-                <button
-                  onClick={() => setShowStudyPanel(s => !s)}
-                  disabled={isStreaming || !currentSession}
-                  className="flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                  style={{ width: 30, height: 30, color: showStudyPanel ? '#002FA7' : '#7a8399' }}
-                  onMouseEnter={e => { if (!isStreaming) e.currentTarget.style.color = '#002FA7' }}
-                  onMouseLeave={e => { if (!showStudyPanel) e.currentTarget.style.color = '#7a8399' }}
-                  title="英语练习"
-                >
-                  <BookOpen size={16} strokeWidth={1.8} />
                 </button>
                 <textarea
                   ref={textareaRef}
