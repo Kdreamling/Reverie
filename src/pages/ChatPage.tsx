@@ -34,6 +34,7 @@ const SCENES = [
   { key: 'roleplay', icon: '🎭', label: '剧本' },
   { key: 'reading', icon: '📚', label: '共读' },
   { key: 'study', icon: '📝', label: '练习' },
+  { key: 'errors', icon: '📕', label: '错题本' },
 ]
 
 const ACCEPTED_FILE_TYPES = 'image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,text/markdown,text/csv'
@@ -382,10 +383,8 @@ export default function ChatPage() {
   async function handleCreateWithScene(sceneKey: string) {
     setShowSceneSelect(false)
     setSidebarOpen(false)
-    if (sceneKey === 'study') {
-      navigate('/study')
-      return
-    }
+    if (sceneKey === 'study') { navigate('/study'); return }
+    if (sceneKey === 'errors') { navigate('/errors'); return }
     const session = await createSession(sceneKey, model)
     if (sceneKey === 'reading' && session) {
       navigate(`/read/${session.id}`)
@@ -393,24 +392,18 @@ export default function ChatPage() {
   }
 
   async function handleWelcomeScene(sceneKey: string) {
+    if (sceneKey === 'study') { navigate('/study'); return }
+    if (sceneKey === 'errors') { navigate('/errors'); return }
     if (currentSession) {
       if (sceneKey === 'reading') {
         const session = await createSession(sceneKey, model)
         if (session) navigate(`/read/${session.id}`)
         return
       }
-      if (sceneKey === 'study') {
-        navigate('/study')
-        return
-      }
       await updateSessionAPI(currentSession.id, { scene_type: sceneKey })
       await fetchSessions()
       selectSession(currentSession.id)
     } else {
-      if (sceneKey === 'study') {
-        navigate('/study')
-        return
-      }
       const session = await createSession(sceneKey, model)
       if (sceneKey === 'reading' && session) {
         navigate(`/read/${session.id}`)

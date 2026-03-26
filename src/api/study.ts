@@ -66,6 +66,14 @@ export function listErrors(params?: { mastered?: boolean }) {
   return client.get<{ errors: StudyError[]; total: number }>(`/study/errors${qs ? `?${qs}` : ''}`)
 }
 
+export function updateError(id: string, data: { mastered?: boolean; review_count?: number }) {
+  return client.patch<StudyError>(`/study/errors/${id}`, data)
+}
+
+export function deleteError(id: string) {
+  return client.delete<{ ok: boolean }>(`/study/errors/${id}`)
+}
+
 export function getErrorStats() {
   return client.get<{ total: number; mastered: number; unmastered: number }>('/study/errors/stats')
 }
