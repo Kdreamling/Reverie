@@ -27,19 +27,32 @@ function useElapsedTimer(startTime: number | null): number {
 
 /** Strip artifact blocks from streaming text and return clean text + whether an artifact is in progress */
 function stripArtifacts(text: string): { clean: string; hasPartialArtifact: boolean; artifactTitle?: string } {
-  // Remove complete artifacts
-  let clean = text.replace(/<artifact[\s\S]*?<\/artifact>/g, '')
+  let clean = text
+  let hasPartialArtifact = false
+  let artifactTitle: string | undefined
 
-  // Check for partial (unclosed) artifact — opening tag exists but no closing tag
-  const partialMatch = clean.match(/<artifact(\s[\s\S]*)?$/)
-  if (partialMatch) {
-    // Extract title if available
-    const titleMatch = partialMatch[0].match(/title="([^"]*)"/)
-    clean = clean.slice(0, partialMatch.index)
-    return { clean: clean.trim(), hasPartialArtifact: true, artifactTitle: titleMatch?.[1] }
+  // Loop: remove all complete <artifact...>...</artifact> blocks
+  while (true) {
+    const openIdx = clean.indexOf('<artifact')
+    if (openIdx === -1) break
+
+    const closeTag = '</artifact>'
+    const closeIdx = clean.indexOf(closeTag, openIdx)
+    if (closeIdx !== -1) {
+      // Complete block — remove it entirely
+      clean = clean.slice(0, openIdx) + clean.slice(closeIdx + closeTag.length)
+    } else {
+      // Partial block — no closing tag yet, strip from <artifact to end
+      const fragment = clean.slice(openIdx)
+      const titleMatch = fragment.match(/title="([^"]*)"/)
+      artifactTitle = titleMatch?.[1]
+      clean = clean.slice(0, openIdx)
+      hasPartialArtifact = true
+      break
+    }
   }
 
-  return { clean: clean.trim(), hasPartialArtifact: false }
+  return { clean: clean.trim(), hasPartialArtifact, artifactTitle }
 }
 
 function ArtifactGeneratingCard({ title }: { title?: string }) {
