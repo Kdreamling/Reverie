@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
-import { ChevronLeft, Brain, Settings, LogOut, Camera } from 'lucide-react'
+import { ChevronLeft, Brain, Settings, LogOut, Camera, Download } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
+import { useSessionStore } from '../stores/sessionStore'
+import { exportSession, downloadText } from '../api/export'
 import MemoryPanel from './MemoryPanel'
 import FeaturesPanel from './FeaturesPanel'
 
@@ -94,6 +96,38 @@ function AvatarEditor({ label, storageKey, fallback }: { label: string; storageK
   )
 }
 
+function ExportButton({ format }: { format: 'json' | 'md' }) {
+  const [loading, setLoading] = useState(false)
+  const currentSession = useSessionStore(s => s.currentSession)
+
+  const handleExport = async () => {
+    if (!currentSession) return
+    setLoading(true)
+    try {
+      const content = await exportSession(currentSession.id, format)
+      const ext = format === 'md' ? '.md' : '.json'
+      const title = currentSession.title || 'conversation'
+      downloadText(typeof content === 'string' ? content : JSON.stringify(content, null, 2), `${title}${ext}`)
+    } catch (e) {
+      console.error('Export failed:', e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <button
+      onClick={handleExport}
+      disabled={loading || !currentSession}
+      className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer disabled:opacity-40"
+      style={{ border: '1px solid #e8ecf5', color: '#5a6a8a' }}
+    >
+      <Download size={13} />
+      {loading ? '导出中...' : format === 'md' ? '导出 Markdown' : '导出 JSON'}
+    </button>
+  )
+}
+
 export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
   const logout = useAuthStore(s => s.logout)
 
@@ -182,6 +216,15 @@ export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
             </button>
           ))}
         </nav>
+      </div>
+
+      {/* Export */}
+      <div className="px-5 md:px-4 py-4" style={{ borderTop: '1px solid #e8ecf5' }}>
+        <p className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: '#9aa3b8' }}>导出</p>
+        <div className="flex gap-2">
+          <ExportButton format="json" />
+          <ExportButton format="md" />
+        </div>
       </div>
 
       {/* Logout */}
