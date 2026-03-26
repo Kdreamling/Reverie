@@ -19,22 +19,33 @@ export interface ParseResult {
   cleanContent: string
 }
 
+function extractAttr(tag: string, name: string): string | undefined {
+  const match = tag.match(new RegExp(`${name}="([^"]*)"` ))
+  return match?.[1] || undefined
+}
+
 function parseXMLArtifacts(content: string): ParseResult {
   const artifacts: ParsedArtifact[] = []
-  const regex = /<artifact\s+type="(\w+)"\s+title="([^"]+)"(?:\s+language="([^"]+)")?(?:\s+ref="([^"]+)")?(?:\s+version="(\d+)")?\s*>([\s\S]*?)<\/artifact>/g
-
-  let match
   let cleanContent = content
   let index = 0
 
+  // Match <artifact ...attributes...>content</artifact> with any attribute order
+  const regex = /<artifact\s+([^>]+)>([\s\S]*?)<\/artifact>/g
+  let match
+
   while ((match = regex.exec(content)) !== null) {
+    const attrs = match[1]
+    const type = extractAttr(attrs, 'type')
+    const title = extractAttr(attrs, 'title')
+    if (!type || !title) continue
+
     artifacts.push({
-      type: match[1],
-      title: match[2],
-      language: match[3] || undefined,
-      ref: match[4] || undefined,
-      version: match[5] ? parseInt(match[5]) : undefined,
-      content: match[6].trim(),
+      type,
+      title,
+      language: extractAttr(attrs, 'language'),
+      ref: extractAttr(attrs, 'ref'),
+      version: extractAttr(attrs, 'version') ? parseInt(extractAttr(attrs, 'version')!) : undefined,
+      content: match[2].trim(),
     })
     cleanContent = cleanContent.replace(match[0], `{{ARTIFACT_${index}}}`)
     index++
