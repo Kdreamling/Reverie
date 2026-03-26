@@ -33,7 +33,8 @@ const SCENES = [
   { key: 'daily', icon: '🏠', label: '日常' },
   { key: 'code', icon: '💻', label: '代码' },
   { key: 'roleplay', icon: '🎭', label: '剧本' },
-  { key: 'reading', icon: '📚', label: '学习' },
+  { key: 'reading', icon: '📚', label: '共读' },
+  { key: 'study', icon: '📝', label: '练习' },
 ]
 
 const ACCEPTED_FILE_TYPES = 'image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,text/markdown,text/csv'
@@ -386,6 +387,8 @@ export default function ChatPage() {
     const session = await createSession(sceneKey, model)
     if (sceneKey === 'reading' && session) {
       navigate(`/read/${session.id}`)
+    } else if (sceneKey === 'study' && session) {
+      navigate(`/study/${session.id}`)
     }
   }
 
@@ -396,6 +399,11 @@ export default function ChatPage() {
         if (session) navigate(`/read/${session.id}`)
         return
       }
+      if (sceneKey === 'study') {
+        const session = await createSession(sceneKey, model)
+        if (session) navigate(`/study/${session.id}`)
+        return
+      }
       await updateSessionAPI(currentSession.id, { scene_type: sceneKey })
       await fetchSessions()
       selectSession(currentSession.id)
@@ -403,6 +411,8 @@ export default function ChatPage() {
       const session = await createSession(sceneKey, model)
       if (sceneKey === 'reading' && session) {
         navigate(`/read/${session.id}`)
+      } else if (sceneKey === 'study' && session) {
+        navigate(`/study/${session.id}`)
       }
     }
   }
