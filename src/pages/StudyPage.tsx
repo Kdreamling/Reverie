@@ -306,7 +306,7 @@ export default function StudyPage() {
           </div>
 
           {/* Input bar */}
-          <div className="shrink-0 px-4 pb-4 pt-2">
+          <div className="shrink-0 px-4 pt-2" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
             <div className="max-w-2xl mx-auto">
               <div
                 className={`flex gap-3 px-4 transition-all duration-200 ${isFocused || input ? 'rounded-2xl items-end py-3' : 'rounded-full items-center py-2.5'}`}
