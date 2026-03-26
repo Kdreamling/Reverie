@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, Loader2, RotateCcw } from 'lucide-react'
-import { generateQuestions, explainWrong, saveErrorsBatch, type Question } from '../api/study'
+import { ArrowLeft, ArrowUp, BookOpen, ChevronLeft, ChevronRight, Loader2, RotateCcw } from 'lucide-react'
+import { generateQuestions, explainChat, saveErrorsBatch, type Question, type ChatMessage as StudyChatMessage } from '../api/study'
 import ReactMarkdown from 'react-markdown'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -413,34 +413,144 @@ function ResultScreen({ questions, answers, onExplain, onRestart }: {
   )
 }
 
-// ─── Explanation Screen ───────────────────────────────────────────────────────
+// ─── Explanation Chat Screen ──────────────────────────────────────────────────
 
-function ExplanationScreen({ explanation, loading, onBack }: {
-  explanation: string
-  loading: boolean
+function ExplanationScreen({ wrongQuestions, onBack }: {
+  wrongQuestions: Array<Question & { userAnswer: string }>
   onBack: () => void
 }) {
+  const [currentIdx, setCurrentIdx] = useState(0)
+  const [chatHistory, setChatHistory] = useState<StudyChatMessage[]>([])
+  const [loading, setLoading] = useState(true)
+  const [input, setInput] = useState('')
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  const q = wrongQuestions[currentIdx]
+  const total = wrongQuestions.length
+
+  // Auto-scroll
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+  }, [chatHistory, loading])
+
+  // Load explanation for current question
+  useEffect(() => {
+    setChatHistory([])
+    setLoading(true)
+    explainChat({
+      question: q.passage ? `[文章] ${q.passage.slice(0, 200)}...\n[题目] ${q.question}` : q.question,
+      user_answer: q.userAnswer || '未作答',
+      correct_answer: q.answer,
+      knowledge: q.knowledge || '',
+    }).then(res => {
+      setChatHistory(res.messages)
+    }).catch(() => {
+      setChatHistory([{ role: 'assistant', content: '讲解加载失败，请重试' }])
+    }).finally(() => setLoading(false))
+  }, [currentIdx])
+
+  const handleSend = async () => {
+    if (!input.trim() || loading) return
+    const msg = input.trim()
+    setInput('')
+    const newHistory = [...chatHistory, { role: 'user' as const, content: msg }]
+    setChatHistory(newHistory)
+    setLoading(true)
+
+    try {
+      const res = await explainChat(
+        { question: q.question, user_answer: q.userAnswer, correct_answer: q.answer, knowledge: q.knowledge || '' },
+        newHistory,
+        msg,
+      )
+      setChatHistory(res.messages)
+    } catch {
+      setChatHistory([...newHistory, { role: 'assistant', content: '回复失败，请重试' }])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const goNext = () => {
+    if (currentIdx < total - 1) setCurrentIdx(i => i + 1)
+  }
+
   return (
-    <div className="flex-1 overflow-auto px-6 py-6">
-      <div className="max-w-lg mx-auto">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <Loader2 size={24} className="animate-spin" style={{ color: '#002FA7' }} />
-            <p className="text-sm" style={{ color: '#9aa3b8' }}>AI 正在讲解...</p>
+    <div className="flex-1 flex flex-col">
+      {/* Question header */}
+      <div className="px-4 py-3 shrink-0" style={{ borderBottom: '1px solid #e8ecf5', background: 'rgba(239,68,68,0.03)' }}>
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs font-medium" style={{ color: '#ef4444' }}>❌ 错题 {currentIdx + 1}/{total}</span>
+          {currentIdx < total - 1 && (
+            <button onClick={goNext} className="text-xs font-medium cursor-pointer" style={{ color: '#002FA7' }}>
+              下一题 →
+            </button>
+          )}
+          {currentIdx === total - 1 && (
+            <button onClick={onBack} className="text-xs font-medium cursor-pointer" style={{ color: '#5a6a8a' }}>
+              返回成绩
+            </button>
+          )}
+        </div>
+        <p className="text-sm" style={{ color: '#3a4255' }}>{q.question}</p>
+        <p className="text-xs mt-1" style={{ color: '#9aa3b8' }}>
+          你的答案：{q.userAnswer || '未答'} → 正确：{q.answer}
+        </p>
+      </div>
+
+      {/* Chat messages */}
+      <div ref={scrollRef} className="flex-1 overflow-auto px-4 py-4">
+        <div className="max-w-lg mx-auto space-y-4">
+          {chatHistory.filter(m => m.role !== 'user' || chatHistory.indexOf(m) > 0).map((msg, i) => (
+            <div key={i} className={msg.role === 'user' ? 'flex justify-end' : ''}>
+              <div
+                className="rounded-2xl px-4 py-3 text-sm leading-relaxed"
+                style={{
+                  maxWidth: '85%',
+                  background: msg.role === 'user' ? '#002FA7' : '#f4f5f9',
+                  color: msg.role === 'user' ? '#fff' : '#3a4255',
+                }}
+              >
+                {msg.role === 'assistant' ? (
+                  <div className="md-content">
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  </div>
+                ) : msg.content}
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="flex items-center gap-2 px-4 py-3" style={{ color: '#9aa3b8' }}>
+              <Loader2 size={14} className="animate-spin" />
+              <span className="text-xs">思考中...</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Input */}
+      <div className="px-4 pt-2" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+        <div className="max-w-lg mx-auto flex gap-3 items-end">
+          <div className="flex-1 flex items-end rounded-2xl px-4 py-2.5" style={{ background: '#fff', border: '1px solid #e8ecf5' }}>
+            <input
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleSend() }}
+              disabled={loading}
+              placeholder="追问..."
+              className="flex-1 text-sm outline-none bg-transparent disabled:opacity-40"
+              style={{ color: '#1a1f2e' }}
+            />
           </div>
-        ) : (
-          <div className="md-content">
-            <ReactMarkdown>{explanation}</ReactMarkdown>
-          </div>
-        )}
-        <button
-          onClick={onBack}
-          disabled={loading}
-          className="w-full py-3 mt-6 rounded-xl text-sm font-medium cursor-pointer"
-          style={{ border: '1px solid #e8ecf5', color: '#5a6a8a' }}
-        >
-          返回成绩
-        </button>
+          <button
+            onClick={handleSend}
+            disabled={!input.trim() || loading}
+            className="flex-shrink-0 flex items-center justify-center rounded-full cursor-pointer disabled:opacity-30"
+            style={{ width: 36, height: 36, background: '#002FA7', color: '#fff' }}
+          >
+            <ArrowUp size={16} strokeWidth={2.5} />
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -453,8 +563,7 @@ export default function StudyPage() {
   const [step, setStep] = useState<'setup' | 'quiz' | 'result' | 'explain'>('setup')
   const [questions, setQuestions] = useState<Question[]>([])
   const [answers, setAnswers] = useState<Map<number, string>>(new Map())
-  const [explanation, setExplanation] = useState('')
-  const [explaining, setExplaining] = useState(false)
+  const [wrongQuestions, setWrongQuestions] = useState<Array<Question & { userAnswer: string }>>([])
 
   const handleStart = useCallback((qs: Question[]) => {
     setQuestions(qs)
@@ -466,22 +575,25 @@ export default function StudyPage() {
     setAnswers(ans)
     setStep('result')
 
-    // Save wrong answers to error book
+    // Compute wrong questions
     const wrongs = questions.filter(q => {
       const userAns = ans.get(q.id) || ''
       const isChoice = q.type === 'choice' || q.type === 'reading'
       return isChoice
         ? userAns.toUpperCase() !== q.answer.toUpperCase().charAt(0)
         : userAns.trim().toLowerCase() !== q.answer.trim().toLowerCase()
-    })
+    }).map(q => ({ ...q, userAnswer: ans.get(q.id) || '' }))
 
+    setWrongQuestions(wrongs)
+
+    // Save wrong answers to error book
     if (wrongs.length > 0) {
       try {
         await saveErrorsBatch(wrongs.map(q => ({
           question_type: q.type,
           question: q.passage ? `[阅读] ${q.question}` : q.question,
           correct_answer: q.answer,
-          user_answer: ans.get(q.id) || '',
+          user_answer: q.userAnswer,
           tags: q.knowledge ? [q.knowledge] : [],
         })))
       } catch (e) {
@@ -490,36 +602,15 @@ export default function StudyPage() {
     }
   }, [questions])
 
-  const handleExplain = useCallback(async () => {
+  const handleExplain = useCallback(() => {
     setStep('explain')
-    setExplaining(true)
-    try {
-      const wrongs = questions.filter(q => {
-        const userAns = answers.get(q.id) || ''
-        const isChoice = q.type === 'choice' || q.type === 'reading'
-        return isChoice
-          ? userAns.toUpperCase() !== q.answer.toUpperCase().charAt(0)
-          : userAns.trim().toLowerCase() !== q.answer.trim().toLowerCase()
-      })
-      const result = await explainWrong(wrongs.map(q => ({
-        question: q.passage ? `[文章] ${q.passage.slice(0, 100)}...\n[题目] ${q.question}` : q.question,
-        user_answer: answers.get(q.id) || '未作答',
-        correct_answer: q.answer,
-        knowledge: q.knowledge,
-      })))
-      setExplanation(result.explanation)
-    } catch (e) {
-      setExplanation('讲解加载失败，请重试')
-    } finally {
-      setExplaining(false)
-    }
-  }, [questions, answers])
+  }, [])
 
   const handleRestart = useCallback(() => {
     setStep('setup')
     setQuestions([])
     setAnswers(new Map())
-    setExplanation('')
+    setWrongQuestions([])
   }, [])
 
   return (
@@ -553,10 +644,9 @@ export default function StudyPage() {
           onRestart={handleRestart}
         />
       )}
-      {step === 'explain' && (
+      {step === 'explain' && wrongQuestions.length > 0 && (
         <ExplanationScreen
-          explanation={explanation}
-          loading={explaining}
+          wrongQuestions={wrongQuestions}
           onBack={() => setStep('result')}
         />
       )}

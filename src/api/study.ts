@@ -36,6 +36,19 @@ export function explainWrong(wrongQuestions: Array<{ question: string; user_answ
   return client.post<{ explanation: string }>('/study/explain', { wrong_questions: wrongQuestions })
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export function explainChat(question: Record<string, string>, messages: ChatMessage[] = [], userMessage?: string) {
+  return client.post<{ reply: string; messages: ChatMessage[] }>('/study/explain-chat', {
+    question,
+    messages,
+    user_message: userMessage,
+  })
+}
+
 export function saveErrorsBatch(errors: Array<{
   question_type: string
   question: string
