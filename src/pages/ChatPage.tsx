@@ -26,6 +26,7 @@ const MODELS: { value: string; label: string }[] = [
   { value: '[0.1]claude-opus-4-6-thinking', label: 'Claude Opus 4.6' },
   { value: '[按量]claude-opus-4-6-thinking', label: 'Claude Opus 4.6 (按量)' },
   { value: 'anthropic/claude-opus-4.6', label: 'Claude Opus (OR)' },
+  { value: 'claude-opus-4.6-zenmux', label: 'Claude Opus (ZM)' },
 ]
 
 const CHAT_SCENES = [
