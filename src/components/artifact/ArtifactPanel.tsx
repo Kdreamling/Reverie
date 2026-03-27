@@ -84,20 +84,35 @@ function CSVPreview({ content }: { content: string }) {
 }
 
 function MermaidPreview({ content }: { content: string }) {
+  const [zoom, setZoom] = useState(100)
+
   const html = `<!DOCTYPE html><html><head>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"><\/script>
-<style>body{margin:0;display:flex;justify-content:center;padding:20px;background:#fff;}</style>
+<style>
+body{margin:0;display:flex;justify-content:center;padding:20px;background:#fff;overflow:auto;}
+.mermaid svg{max-width:none!important;}
+</style>
 </head><body><pre class="mermaid">${content.replace(/</g, '&lt;')}</pre>
 <script>mermaid.initialize({startOnLoad:true,theme:'default'});<\/script>
 </body></html>`
 
   return (
-    <iframe
-      srcDoc={html}
-      sandbox="allow-scripts"
-      className="w-full border-0"
-      style={{ minHeight: 400, height: '100%', background: '#fff' }}
-    />
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-2 px-3 py-2 shrink-0" style={{ borderBottom: '1px solid #e8ecf5' }}>
+        <button onClick={() => setZoom(z => Math.max(50, z - 25))} className="px-2 py-1 rounded text-xs cursor-pointer" style={{ border: '1px solid #e8ecf5', color: '#5a6a8a' }}>−</button>
+        <span className="text-xs tabular-nums" style={{ color: '#9aa3b8', minWidth: 40, textAlign: 'center' }}>{zoom}%</span>
+        <button onClick={() => setZoom(z => Math.min(200, z + 25))} className="px-2 py-1 rounded text-xs cursor-pointer" style={{ border: '1px solid #e8ecf5', color: '#5a6a8a' }}>+</button>
+        <button onClick={() => setZoom(100)} className="px-2 py-1 rounded text-xs cursor-pointer" style={{ border: '1px solid #e8ecf5', color: '#9aa3b8' }}>重置</button>
+      </div>
+      <div className="flex-1 overflow-auto">
+        <iframe
+          srcDoc={html}
+          sandbox="allow-scripts"
+          className="border-0"
+          style={{ width: `${zoom}%`, minHeight: 400, height: '100%', background: '#fff', transformOrigin: 'top left', transform: `scale(${zoom / 100})` }}
+        />
+      </div>
+    </div>
   )
 }
 
