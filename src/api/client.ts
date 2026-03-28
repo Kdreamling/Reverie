@@ -18,6 +18,7 @@ async function request<T>(
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache',
     ...(init.headers as Record<string, string>),
   }
   if (token) {
@@ -49,8 +50,10 @@ async function request<T>(
 }
 
 export const client = {
-  get: <T>(path: string, init?: RequestInit) =>
-    request<T>(path, { ...init, method: 'GET' }),
+  get: <T>(path: string, init?: RequestInit) => {
+    const sep = path.includes('?') ? '&' : '?'
+    return request<T>(`${path}${sep}_t=${Date.now()}`, { ...init, method: 'GET' })
+  },
 
   post: <T>(path: string, body: unknown, init?: RequestInit) =>
     request<T>(path, { ...init, method: 'POST', body: JSON.stringify(body) }),

@@ -8,6 +8,7 @@ import StudyPage from './pages/StudyPage'
 import ErrorBookPage from './pages/ErrorBookPage'
 import GraphPage from './pages/GraphPage'
 import ProjectsPage from './pages/ProjectsPage'
+import ProjectDetailPage from './pages/ProjectDetailPage'
 import AuthGuard from './components/AuthGuard'
 import { useAuthStore } from './stores/authStore'
 
@@ -35,7 +36,7 @@ export default function App() {
           <Route path="/errors" element={<ErrorBookPage />} />
           <Route path="/graph" element={<GraphPage />} />
           <Route path="/projects" element={<ProjectsPage />} />
-          <Route path="/projects/:projectId" element={<ProjectsPage />} />
+          <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

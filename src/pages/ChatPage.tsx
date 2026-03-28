@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
 import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
 import { useAuthStore } from '../stores/authStore'
@@ -105,6 +105,7 @@ function WelcomeScreen() {
 
 export default function ChatPage() {
   const navigate = useNavigate()
+  const { sessionId: urlSessionId } = useParams<{ sessionId?: string }>()
   const { sessions, currentSession, loading, fetchSessions, createSession, selectSession, deleteSession, updateSessionModel } =
     useSessionStore()
   const { messages, isStreaming, loadMessages, sendMessage, clearMessages, deleteConversation, lastError, retryLast, clearError, stopStreaming } =
@@ -270,6 +271,13 @@ export default function ChatPage() {
 
   // Load sessions on mount
   useEffect(() => { if (token) fetchSessions() }, [token, fetchSessions])
+
+  // Auto-select session from URL param (e.g. from project chapters)
+  useEffect(() => {
+    if (urlSessionId && sessions.length > 0 && currentSession?.id !== urlSessionId) {
+      selectSession(urlSessionId)
+    }
+  }, [urlSessionId, sessions, currentSession?.id, selectSession])
 
   // Clean up swipe/rename state
   useEffect(() => {

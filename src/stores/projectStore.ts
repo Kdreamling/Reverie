@@ -54,7 +54,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   async createProject(title, tagline, posterTheme) {
-    const project = await createProjectAPI({ title, tagline, poster_theme: posterTheme })
+    // 自动分配海报主题：按现有项目数轮换
+    const themes = ['cyber', 'kyoto', 'ocean']
+    const autoTheme = posterTheme || themes[get().projects.length % themes.length]
+    const project = await createProjectAPI({ title, tagline, poster_theme: autoTheme })
     set(s => ({ projects: [project, ...s.projects] }))
     return project
   },
