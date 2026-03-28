@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 import type { DebugInfo } from '../api/chat'
+import { C } from '../theme'
 
 type Tab = 'memories' | 'search' | 'window' | 'summaries' | 'session_summary' | 'graph'
 
@@ -13,23 +15,30 @@ const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: 'graph', icon: '🕸️', label: '图谱' },
 ]
 
-const LAYER_COLORS: Record<string, string> = {
-  core_base: '#002FA7',
-  core_living: '#3366CC',
-  scene: '#6699DD',
-  ai_journal: '#9966CC',
+const LAYER_COLORS: Record<string, { bg: string; fg: string; dot: string }> = {
+  core_base: { bg: 'rgba(200,170,130,0.12)', fg: '#A08060', dot: '#C4A878' },
+  core_living: { bg: 'rgba(140,160,180,0.1)', fg: '#7A8A9A', dot: '#9AACBC' },
+  scene: { bg: 'rgba(200,150,160,0.1)', fg: '#B08088', dot: '#D0A0A8' },
+  ai_journal: { bg: 'rgba(150,180,140,0.1)', fg: '#7A9A70', dot: '#A0C090' },
+}
+
+const LAYER_LABELS: Record<string, string> = {
+  core_base: '基石',
+  core_living: '活水',
+  scene: '场景',
+  ai_journal: '日记',
 }
 
 const MATCH_COLORS: Record<string, string> = {
-  keyword: '#3366CC',
-  vector: '#8855CC',
-  both: '#22995e',
+  keyword: '#A08060',
+  vector: '#B08088',
+  both: '#7A9A70',
 }
 
 function getScoreColor(score: number) {
-  if (score >= 0.7) return '#22995e'
-  if (score >= 0.4) return '#cc9922'
-  return '#999'
+  if (score >= 0.7) return '#7A9A70'
+  if (score >= 0.4) return '#C4A878'
+  return C.textMuted
 }
 
 interface Props {
@@ -62,8 +71,8 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
     <div
       className="mt-2 rounded-xl overflow-hidden w-full"
       style={{
-        background: 'rgba(0,47,167,0.04)',
-        border: '1px solid rgba(0,47,167,0.10)',
+        background: C.memoryBg,
+        border: `1px solid ${C.border}`,
         backdropFilter: 'blur(8px)',
         transition: 'all 200ms ease',
       }}
@@ -81,8 +90,8 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
                   onClick={() => !empty && setActiveTab(t.key)}
                   className="flex items-center gap-1 px-2 py-1.5 sm:px-2.5 sm:py-1 rounded-full text-xs transition-all duration-150 cursor-pointer active:scale-95"
                   style={{
-                    background: empty ? 'rgba(0,0,0,0.03)' : 'rgba(0,47,167,0.08)',
-                    color: empty ? '#b0b8c8' : '#002FA7',
+                    background: empty ? 'rgba(0,0,0,0.03)' : C.sidebarActive,
+                    color: empty ? C.textMuted : C.accent,
                     opacity: empty ? 0.5 : 1,
                     fontWeight: 500,
                     minHeight: 32,
@@ -96,14 +105,14 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
             })}
           </div>
           {/* token bar */}
-          <div className="flex items-center gap-2 text-xs" style={{ color: '#8a9ab5' }}>
+          <div className="flex items-center gap-2 text-xs" style={{ color: C.textMuted }}>
             <span className="whitespace-nowrap">{token_usage.total} / {token_usage.budget}</span>
-            <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(0,47,167,0.08)', minWidth: 40 }}>
+            <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: C.surface, minWidth: 40 }}>
               <div
                 className="h-full rounded-full transition-all duration-300"
                 style={{
                   width: `${Math.min(usageRatio * 100, 100)}%`,
-                  background: usageRatio > 0.9 ? '#e05555' : '#002FA7',
+                  background: usageRatio > 0.9 ? C.errorText : `linear-gradient(90deg, ${C.accentWarm}, ${C.accent})`,
                 }}
               />
             </div>
@@ -115,11 +124,11 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
           <button
             onClick={() => setActiveTab(null)}
             className="flex items-center gap-1 text-xs mb-2 cursor-pointer transition-colors active:scale-95"
-            style={{ color: '#002FA7', minHeight: 28 }}
+            style={{ color: C.accent, minHeight: 28 }}
           >
             <ChevronLeft size={14} />
             <span>返回</span>
-            <span className="ml-auto" style={{ color: '#8a9ab5' }}>
+            <span className="ml-auto" style={{ color: C.textMuted }}>
               {TABS.find(t => t.key === activeTab)?.icon} {TABS.find(t => t.key === activeTab)?.label} ({counts[activeTab]})
             </span>
           </button>
@@ -151,32 +160,35 @@ function MemoryDetail({ debugInfo }: { debugInfo: DebugInfo }) {
   ]
   return (
     <>
-      {layers.map(l => l.items.map((m, i) => (
-        <div
-          key={`${l.key}-${i}`}
-          className="rounded-lg px-2.5 py-2 text-xs"
-          style={{
-            background: 'rgba(255,255,255,0.6)',
-            border: `1px solid ${LAYER_COLORS[l.key]}22`,
-          }}
-        >
-          <div className="flex flex-wrap items-center gap-1.5 mb-1">
-            <span
-              className="px-1.5 py-0.5 rounded text-xs font-medium"
-              style={{ background: LAYER_COLORS[l.key] + '15', color: LAYER_COLORS[l.key], fontSize: 10 }}
-            >
-              {l.label}
-            </span>
-            {'importance' in m && (
-              <span style={{ color: '#8a9ab5', fontSize: 10 }}>importance: {(m as { importance: number }).importance}</span>
-            )}
-            {'recorded_at' in m && (
-              <span style={{ color: '#8a9ab5', fontSize: 10 }}>{(m as { recorded_at: string }).recorded_at}</span>
-            )}
+      {layers.map(l => l.items.map((m, i) => {
+        const lc = LAYER_COLORS[l.key] || LAYER_COLORS.core_base
+        return (
+          <div
+            key={`${l.key}-${i}`}
+            className="rounded-lg px-2.5 py-2 text-xs"
+            style={{
+              background: 'rgba(255,255,255,0.6)',
+              border: `1px solid ${lc.dot}22`,
+            }}
+          >
+            <div className="flex flex-wrap items-center gap-1.5 mb-1">
+              <span
+                className="px-1.5 py-0.5 rounded text-xs font-medium"
+                style={{ background: lc.bg, color: lc.fg, fontSize: 10 }}
+              >
+                {LAYER_LABELS[l.key] || l.label}
+              </span>
+              {'importance' in m && (
+                <span style={{ color: C.textMuted, fontSize: 10 }}>importance: {(m as { importance: number }).importance}</span>
+              )}
+              {'recorded_at' in m && (
+                <span style={{ color: C.textMuted, fontSize: 10 }}>{(m as { recorded_at: string }).recorded_at}</span>
+              )}
+            </div>
+            <p className="leading-relaxed" style={{ color: C.text, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{m.content}</p>
           </div>
-          <p className="leading-relaxed" style={{ color: '#3a4a6a', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{m.content}</p>
-        </div>
-      )))}
+        )
+      }))}
     </>
   )
 }
@@ -188,7 +200,7 @@ function SearchDetail({ debugInfo }: { debugInfo: DebugInfo }) {
         <div
           key={i}
           className="rounded-lg px-2.5 py-2 text-xs"
-          style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(0,47,167,0.08)' }}
+          style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${C.border}` }}
         >
           <div className="flex items-center gap-1.5 mb-1">
             <span className="font-medium" style={{ color: getScoreColor(r.score), fontSize: 11 }}>
@@ -196,33 +208,37 @@ function SearchDetail({ debugInfo }: { debugInfo: DebugInfo }) {
             </span>
             <span
               className="px-1.5 py-0.5 rounded text-xs"
-              style={{ background: (MATCH_COLORS[r.match_type] || '#999') + '15', color: MATCH_COLORS[r.match_type] || '#999', fontSize: 10 }}
+              style={{ background: (MATCH_COLORS[r.match_type] || C.textMuted) + '15', color: MATCH_COLORS[r.match_type] || C.textMuted, fontSize: 10 }}
             >
               {r.match_type}
             </span>
           </div>
           {r.source === 'summaries' ? (
-            <p style={{ color: '#3a4a6a', wordBreak: 'break-word' }}>{r.summary}</p>
+            <p style={{ color: C.text, wordBreak: 'break-word' }}>{r.summary}</p>
           ) : r.source === 'memories' ? (
             <>
               <span
                 className="px-1.5 py-0.5 rounded text-xs"
-                style={{ background: (LAYER_COLORS[r.layer ?? ''] || '#9966CC') + '15', color: LAYER_COLORS[r.layer ?? ''] || '#9966CC', fontSize: 10 }}
+                style={{
+                  background: (LAYER_COLORS[r.layer ?? '']?.bg || LAYER_COLORS.scene.bg),
+                  color: (LAYER_COLORS[r.layer ?? '']?.fg || LAYER_COLORS.scene.fg),
+                  fontSize: 10,
+                }}
               >
-                {r.layer || 'memory'}
+                {LAYER_LABELS[r.layer ?? ''] || r.layer || 'memory'}
               </span>
-              <p style={{ color: '#3a4a6a', wordBreak: 'break-word', marginTop: 4 }}>📝 {r.content}</p>
+              <p style={{ color: C.text, wordBreak: 'break-word', marginTop: 4 }}>📝 {r.content}</p>
             </>
           ) : (
             <>
-              <p style={{ color: '#3a4a6a', wordBreak: 'break-word' }}>👤 {r.user_msg}</p>
-              <p style={{ color: '#6a7a9a', wordBreak: 'break-word', marginTop: 2 }}>🤖 {r.assistant_msg}</p>
+              <p style={{ color: C.text, wordBreak: 'break-word' }}>👤 {r.user_msg}</p>
+              <p style={{ color: C.textSecondary, wordBreak: 'break-word', marginTop: 2 }}>🤖 {r.assistant_msg}</p>
             </>
           )}
         </div>
       ))}
       {debugInfo.search_results.length === 0 && (
-        <p className="text-xs py-2" style={{ color: '#b0b8c8' }}>未触发检索或无结果</p>
+        <p className="text-xs py-2" style={{ color: C.textMuted }}>未触发检索或无结果</p>
       )}
     </>
   )
@@ -234,8 +250,8 @@ function WindowDetail({ debugInfo }: { debugInfo: DebugInfo }) {
   return (
     <>
       <div className="rounded-lg px-2.5 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.4)' }}>
-        <span style={{ color: '#8a9ab5' }}>
-          滑动窗口：<strong style={{ color: '#3a4a6a' }}>{w?.rounds ?? 0}</strong> 轮
+        <span style={{ color: C.textMuted }}>
+          滑动窗口：<strong style={{ color: C.text }}>{w?.rounds ?? 0}</strong> 轮
           {w?.range && ` · ${w.range}`}
         </span>
       </div>
@@ -243,14 +259,14 @@ function WindowDetail({ debugInfo }: { debugInfo: DebugInfo }) {
         <div
           key={i}
           className="rounded-lg px-2.5 py-2 text-xs"
-          style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(0,47,167,0.06)' }}
+          style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${C.border}` }}
         >
-          {m.user_msg && <p style={{ color: '#3a4a6a', wordBreak: 'break-word' }}>👤 {m.user_msg}</p>}
-          {m.assistant_msg && <p style={{ color: '#6a7a9a', wordBreak: 'break-word', marginTop: 2 }}>🤖 {m.assistant_msg}</p>}
+          {m.user_msg && <p style={{ color: C.text, wordBreak: 'break-word' }}>👤 {m.user_msg}</p>}
+          {m.assistant_msg && <p style={{ color: C.textSecondary, wordBreak: 'break-word', marginTop: 2 }}>🤖 {m.assistant_msg}</p>}
         </div>
       ))}
       {messages.length === 0 && (
-        <p className="text-xs py-2" style={{ color: '#b0b8c8' }}>无历史对话</p>
+        <p className="text-xs py-2" style={{ color: C.textMuted }}>无历史对话</p>
       )}
     </>
   )
@@ -263,19 +279,19 @@ function SummaryDetail({ debugInfo }: { debugInfo: DebugInfo }) {
         <div
           key={i}
           className="rounded-lg px-2.5 py-2 text-xs"
-          style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(0,47,167,0.08)' }}
+          style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${C.border}` }}
         >
           <span
             className="px-1.5 py-0.5 rounded text-xs font-medium mb-1 inline-block"
-            style={{ background: 'rgba(0,47,167,0.08)', color: '#002FA7', fontSize: 10 }}
+            style={{ background: C.sidebarActive, color: C.accent, fontSize: 10 }}
           >
             {s.dimension}
           </span>
-          <p className="leading-relaxed" style={{ color: '#3a4a6a', wordBreak: 'break-word' }}>{s.content}</p>
+          <div className="leading-relaxed md-content" style={{ color: C.text, wordBreak: 'break-word', fontSize: 12 }}><ReactMarkdown>{s.content}</ReactMarkdown></div>
         </div>
       ))}
       {debugInfo.summaries.length === 0 && (
-        <p className="text-xs py-2" style={{ color: '#b0b8c8' }}>无摘要</p>
+        <p className="text-xs py-2" style={{ color: C.textMuted }}>无摘要</p>
       )}
     </>
   )
@@ -286,15 +302,15 @@ function SessionSummaryDetail({ debugInfo }: { debugInfo: DebugInfo }) {
   return (
     <div
       className="rounded-lg px-2.5 py-2 text-xs"
-      style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(0,47,167,0.08)' }}
+      style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${C.border}` }}
     >
       <span
         className="px-1.5 py-0.5 rounded text-xs font-medium mb-1 inline-block"
-        style={{ background: 'rgba(0,47,167,0.08)', color: '#002FA7', fontSize: 10 }}
+        style={{ background: C.sidebarActive, color: C.accent, fontSize: 10 }}
       >
         前情概要
       </span>
-      <p className="leading-relaxed mt-1" style={{ color: '#3a4a6a', wordBreak: 'break-word' }}>{content}</p>
+      <div className="leading-relaxed mt-1 md-content" style={{ color: C.text, wordBreak: 'break-word', fontSize: 12 }}><ReactMarkdown>{content}</ReactMarkdown></div>
     </div>
   )
 }
@@ -306,7 +322,7 @@ const RELATION_LABELS: Record<string, string> = {
 
 function GraphDetail({ debugInfo }: { debugInfo: DebugInfo }) {
   const graph = debugInfo.graph
-  if (!graph) return <p className="text-xs py-2" style={{ color: '#b0b8c8' }}>图谱未启用</p>
+  if (!graph) return <p className="text-xs py-2" style={{ color: C.textMuted }}>图谱未启用</p>
   const [showRaw, setShowRaw] = useState(false)
 
   return (
@@ -315,46 +331,46 @@ function GraphDetail({ debugInfo }: { debugInfo: DebugInfo }) {
         <div
           key={`seed-${i}`}
           className="rounded-lg px-2.5 py-2 text-xs"
-          style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(0,47,167,0.15)' }}
+          style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${C.accent}22` }}
         >
           <div className="flex flex-wrap items-center gap-1.5 mb-1">
             <span
               className="px-1.5 py-0.5 rounded text-xs font-medium"
-              style={{ background: 'rgba(0,47,167,0.10)', color: '#002FA7', fontSize: 10 }}
+              style={{ background: C.sidebarActive, color: C.accent, fontSize: 10 }}
             >
               ◆ 种子
             </span>
-            <span style={{ color: '#8a9ab5', fontSize: 10 }}>
+            <span style={{ color: C.textMuted, fontSize: 10 }}>
               相似度: {seed.similarity.toFixed(2)}
             </span>
             {seed.base_importance != null && seed.base_importance >= 0.9 && (
-              <span style={{ color: '#e0a030', fontSize: 10 }}>★</span>
+              <span style={{ color: C.accentWarm, fontSize: 10 }}>★</span>
             )}
           </div>
-          <p style={{ color: '#3a4a6a', wordBreak: 'break-word' }}>{seed.content}</p>
+          <p style={{ color: C.text, wordBreak: 'break-word' }}>{seed.content}</p>
 
           {/* 展开的邻居节点 */}
           {graph.expanded_nodes.map((nb, j) => (
             <div
               key={`nb-${j}`}
               className="ml-3 mt-1.5 rounded-lg px-2 py-1.5"
-              style={{ background: 'rgba(0,47,167,0.03)', borderLeft: '2px solid rgba(0,47,167,0.15)' }}
+              style={{ background: C.memoryBg, borderLeft: `2px solid ${C.accent}30` }}
             >
               <div className="flex items-center gap-1.5 mb-0.5">
                 <span
                   className="px-1.5 py-0.5 rounded"
-                  style={{ background: 'rgba(136,85,204,0.10)', color: '#8855CC', fontSize: 10 }}
+                  style={{ background: LAYER_COLORS.scene.bg, color: LAYER_COLORS.scene.fg, fontSize: 10 }}
                 >
                   └─ {RELATION_LABELS[nb.edge_relation_type] || nb.edge_relation_type}
                 </span>
                 {nb.emotion_intensity != null && (
-                  <span style={{ color: '#8a9ab5', fontSize: 10 }}>强度: {nb.emotion_intensity}</span>
+                  <span style={{ color: C.textMuted, fontSize: 10 }}>强度: {nb.emotion_intensity}</span>
                 )}
                 {nb.base_importance != null && nb.base_importance >= 0.9 && (
-                  <span style={{ color: '#e0a030', fontSize: 10 }}>★</span>
+                  <span style={{ color: C.accentWarm, fontSize: 10 }}>★</span>
                 )}
               </div>
-              <p style={{ color: '#5a6a8a', wordBreak: 'break-word' }}>{nb.content}</p>
+              <p style={{ color: C.textSecondary, wordBreak: 'break-word' }}>{nb.content}</p>
             </div>
           ))}
         </div>
@@ -364,17 +380,17 @@ function GraphDetail({ debugInfo }: { debugInfo: DebugInfo }) {
       {graph.formatted_text && (
         <div
           className="rounded-lg px-2.5 py-2 text-xs"
-          style={{ background: 'rgba(255,255,255,0.4)', border: '1px solid rgba(0,47,167,0.06)' }}
+          style={{ background: 'rgba(255,255,255,0.4)', border: `1px solid ${C.border}` }}
         >
           <button
             onClick={() => setShowRaw(!showRaw)}
             className="cursor-pointer text-xs"
-            style={{ color: '#8a9ab5' }}
+            style={{ color: C.textMuted }}
           >
             {showRaw ? '▼' : '▶'} 注入原文
           </button>
           {showRaw && (
-            <pre className="mt-1 whitespace-pre-wrap" style={{ color: '#5a6a8a', fontSize: 11 }}>
+            <pre className="mt-1 whitespace-pre-wrap" style={{ color: C.textSecondary, fontSize: 11 }}>
               {graph.formatted_text}
             </pre>
           )}

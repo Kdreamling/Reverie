@@ -22,7 +22,7 @@ interface SseEvent {
   memory_id?: string
   new_content?: string
   reason?: string
-  usage?: { input_tokens?: number; output_tokens?: number; prompt_tokens?: number; completion_tokens?: number }
+  usage?: { input_tokens?: number; output_tokens?: number; prompt_tokens?: number; completion_tokens?: number; cached_tokens?: number }
   debug_info?: DebugInfo
 }
 
@@ -116,6 +116,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           thinking_time?: number | null
           input_tokens?: number | null
           output_tokens?: number | null
+          cached_tokens?: number | null
           memory_ops?: string | null
           model?: string
           created_at: string
@@ -164,7 +165,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             memoryRef: parsedMemoryRef,
             memoryOps: parsedOps,
             thinkingTime: r.thinking_time ?? null,
-            tokens: (r.input_tokens || r.output_tokens) ? { input: r.input_tokens ?? 0, output: r.output_tokens ?? 0 } : null,
+            tokens: (r.input_tokens || r.output_tokens) ? { input: r.input_tokens ?? 0, output: r.output_tokens ?? 0, cached: r.cached_tokens ?? 0 } : null,
           })
         }
       }
@@ -410,11 +411,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
               case 'thinking_start': {
                 flushDeltas()
                 const now = Date.now()
-                set(s => ({
-                  thinkingStartTime: now,
-                  thinkingElapsedTime: null,
-                  streamBlocks: [...s.streamBlocks, { kind: 'thinking', text: '', startTime: now, elapsed: null }],
-                }))
+                set(s => {
+                  // If there are already tool blocks + text blocks, this is a new round after tool calls.
+                  // Remove previous text blocks to avoid duplication (the new round will output full text).
+                  const hasToolBlocks = s.streamBlocks.some(b => b.kind === 'tool_result' || b.kind === 'memory_op')
+                  const blocks = hasToolBlocks
+                    ? s.streamBlocks.filter(b => b.kind !== 'text')
+                    : [...s.streamBlocks]
+                  return {
+                    thinkingStartTime: now,
+                    thinkingElapsedTime: null,
+                    currentText: hasToolBlocks ? '' : s.currentText,
+                    streamBlocks: [...blocks, { kind: 'thinking', text: '', startTime: now, elapsed: null }],
+                  }
+                })
                 break
               }
               case 'thinking_delta':
@@ -439,11 +449,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   }
                 })
                 break
-              case 'text_delta':
+              case 'text_delta': {
+                // If text arrives after tool blocks and no thinking_start cleared prev text,
+                // clear previous text blocks now to avoid duplication
+                const st = get()
+                const hasTools = st.streamBlocks.some(b => b.kind === 'tool_result' || b.kind === 'memory_op')
+                const lastBlock = st.streamBlocks[st.streamBlocks.length - 1]
+                const textAfterTools = hasTools && lastBlock && lastBlock.kind !== 'text'
+                if (textAfterTools && st.currentText) {
+                  set(s => ({
+                    currentText: '',
+                    streamBlocks: s.streamBlocks.filter(b => b.kind !== 'text'),
+                  }))
+                }
                 // Batch: accumulate and schedule flush
                 pendingTextDelta += event.content ?? ''
                 scheduleFlush()
                 break
+              }
               case 'done': {
                 flushDeltas() // flush any remaining text
                 if (flushTimer) { clearTimeout(flushTimer); flushTimer = null }
@@ -452,6 +475,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 const tokens = usage ? {
                   input: usage.input_tokens ?? usage.prompt_tokens ?? 0,
                   output: usage.output_tokens ?? usage.completion_tokens ?? 0,
+                  cached: usage.cached_tokens ?? 0,
                 } : null
                 if (currentText || currentThinking) {
                   const assistantMsg: ChatMessage = {

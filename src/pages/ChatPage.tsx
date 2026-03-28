@@ -11,13 +11,25 @@ import SettingsPanel from '../components/SettingsPanel'
 import MessageItem from '../components/MessageItem'
 import StreamingMessage from '../components/StreamingMessage'
 import ArtifactPanel from '../components/artifact/ArtifactPanel'
+import MemorySheetPanel from '../components/MemorySheetPanel'
+import { C, getModelColor } from '../theme'
+
+// Nav icons as inline SVGs
+function NavIcon({ type }: { type: string }) {
+  const s = { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
+  if (type === 'chats') return <svg {...s}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
+  if (type === 'scripts') return <svg {...s}><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M2 8h20" /><circle cx="8" cy="6" r="0.7" fill="currentColor" stroke="none" /><circle cx="11" cy="6" r="0.7" fill="currentColor" stroke="none" /><path d="M7 13l3 2-3 2" /><path d="M13 17h4" /></svg>
+  if (type === 'reading') return <svg {...s}><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z" /><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" /></svg>
+  if (type === 'graph') return <svg {...s}><circle cx="12" cy="5" r="2" /><circle cx="5" cy="19" r="2" /><circle cx="19" cy="19" r="2" /><path d="M12 7v4M7.5 17.5L11 13M16.5 17.5L13 13" /><circle cx="12" cy="12" r="1.5" /></svg>
+  return null
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const GROUPS: { key: Group; label: string }[] = [
-  { key: 'today', label: 'Today' },
-  { key: 'yesterday', label: 'Yesterday' },
-  { key: 'previous', label: 'Previous 7 Days' },
+  { key: 'today', label: '今天' },
+  { key: 'yesterday', label: '昨天' },
+  { key: 'previous', label: '更早' },
 ]
 
 const MODELS: { value: string; label: string }[] = [
@@ -29,16 +41,12 @@ const MODELS: { value: string; label: string }[] = [
   { value: 'claude-opus-4.6-zenmux', label: 'Claude Opus (ZM)' },
 ]
 
-const CHAT_SCENES = [
-  { key: 'daily', icon: '🏠', label: '日常' },
-  { key: 'code', icon: '💻', label: '代码' },
-  { key: 'roleplay', icon: '🎭', label: '剧本' },
-]
-
-const TOOLS = [
-  { key: 'study', icon: '📝', label: '英语练习', path: '/study' },
-  { key: 'reading', icon: '📚', label: '共读', path: null },  // needs session
-  { key: 'errors', icon: '📕', label: '错题本', path: '/errors' },
+// Sidebar navigation icons (SVG paths)
+const NAV_ITEMS: { key: string; label: string; iconPath: string; enabled: boolean; badge?: string }[] = [
+  { key: 'chats', label: '对话', iconPath: 'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z', enabled: true },
+  { key: 'scripts', label: '剧本世界', iconPath: '', enabled: true, badge: '3' }, // custom icon
+  { key: 'reading', label: '共读', iconPath: 'M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z', enabled: true },
+  { key: 'graph', label: '记忆图谱', iconPath: '', enabled: true }, // custom icon
 ]
 
 const ACCEPTED_FILE_TYPES = 'image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,text/markdown,text/csv'
@@ -59,78 +67,36 @@ const WELCOME_MESSAGES = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getModelColor(value: string): string {
-  const v = value.toLowerCase()
-  if (v.includes('claude') || v.includes('opus') || v.includes('sonnet')) return '#002FA7'
-  if (v.includes('deepseek')) return '#22c55e'
-  return '#f59e0b'
-}
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function WelcomeScreen({ onSelectScene, currentScene }: { onSelectScene: (scene: string) => void; currentScene: string }) {
+function WelcomeScreen() {
   const [greeting] = useState(() => WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)])
 
   return (
-    <div className="flex flex-col items-center justify-center flex-1 gap-6 select-none" style={{ paddingBottom: 80 }}>
-      <div className="flex flex-col items-center gap-3">
-        <span style={{ color: '#002FA7', fontSize: 22, opacity: 0.4 }}>✦</span>
-        <p
-          style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            letterSpacing: '0.3em',
-            color: '#c8cfe0',
-            fontSize: '1.1rem',
-          }}
-        >
-          REVERIE
-        </p>
+    <div className="flex flex-col items-center justify-center flex-1 gap-4 select-none" style={{ paddingBottom: 80 }}>
+      <div
+        style={{
+          width: 48, height: 48, borderRadius: '50%',
+          background: C.accentGradient,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 20, color: '#fff', fontWeight: 700,
+          boxShadow: '0 4px 20px rgba(160,120,90,0.2)',
+        }}
+      >
+        晨
       </div>
-
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, letterSpacing: '0.22em', marginTop: 4 }}>
+        REVERIE
+      </div>
       <p
         style={{
-          fontFamily: 'Georgia, "Times New Roman", serif',
+          fontSize: 13,
+          color: C.textMuted,
           fontStyle: 'italic',
-          color: '#a0aac0',
-          fontSize: '0.85rem',
-          letterSpacing: '0.05em',
         }}
       >
         {greeting}
       </p>
-
-      <div className="grid grid-cols-3 gap-3 mt-4">
-        {CHAT_SCENES.map(s => {
-          const isDefault = s.key === currentScene
-          return (
-            <button
-              key={s.key}
-              onClick={() => onSelectScene(s.key)}
-              className="flex flex-col items-center gap-1.5 px-5 py-3 rounded-xl transition-all duration-150 cursor-pointer"
-              style={{
-                background: isDefault ? 'rgba(0,47,167,0.08)' : 'rgba(0,0,0,0.02)',
-                border: isDefault ? '1px solid rgba(0,47,167,0.25)' : '1px solid #e8ecf5',
-                color: isDefault ? '#002FA7' : '#7a8399',
-              }}
-              onMouseEnter={e => {
-                if (!isDefault) {
-                  e.currentTarget.style.background = 'rgba(0,47,167,0.05)'
-                  e.currentTarget.style.borderColor = 'rgba(0,47,167,0.15)'
-                }
-              }}
-              onMouseLeave={e => {
-                if (!isDefault) {
-                  e.currentTarget.style.background = 'rgba(0,0,0,0.02)'
-                  e.currentTarget.style.borderColor = '#e8ecf5'
-                }
-              }}
-            >
-              <span style={{ fontSize: 22 }}>{s.icon}</span>
-              <span className="text-xs font-medium">{s.label}</span>
-            </button>
-          )
-        })}
-      </div>
     </div>
   )
 }
@@ -149,9 +115,11 @@ export default function ChatPage() {
   const [showSettings, setShowSettings] = useState(false)
   const [settingsPage, setSettingsPage] = useState<'menu' | 'memory' | 'features'>('menu')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [activeNav, setActiveNav] = useState('chats')
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null)
-  const [debugOpenMsgId, setDebugOpenMsgId] = useState<string | null>(null)
+  const [_debugOpenMsgId, _setDebugOpenMsgId] = useState<string | null>(null)
+  const [sheetDebugInfo, setSheetDebugInfo] = useState<import('../api/chat').DebugInfo | null>(null)
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -395,6 +363,7 @@ export default function ChatPage() {
     }
   }
 
+  // @ts-ignore unused — kept for future welcome scene feature
   async function handleWelcomeScene(sceneKey: string) {
     if (sceneKey === 'study') { navigate('/study'); return }
     if (sceneKey === 'errors') { navigate('/errors'); return }
@@ -516,132 +485,131 @@ export default function ChatPage() {
   const showWelcome = !isStreaming && !isLoadingMessages && (!Array.isArray(messages) || messages.length === 0)
 
   return (
-    <div className="flex overflow-hidden" style={{ background: '#fafbfd', height: '100%', overscrollBehavior: 'none' }}>
+    <div className="flex overflow-hidden" style={{ background: C.bg, height: '100%', overscrollBehavior: 'none' }}>
+
+      {/* ── Sidebar overlay ── */}
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            background: 'rgba(50,42,34,0.25)',
+            backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)',
+          }}
+          className="md:hidden"
+        />
+      )}
 
       {/* ── Sidebar ── */}
       <aside
-        className={`
-          fixed inset-0 z-40
-          md:relative md:inset-auto md:z-auto
-          flex flex-col flex-shrink-0
-          transition-all duration-300 ease-in-out
-          ${sidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full md:translate-x-0 opacity-0 md:opacity-100'}
-        `}
+        className="fixed inset-y-0 left-0 z-210 flex flex-col flex-shrink-0 transition-transform duration-350 ease-out md:relative md:translate-x-0"
         style={{
-          width: undefined,  // 手机端全屏，由 inset-0 控制
+          width: '100%',
+          maxWidth: 360,
           height: '100%',
-          background: '#fafbfd',  // 手机端浅色
-          color: '#1a1f2e',       // 手机端深色文字
+          background: C.sidebarBg,
+          color: C.text,
+          transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+          boxShadow: sidebarOpen ? '8px 0 40px rgba(100,80,50,0.1)' : 'none',
+          zIndex: 210,
         }}
-        // 桌面端通过内联类覆盖：md 断点下恢复 260px 深蓝
       >
-        {/* 桌面端覆盖样式（通过隐藏的 style 标签注入） */}
         <style>{`
           @media (min-width: 768px) {
-            aside { width: 260px !important; background: #0a1a3a !important; color: #c8d4e8 !important; }
+            aside { width: 260px !important; max-width: 260px !important; transform: translateX(0) !important; position: relative !important; }
           }
         `}</style>
 
         {/* Sidebar top */}
-        <div className="px-5 py-4 md:px-4" style={{ paddingTop: 'calc(16px + env(safe-area-inset-top))' }}>
+        <div className="px-5 py-4" style={{ paddingTop: 'calc(16px + env(safe-area-inset-top))' }}>
           <div className="flex items-center justify-between">
-            {/* 手机端：关闭按钮 */}
             <button
               onClick={() => setSidebarOpen(false)}
               className="flex md:hidden items-center justify-center rounded-md cursor-pointer"
-              style={{ width: 32, height: 32, color: '#7a8399' }}
+              style={{ width: 32, height: 32, color: C.textSecondary }}
             >
-              <X size={18} strokeWidth={1.8} />
+              <X size={18} strokeWidth={2} />
             </button>
 
-            <span className="text-sm font-medium select-none" style={{ letterSpacing: '0.15em' }}>
-              <span className="hidden md:inline" style={{ color: '#c8d4e8' }}>✦ REVERIE</span>
-              <span className="md:hidden" style={{ color: '#1a1f2e' }}>REVERIE</span>
+            <span className="text-sm font-bold select-none" style={{ letterSpacing: '0.18em', color: C.accent }}>
+              REVERIE
             </span>
 
             <button
               onClick={() => { handleCreateWithScene('daily'); setSidebarOpen(false) }}
               className="flex items-center justify-center rounded-md transition-colors duration-150 cursor-pointer"
-              style={{ width: 32, height: 32 }}
+              style={{ width: 32, height: 32, color: C.textSecondary }}
               title="新对话"
             >
-              <Plus size={16} strokeWidth={1.8} />
+              <Plus size={18} strokeWidth={2} />
             </button>
           </div>
         </div>
 
-        {/* Tools section */}
-        <div className="px-3 md:px-2 pb-3" style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-          <p className="px-2 pb-2 uppercase tracking-wider select-none text-xs" style={{ color: '#9aa3b8', fontSize: 10 }}>
-            工具
-          </p>
-          <div className="space-y-0.5">
-            {TOOLS.map(tool => (
+        {/* Navigation tabs */}
+        <div style={{ padding: '4px 10px 12px' }}>
+          {NAV_ITEMS.map(n => {
+            const act = activeNav === n.key
+            return (
               <button
-                key={tool.key}
+                key={n.key}
                 onClick={() => {
-                  setSidebarOpen(false)
-                  if (tool.path) {
-                    navigate(tool.path)
-                  } else if (tool.key === 'reading') {
-                    createSession('reading', model).then(session => {
-                      if (session) navigate(`/read/${session.id}`)
-                    })
+                  if (!n.enabled) return
+                  setActiveNav(n.key)
+                  if (n.key === 'reading') {
+                    setSidebarOpen(false)
+                    navigate('/bookshelf')
+                  } else if (n.key === 'graph') {
+                    setSidebarOpen(false)
+                    // TODO: navigate to graph page
+                  } else if (n.key === 'scripts') {
+                    setSidebarOpen(false)
+                    navigate('/projects')
                   }
                 }}
-                className="flex items-center gap-2.5 w-full px-3 py-2.5 md:px-2.5 md:py-2 rounded-lg md:rounded-md transition-colors duration-150 cursor-pointer"
-                style={{ color: '#5a6a8a' }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,47,167,0.05)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                className="w-full flex items-center gap-3 transition-all duration-150"
+                style={{
+                  padding: '10px 12px', borderRadius: 10, border: 'none',
+                  background: act ? C.sidebarActive : 'transparent',
+                  color: n.enabled ? (act ? C.text : C.textSecondary) : '#d0c8c0',
+                  fontSize: 14, fontWeight: act ? 600 : 400,
+                  cursor: n.enabled ? 'pointer' : 'default',
+                  opacity: n.enabled ? 1 : 0.4, position: 'relative',
+                  textAlign: 'left' as const, marginBottom: 1,
+                }}
               >
-                <span style={{ fontSize: 16 }}>{tool.icon}</span>
-                <span className="text-sm md:text-xs font-medium">{tool.label}</span>
+                {act && <div style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: 3, height: 18, borderRadius: 2, background: C.accent }} />}
+                <span style={{ display: 'flex', opacity: act ? 0.85 : 0.5 }}><NavIcon type={n.key} /></span>
+                <span style={{ flex: 1 }}>{n.label}</span>
+                {n.badge && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 8, background: C.accent + '14', color: C.accent, fontWeight: 600 }}>{n.badge}</span>}
               </button>
-            ))}
-          </div>
+            )
+          })}
         </div>
 
-        {/* Scene filter for new chat */}
-        {showSceneSelect && (
-          <div ref={sceneRef} className="px-3 md:px-2 py-3" style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-            <p className="px-2 pb-2 uppercase tracking-wider select-none text-xs" style={{ color: '#9aa3b8', fontSize: 10 }}>
-              新建对话
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {CHAT_SCENES.map(s => (
-                <button
-                  key={s.key}
-                  onClick={() => handleCreateWithScene(s.key)}
-                  className="flex flex-col items-center gap-1 py-2.5 rounded-lg md:rounded-md transition-colors duration-150 cursor-pointer"
-                  style={{
-                    background: 'rgba(0,0,0,0.02)',
-                    border: '1px solid #e8ecf5',
-                    color: '#7a8399',
-                  }}
-                >
-                  <span style={{ fontSize: 18 }}>{s.icon}</span>
-                  <span className="text-xs font-medium">{s.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        <div style={{ height: 1, background: C.border, margin: '0 18px' }} />
 
-        {/* Session list */}
-        <nav className="flex-1 overflow-y-auto px-3 md:px-2 pb-2" style={{ scrollbarWidth: 'none' }}>
+        {/* Search — below nav tabs */}
+        <div style={{ padding: '12px 14px 6px' }}>
+          <div className="flex items-center gap-2" style={{ padding: '7px 11px', borderRadius: 10, background: C.surface, border: `1px solid ${C.border}` }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.textMuted} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input placeholder="搜索..." className="flex-1 border-none outline-none bg-transparent" style={{ color: C.text, fontSize: 13 }} />
+          </div>
+        </div>
+        <nav className="flex-1 overflow-y-auto px-3 pt-2 pb-2" style={{ scrollbarWidth: 'none' }}>
           {loading && !sessions.length && (
-            <p className="px-3 py-4 text-sm md:text-xs" style={{ color: '#9aa3b8' }}>
+            <p className="px-3 py-4 text-sm" style={{ color: C.textMuted }}>
               Loading…
             </p>
           )}
           {GROUPS.map(({ key, label }) => {
-            const items = sessions.filter(s => getGroup(s.created_at) === key)
+            const items = sessions.filter(s => getGroup(s.created_at) === key && s.scene_type !== 'reading')
             if (!items.length) return null
             return (
-              <div key={key} className="mb-4">
+              <div key={key} className="mb-2">
                 <p
-                  className="px-2 pb-2 uppercase tracking-wider select-none text-xs md:text-xs"
-                  style={{ color: '#9aa3b8', fontSize: undefined }}
+                  className="px-3 pt-3 pb-1.5 select-none"
+                  style={{ color: C.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: '0.03em' }}
                 >
                   {label}
                 </p>
@@ -652,7 +620,7 @@ export default function ChatPage() {
                   return (
                     <div
                       key={session.id}
-                      className="relative mb-0.5 rounded-md select-none"
+                      className="relative mb-1 rounded-xl select-none"
                       style={{ overflow: 'hidden' }}
                     >
                       {isSwiped && (
@@ -665,7 +633,7 @@ export default function ChatPage() {
                         >
                           <button
                             className="flex-1 flex items-center justify-center text-xs cursor-pointer"
-                            style={{ background: '#e8ecf5', color: '#5a6a8a' }}
+                            style={{ background: C.surfaceSolid, color: C.textSecondary }}
                             onClick={e => { e.stopPropagation(); setSwipedId(null); setRenameModal({ id: session.id, title: session.title || '' }) }}
                             onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); setSwipedId(null); setRenameModal({ id: session.id, title: session.title || '' }) }}
                           >
@@ -673,7 +641,7 @@ export default function ChatPage() {
                           </button>
                           <button
                             className="flex-1 flex items-center justify-center text-xs cursor-pointer"
-                            style={{ background: '#f0e0e0', color: '#c05050' }}
+                            style={{ background: C.errorBg, color: C.errorText }}
                             onClick={e => { e.stopPropagation(); setSwipedId(null); if (window.confirm('确定要删除这个对话吗？')) deleteSession(session.id) }}
                             onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); setSwipedId(null); if (window.confirm('确定要删除这个对话吗？')) deleteSession(session.id) }}
                           >
@@ -696,44 +664,37 @@ export default function ChatPage() {
                         onTouchStart={e => { e.nativeEvent.stopImmediatePropagation(); handleItemTouchStart(e, session.id) }}
                         onTouchMove={e => { e.nativeEvent.stopImmediatePropagation(); handleItemTouchMove(e) }}
                         onTouchEnd={e => { e.nativeEvent.stopImmediatePropagation(); handleItemTouchEnd(e) }}
-                        className="relative w-full text-left rounded-xl md:rounded-md px-4 py-3.5 md:px-3 md:py-2.5 transition-colors duration-150 cursor-pointer"
+                        className="relative w-full text-left rounded-xl px-4 py-3.5 transition-colors duration-150 cursor-pointer"
                         style={{
-                          background: isActive ? 'rgba(0,47,167,0.08)' : isHovered ? 'rgba(0,0,0,0.02)' : 'transparent',
-                          borderLeft: isActive ? '3px solid #002FA7' : '3px solid transparent',
-                          color: isActive ? '#002FA7' : '#1a1f2e',
+                          background: isActive ? C.sidebarActive : isHovered ? 'rgba(160,120,90,0.04)' : 'transparent',
+                          color: C.text,
                           transform: isSwiped ? 'translateX(-130px)' : 'translateX(0)',
                           transition: 'transform 0.25s ease',
                         }}
                       >
-                        {/* 桌面端覆盖颜色 */}
-                        <style>{`
-                          @media (min-width: 768px) {
-                            .session-item-active { background: rgba(0,47,167,0.3) !important; color: #e8edf8 !important; }
-                            .session-item { color: #c8d4e8 !important; }
-                            .session-item:hover { background: rgba(255,255,255,0.05) !important; }
-                          }
-                        `}</style>
-                        <p
-                          className="text-sm md:text-xs leading-snug font-medium md:font-normal"
-                          style={{ paddingRight: 32, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                          onDoubleClick={e => { e.stopPropagation(); setRenameModal({ id: session.id, title: session.title || '' }) }}
-                        >
-                          {session.title || 'New Chat'}
-                        </p>
-                        <p
-                          className="text-xs mt-1 md:mt-0.5"
-                          style={{ color: '#9aa3b8', fontSize: 12 }}
-                        >
-                          {formatSessionTime(session.updated_at)}
-                        </p>
+                        {isActive && (
+                          <div style={{ position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)', width: 3, height: 20, borderRadius: 2, background: C.accent }} />
+                        )}
+                        <div className="flex items-start justify-between gap-3">
+                          <p
+                            className="text-sm leading-snug"
+                            style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: isActive ? 600 : 400, color: C.text }}
+                            onDoubleClick={e => { e.stopPropagation(); setRenameModal({ id: session.id, title: session.title || '' }) }}
+                          >
+                            {session.title || 'New Chat'}
+                          </p>
+                          <span className="flex-shrink-0" style={{ color: C.metaText, fontSize: 11 }}>
+                            {formatSessionTime(session.updated_at)}
+                          </span>
+                        </div>
                         {isHovered && (
                           <span
                             role="button"
                             onClick={e => { e.stopPropagation(); if (window.confirm('确定要删除这个对话吗？')) deleteSession(session.id) }}
                             className="absolute right-2 top-1/2 hidden md:flex items-center justify-center rounded cursor-pointer"
-                            style={{ width: 18, height: 18, transform: 'translateY(-50%)', color: 'rgba(200,212,232,0.5)' }}
-                            onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#e8edf8')}
-                            onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'rgba(200,212,232,0.5)')}
+                            style={{ width: 18, height: 18, transform: 'translateY(-50%)', color: C.textMuted }}
+                            onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = C.errorText)}
+                            onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = C.textMuted)}
                           >
                             <X size={12} strokeWidth={2} />
                           </span>
@@ -750,39 +711,39 @@ export default function ChatPage() {
         {/* Rename modal */}
         {renameModal && (
           <>
-            <div className="fixed inset-0 z-50" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={() => { setRenameModal(null); setSwipedId(null) }} onTouchStart={e => e.nativeEvent.stopImmediatePropagation()} onTouchEnd={e => { e.nativeEvent.stopImmediatePropagation(); e.preventDefault(); setRenameModal(null); setSwipedId(null) }} />
+            <div className="fixed inset-0 z-50" style={{ background: 'rgba(50,42,34,0.5)' }} onClick={() => { setRenameModal(null); setSwipedId(null) }} onTouchStart={e => e.nativeEvent.stopImmediatePropagation()} onTouchEnd={e => { e.nativeEvent.stopImmediatePropagation(); e.preventDefault(); setRenameModal(null); setSwipedId(null) }} />
             <div
-              className="fixed z-50 rounded-xl shadow-xl"
+              className="fixed z-50 rounded-2xl shadow-xl"
               onClick={e => e.stopPropagation()}
               onTouchStart={e => e.nativeEvent.stopImmediatePropagation()}
               onTouchMove={e => e.nativeEvent.stopImmediatePropagation()}
               onTouchEnd={e => e.nativeEvent.stopImmediatePropagation()}
               style={{
                 left: '50%', top: '40%', transform: 'translate(-50%, -50%)',
-                width: 280, background: '#1a2d5a',
-                border: '1px solid rgba(255,255,255,0.12)', padding: '20px',
+                width: 280, background: C.bg,
+                border: `1px solid ${C.borderStrong}`, padding: '20px',
               }}
             >
-              <p className="text-sm mb-3" style={{ color: '#c8d4e8' }}>重命名对话</p>
+              <p className="text-sm mb-3 font-medium" style={{ color: C.text }}>重命名对话</p>
               <input
                 autoFocus
                 value={renameModal.title}
                 onChange={e => setRenameModal({ ...renameModal, title: e.target.value })}
                 onKeyDown={e => { if (e.key === 'Enter') doRename(); if (e.key === 'Escape') { setRenameModal(null); setSwipedId(null) } }}
                 placeholder="输入新名称…"
-                className="w-full text-sm outline-none rounded-md px-3 py-2"
-                style={{ background: 'rgba(255,255,255,0.07)', color: '#e8edf8', border: '1px solid rgba(0,47,167,0.5)' }}
+                className="w-full text-sm outline-none rounded-xl px-3 py-2"
+                style={{ background: C.surface, color: C.text, border: `1px solid ${C.borderStrong}` }}
               />
               <div className="flex gap-2 mt-4 justify-end">
                 <button
-                  className="px-4 py-1.5 rounded-md text-sm cursor-pointer"
-                  style={{ color: '#8a9abc', background: 'transparent' }}
+                  className="px-4 py-1.5 rounded-lg text-sm cursor-pointer"
+                  style={{ color: C.textSecondary, background: 'transparent' }}
                   onClick={() => { setRenameModal(null); setSwipedId(null) }}
                   onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); setRenameModal(null); setSwipedId(null) }}
                 >取消</button>
                 <button
-                  className="px-4 py-1.5 rounded-md text-sm cursor-pointer"
-                  style={{ background: '#002FA7', color: '#fff' }}
+                  className="px-4 py-1.5 rounded-lg text-sm cursor-pointer"
+                  style={{ background: C.accent, color: '#fff' }}
                   onClick={doRename}
                   onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); doRename() }}
                 >确认</button>
@@ -792,16 +753,18 @@ export default function ChatPage() {
         )}
 
         {/* Sidebar bottom */}
-        <div style={{ borderTop: '1px solid #e8ecf5', paddingBottom: 'env(safe-area-inset-bottom)' }}>
-          <style>{`@media (min-width: 768px) { .sidebar-bottom { border-color: rgba(255,255,255,0.07) !important; background: #0a1a3a !important; } }`}</style>
-          <button
-            onClick={() => setShowSettings(true)}
-            className="flex items-center gap-2.5 w-full px-5 md:px-4 py-4 text-sm transition-colors duration-150 cursor-pointer"
-            style={{ color: '#7a8399' }}
-          >
-            <Settings size={15} strokeWidth={1.6} />
-            <span>Settings</span>
-          </button>
+        <div style={{ borderTop: `1px solid ${C.border}`, paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <div className="flex items-center justify-between px-5 py-3">
+            <button
+              onClick={() => setShowSettings(true)}
+              className="flex items-center gap-2.5 text-sm transition-colors duration-150 cursor-pointer"
+              style={{ color: C.textSecondary }}
+            >
+              <Settings size={15} strokeWidth={1.6} />
+              <span>设置</span>
+            </button>
+            <span className="text-xs" style={{ color: C.metaText }}>v3.0</span>
+          </div>
         </div>
 
         {showSettings && (
@@ -814,23 +777,27 @@ export default function ChatPage() {
       </aside>
 
       {/* ── Chat area ── */}
-      <div className="flex flex-col flex-1 min-w-0 h-full" style={{ background: 'linear-gradient(180deg, #f5f7fc 0%, #f0f2f9 35%, #edf0f8 65%, #f2f4fa 100%)' }}>
+      <div className="flex flex-col flex-1 min-w-0 h-full" style={{ background: C.bgGradient }}>
 
         {/* Top bar */}
         <header
-          className="chat-header flex items-center justify-between flex-shrink-0 px-4 md:px-6"
+          className="chat-header flex items-center justify-between flex-shrink-0 px-3.5"
           style={{
-            height: 'calc(56px + env(safe-area-inset-top))',
+            height: 54,
             paddingTop: 'env(safe-area-inset-top)',
-            background: 'transparent',
+            background: C.glass,
+            backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+            borderBottom: `1px solid ${C.border}`,
+            position: 'relative',
+            zIndex: 30,
           }}
         >
           <button
             className="flex md:hidden items-center justify-center rounded-md cursor-pointer"
-            style={{ width: 32, height: 32, color: '#7a8399' }}
+            style={{ width: 32, height: 32, color: C.textSecondary, padding: 6 }}
             onClick={() => { setSidebarOpen(true) }}
           >
-            <Menu size={18} strokeWidth={1.8} />
+            <Menu size={20} strokeWidth={1.8} />
           </button>
           <div className="hidden md:block" style={{ width: 32 }} />
 
@@ -838,53 +805,67 @@ export default function ChatPage() {
           <div className="relative" ref={modelDropdownRef}>
             <button
               onClick={() => setShowModelDropdown(o => !o)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full cursor-pointer transition-colors"
+              className="flex items-center gap-2 px-4 py-1.5 rounded-full cursor-pointer transition-all duration-200"
               style={{
-                background: showModelDropdown ? 'rgba(0,0,0,0.05)' : 'transparent',
-                color: '#1a1f2e',
+                background: showModelDropdown ? C.surface : 'transparent',
+                border: `1px solid ${showModelDropdown ? C.borderStrong : 'transparent'}`,
               }}
             >
               <span
                 className="rounded-full flex-shrink-0"
-                style={{ width: 7, height: 7, background: getModelColor(model) }}
+                style={{ width: 6, height: 6, background: getModelColor(model), boxShadow: `0 0 6px ${getModelColor(model)}40` }}
               />
-              <span className="text-sm font-medium">
+              <span className="text-sm font-semibold" style={{ color: C.text }}>
                 {MODELS.find(m => m.value === model)?.label ?? model}
               </span>
-              <ChevronDown size={13} strokeWidth={2} style={{ color: '#9ca3af' }} />
+              <span style={{ display: 'inline-flex', transform: showModelDropdown ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.25s', color: C.textMuted }}>
+                <ChevronDown size={12} strokeWidth={2.5} />
+              </span>
             </button>
 
             {showModelDropdown && (
               <div
-                className="absolute top-full mt-1 left-1/2 rounded-xl shadow-lg overflow-hidden"
+                className="absolute top-12 left-1/2 rounded-2xl overflow-hidden"
                 style={{
                   transform: 'translateX(-50%)',
-                  minWidth: 200,
-                  background: '#fff',
-                  border: '1px solid rgba(0,0,0,0.08)',
-                  zIndex: 50,
+                  minWidth: 260,
+                  background: 'rgba(255,252,248,0.72)',
+                  backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+                  border: `1px solid ${C.border}`,
+                  boxShadow: '0 12px 48px rgba(100,80,50,0.14)',
+                  zIndex: 51,
                 }}
               >
-                {MODELS.map(m => (
-                  <button
-                    key={m.value}
-                    onClick={() => { handleModelChange(m.value); setShowModelDropdown(false) }}
-                    className="flex items-center gap-2.5 w-full px-4 py-2.5 text-left text-sm transition-colors cursor-pointer"
-                    style={{
-                      color: m.value === model ? '#1a1f2e' : '#5a6a8a',
-                      background: m.value === model ? 'rgba(0,47,167,0.06)' : 'transparent',
-                      fontWeight: m.value === model ? 500 : 400,
-                    }}
-                    onMouseEnter={e => { if (m.value !== model) e.currentTarget.style.background = 'rgba(0,0,0,0.03)' }}
-                    onMouseLeave={e => { if (m.value !== model) e.currentTarget.style.background = 'transparent' }}
-                  >
-                    <span
-                      className="rounded-full flex-shrink-0"
-                      style={{ width: 7, height: 7, background: getModelColor(m.value) }}
-                    />
-                    {m.label}
-                  </button>
-                ))}
+                <div style={{ padding: '12px 14px 6px', fontSize: 11, color: C.textMuted, fontWeight: 600, letterSpacing: '0.05em' }}>选择模型</div>
+                {MODELS.map(m => {
+                  const isActive = m.value === model
+                  return (
+                    <div
+                      key={m.value}
+                      onClick={() => { handleModelChange(m.value); setShowModelDropdown(false) }}
+                      className="flex items-center gap-3 cursor-pointer transition-colors"
+                      style={{
+                        padding: '12px 14px',
+                        background: isActive ? C.sidebarActive : 'transparent',
+                      }}
+                      onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(160,120,90,0.04)' }}
+                      onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
+                    >
+                      <span
+                        className="rounded-full flex-shrink-0"
+                        style={{ width: 8, height: 8, background: getModelColor(m.value), boxShadow: isActive ? `0 0 8px ${getModelColor(m.value)}60` : 'none' }}
+                      />
+                      <span className="text-sm" style={{ fontWeight: isActive ? 700 : 500, color: isActive ? C.text : C.textSecondary }}>
+                        {m.label}
+                      </span>
+                      {isActive && (
+                        <span style={{ marginLeft: 'auto', color: C.accent }}>
+                          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -896,30 +877,33 @@ export default function ChatPage() {
               handleCreateWithScene(scene)
             }}
             className="flex items-center justify-center rounded-md cursor-pointer transition-colors"
-            style={{ width: 32, height: 32, color: '#7a8399' }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#1a1f2e')}
-            onMouseLeave={e => (e.currentTarget.style.color = '#7a8399')}
+            style={{ width: 32, height: 32, color: C.textSecondary, padding: 6 }}
+            onMouseEnter={e => (e.currentTarget.style.color = C.text)}
+            onMouseLeave={e => (e.currentTarget.style.color = C.textSecondary)}
             title="New chat"
           >
-            <Plus size={18} strokeWidth={1.8} />
+            <Plus size={18} strokeWidth={2} />
           </button>
         </header>
 
         {/* Messages */}
-        <main ref={mainRef} className="flex-1 overflow-y-auto flex flex-col">
+        <main ref={mainRef} className="flex-1 overflow-y-auto flex flex-col" style={{ WebkitOverflowScrolling: 'touch' }}>
           {showWelcome ? (
-          <WelcomeScreen onSelectScene={handleWelcomeScene} currentScene={currentSession?.scene_type || 'daily'} />
+          <WelcomeScreen />
           ) : (
-            <div className="mx-auto w-full px-3 md:px-6 pt-8" style={{ maxWidth: 800, paddingBottom: 16 }}>
+            <div className="mx-auto w-full px-4 md:px-6 pt-5" style={{ maxWidth: 720, paddingBottom: 16 }}>
 
               {/* Completed messages — each item is memo'd */}
               {Array.isArray(messages) && messages.map(msg => (
                 <MessageItem
                   key={msg.id}
                   msg={msg}
-                  isDebugOpen={debugOpenMsgId === msg.id}
+                  modelLabel={msg.role === 'assistant' ? (MODELS.find(m => m.value === model)?.label ?? model) : undefined}
+                  isDebugOpen={_debugOpenMsgId === msg.id}
                   isCopied={copiedMsgId === msg.id}
-                  onToggleDebug={() => setDebugOpenMsgId(debugOpenMsgId === msg.id ? null : msg.id)}
+                  onToggleDebug={() => {
+                    if (msg.debugInfo) setSheetDebugInfo(msg.debugInfo)
+                  }}
                   onCopy={handleCopyMsg}
                   onDelete={handleDeleteConv}
                   onRetry={handleRetry}
@@ -928,36 +912,37 @@ export default function ChatPage() {
 
               {/* Error / retry block */}
               {lastError && !isStreaming && (
-                <div className="flex gap-3 mb-6">
+                <div className="flex gap-2.5 mb-6">
                   <div
-                    className="flex-shrink-0 flex items-center justify-center select-none"
-                    style={{ width: 28, height: 28, color: '#002FA7', fontSize: 16, lineHeight: 1 }}
+                    className="flex-shrink-0 flex items-center justify-center select-none rounded-full"
+                    style={{ width: 34, height: 34, background: C.errorBg, border: `1px solid ${C.errorBorder}`, fontSize: 14 }}
                   >
-                    ✦
+                    ⚠
                   </div>
-                  <div
-                    className="flex-1 flex items-center justify-between gap-3 rounded-lg px-3 py-2"
-                    style={{ borderLeft: '3px solid rgba(208,64,64,0.2)', background: 'rgba(208,64,64,0.03)' }}
-                  >
-                    <span className="text-xs" style={{ color: '#b03030' }}>⚠ {lastError}</span>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <button
-                        onClick={() => retryLast(currentSession!.id, model)}
-                        className="text-xs font-medium cursor-pointer"
-                        style={{ color: '#002FA7' }}
-                        onMouseEnter={e => (e.currentTarget.style.opacity = '0.7')}
-                        onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-                      >
-                        重试
-                      </button>
-                      <button
-                        onClick={clearError}
-                        className="flex items-center justify-center cursor-pointer"
-                        style={{ color: '#b0b8c8' }}
-                        title="忽略"
-                      >
-                        <X size={13} strokeWidth={2} />
-                      </button>
+                  <div className="flex-1">
+                    <div className="text-xs font-semibold mb-1.5" style={{ color: C.errorText }}>发送失败</div>
+                    <div
+                      className="rounded-2xl px-4 py-3"
+                      style={{ background: C.errorBg, border: `1px solid ${C.errorBorder}` }}
+                    >
+                      <span className="text-sm" style={{ color: C.errorText }}>{lastError}</span>
+                      <div className="flex items-center gap-3 mt-3">
+                        <button
+                          onClick={() => retryLast(currentSession!.id, model)}
+                          className="px-4 py-1.5 rounded-lg text-sm font-medium cursor-pointer"
+                          style={{ background: 'transparent', border: `1px solid ${C.errorBorder}`, color: C.errorText }}
+                        >
+                          重新发送
+                        </button>
+                        <button
+                          onClick={clearError}
+                          className="flex items-center justify-center cursor-pointer"
+                          style={{ color: C.textMuted }}
+                          title="忽略"
+                        >
+                          <X size={16} strokeWidth={2} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -970,25 +955,16 @@ export default function ChatPage() {
             </div>
           )}
 
-          {/* Sticky input */}
-          <div style={{
-            position: 'sticky',
-            bottom: 0,
-            zIndex: 10,
-            marginTop: 'auto',
-            background: '#f2f4fa',
-            paddingBottom: keyboardOffset > 0 ? `${keyboardOffset}px` : 'max(8px, env(safe-area-inset-bottom))',
+        </main>
+
+        {/* Input area — outside main, always at bottom */}
+        <div className="flex-shrink-0" style={{
+            background: C.glass,
+            backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+            borderTop: `1px solid ${C.border}`,
+            paddingBottom: keyboardOffset > 0 ? `${keyboardOffset}px` : 'max(10px, env(safe-area-inset-bottom))',
           }}>
-            <div style={{
-              position: 'absolute',
-              top: -36,
-              left: 0,
-              right: 0,
-              height: 36,
-              background: 'linear-gradient(to bottom, rgba(242,244,250,0), rgba(242,244,250,1))',
-              pointerEvents: 'none',
-            }} />
-            <div className="mx-auto px-3 md:px-6 py-3 relative" style={{ maxWidth: 800 }}>
+            <div className="mx-auto px-4 md:px-6 py-2 relative" style={{ maxWidth: 720 }}>
               {/* Hidden file input */}
               <input
                 ref={fileInputRef}
@@ -1007,8 +983,8 @@ export default function ChatPage() {
                       key={i}
                       className="relative group rounded-lg overflow-hidden flex items-center gap-2"
                       style={{
-                        background: '#f0f2f8',
-                        border: '1px solid #e2e6f0',
+                        background: C.surfaceSolid,
+                        border: `1px solid ${C.border}`,
                         ...(att.preview ? { width: 64, height: 64 } : { padding: '6px 10px' }),
                       }}
                     >
@@ -1019,9 +995,9 @@ export default function ChatPage() {
                           {att.file.type === 'application/pdf' ? (
                             <FileText size={14} style={{ color: '#e74c3c', flexShrink: 0 }} />
                           ) : (
-                            <FileIcon size={14} style={{ color: '#7a8399', flexShrink: 0 }} />
+                            <FileIcon size={14} style={{ color: C.textSecondary, flexShrink: 0 }} />
                           )}
-                          <span className="text-xs truncate" style={{ color: '#5a6a8a', maxWidth: 120 }}>
+                          <span className="text-xs truncate" style={{ color: C.textSecondary, maxWidth: 120 }}>
                             {att.file.name}
                           </span>
                         </>
@@ -1039,11 +1015,12 @@ export default function ChatPage() {
               )}
 
               <div
-                className={`flex gap-3 px-4 transition-all duration-200 ${isFocused || input || attachments.length > 0 ? 'rounded-2xl items-end py-3' : 'rounded-full items-center py-2.5'}`}
+                className="flex items-end gap-2.5 px-3.5 py-2.5 transition-all duration-300"
                 style={{
-                  background: '#fff',
-                  boxShadow: '0 1px 6px rgba(0,0,0,0.07)',
-                  border: '1px solid rgba(0,0,0,0.07)',
+                  borderRadius: isFocused ? 22 : 26,
+                  background: C.inputBg,
+                  border: `1px solid ${isFocused ? C.borderStrong : C.border}`,
+                  boxShadow: isFocused ? '0 4px 24px rgba(160,120,90,0.08)' : 'none',
                 }}
               >
                 {/* Attach button */}
@@ -1051,9 +1028,9 @@ export default function ChatPage() {
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isStreaming || isUploading || !currentSession}
                   className="flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                  style={{ width: 30, height: 30, color: '#7a8399' }}
-                  onMouseEnter={e => { if (!isStreaming) e.currentTarget.style.color = '#002FA7' }}
-                  onMouseLeave={e => (e.currentTarget.style.color = '#7a8399')}
+                  style={{ width: 30, height: 30, color: C.textMuted }}
+                  onMouseEnter={e => { if (!isStreaming) e.currentTarget.style.color = C.accent }}
+                  onMouseLeave={e => (e.currentTarget.style.color = C.textMuted)}
                   title="上传文件"
                 >
                   <Paperclip size={16} strokeWidth={1.8} />
@@ -1066,18 +1043,16 @@ export default function ChatPage() {
                   onFocus={() => setIsFocused(true)}
                   onBlur={() => setIsFocused(false)}
                   disabled={isStreaming || !currentSession}
-                  placeholder="Message Reverie…"
+                  placeholder="说点什么..."
                   rows={1}
                   className="flex-1 resize-none bg-transparent text-sm outline-none leading-relaxed disabled:opacity-40"
-                  style={{ color: '#1a1f2e', minHeight: 22, maxHeight: 150, overflowY: 'auto', scrollbarWidth: 'none' }}
+                  style={{ color: C.text, minHeight: 24, maxHeight: 120, overflowY: 'auto', scrollbarWidth: 'none' }}
                 />
                 {isStreaming ? (
                   <button
                     onClick={stopStreaming}
                     className="flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer"
-                    style={{ width: 30, height: 30, flexShrink: 0, background: '#1a1f2e', color: '#fff' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#374151')}
-                    onMouseLeave={e => (e.currentTarget.style.background = '#1a1f2e')}
+                    style={{ width: 32, height: 32, flexShrink: 0, background: C.text, color: '#fff' }}
                     title="停止生成"
                   >
                     <Square size={10} strokeWidth={0} fill="currentColor" />
@@ -1086,37 +1061,42 @@ export default function ChatPage() {
                   <button
                     onClick={handleSend}
                     disabled={isUploading || (!input.trim() && attachments.length === 0) || !currentSession}
-                    className="flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 disabled:cursor-not-allowed"
+                    className="flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-300 disabled:cursor-not-allowed"
                     style={{
-                      width: 30, height: 30, flexShrink: 0,
-                      background: (input.trim() || attachments.length > 0) && !isUploading ? '#002FA7' : '#e8ecf5',
-                      color: (input.trim() || attachments.length > 0) && !isUploading ? '#fff' : '#aab2c8',
+                      width: 32, height: 32, flexShrink: 0,
+                      background: (input.trim() || attachments.length > 0) && !isUploading ? C.accentGradient : C.surface,
+                      color: (input.trim() || attachments.length > 0) && !isUploading ? '#fff' : C.textMuted,
+                      boxShadow: (input.trim() || attachments.length > 0) && !isUploading ? '0 4px 20px rgba(160,120,90,0.08)' : 'none',
                     }}
-                    onMouseEnter={e => { if ((input.trim() || attachments.length > 0) && !isUploading) e.currentTarget.style.background = '#001f80' }}
-                    onMouseLeave={e => { if ((input.trim() || attachments.length > 0) && !isUploading) e.currentTarget.style.background = '#002FA7' }}
                   >
-                    {isUploading ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={14} strokeWidth={2.5} />}
+                    {isUploading ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={15} strokeWidth={2.5} />}
                   </button>
                 )}
               </div>
-              <p className="hidden md:block text-center text-xs mt-2" style={{ color: '#aab2c8' }}>
-                Press Enter to send · Shift+Enter for new line
-              </p>
             </div>
           </div>
-        </main>
 
         {/* Artifact Panel */}
         <ArtifactPanel />
 
+        {/* Memory Sheet */}
+        {sheetDebugInfo && (
+          <MemorySheetPanel
+            debugInfo={sheetDebugInfo}
+            open={true}
+            onClose={() => setSheetDebugInfo(null)}
+          />
+        )}
+
         {/* Toast */}
         {toast && (
           <div
-            className="fixed z-50 rounded-lg px-4 py-2 text-sm pointer-events-none"
+            className="fixed z-50 rounded-xl px-4 py-2.5 text-sm pointer-events-none"
             style={{
               bottom: 100, left: '50%', transform: 'translateX(-50%)',
-              background: 'rgba(26,31,46,0.85)', color: '#fff',
+              background: 'rgba(51,42,34,0.85)', color: '#fff',
               boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+              backdropFilter: 'blur(12px)',
             }}
           >
             {toast}
@@ -1125,7 +1105,6 @@ export default function ChatPage() {
 
       </div>
 
-      <style>{``}</style>
     </div>
   )
 }

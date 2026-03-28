@@ -3,9 +3,11 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
 import ChatPage from './pages/ChatPage'
 import ReadingPage from './pages/ReadingPage'
+import BookshelfPage from './pages/BookshelfPage'
 import StudyPage from './pages/StudyPage'
 import ErrorBookPage from './pages/ErrorBookPage'
 import GraphPage from './pages/GraphPage'
+import ProjectsPage from './pages/ProjectsPage'
 import AuthGuard from './components/AuthGuard'
 import { useAuthStore } from './stores/authStore'
 
@@ -27,10 +29,13 @@ export default function App() {
         <Route element={<AuthGuard />}>
           <Route path="/" element={<ChatPage />} />
           <Route path="/:sessionId" element={<ChatPage />} />
+          <Route path="/bookshelf" element={<BookshelfPage />} />
           <Route path="/read/:sessionId" element={<ReadingPage />} />
           <Route path="/study" element={<StudyPage />} />
           <Route path="/errors" element={<ErrorBookPage />} />
           <Route path="/graph" element={<GraphPage />} />
+          <Route path="/projects" element={<ProjectsPage />} />
+          <Route path="/projects/:projectId" element={<ProjectsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

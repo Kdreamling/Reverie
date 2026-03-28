@@ -39,7 +39,49 @@ export interface ReadingContent {
   created_at: string
 }
 
-// ---- API ----
+// ---- Book types ----
+
+export interface Book {
+  id: string
+  title: string
+  author: string | null
+  total_sections: number
+  total_length: number
+  source_type: string
+  created_at: string
+  progress: number          // 0-100
+  last_read_at: string | null
+  discussion_count: number
+  latest_session_id: string | null
+}
+
+// ---- Books API ----
+
+export async function listBooksAPI(): Promise<Book[]> {
+  return client.get<Book[]>('/reading/books')
+}
+
+export async function createBookAPI(text: string, title?: string, author?: string, sourceType: string = 'paste'): Promise<{
+  id: string; title: string; author: string | null; total_sections: number; total_length: number
+}> {
+  return client.post('/reading/books', { text, title, author, source_type: sourceType })
+}
+
+export async function getBookAPI(bookId: string): Promise<any> {
+  return client.get(`/reading/books/${bookId}`)
+}
+
+export async function deleteBookAPI(bookId: string): Promise<{ ok: boolean }> {
+  return client.delete(`/reading/books/${bookId}`)
+}
+
+export async function startReadingAPI(bookId: string, model?: string): Promise<{
+  session_id: string; book_id: string; resumed: boolean
+}> {
+  return client.post(`/reading/books/${bookId}/start`, { book_id: bookId, model })
+}
+
+// ---- Legacy API ----
 
 export async function uploadReadingContentAPI(
   sessionId: string,

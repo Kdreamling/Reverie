@@ -5,6 +5,7 @@ import { useChatStore, type StreamBlock } from '../stores/chatStore'
 import type { MemoryOperation } from '../api/chat'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
+import { C } from '../theme'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -59,11 +60,11 @@ function ArtifactGeneratingCard({ title }: { title?: string }) {
   return (
     <div
       className="my-3 rounded-xl p-4"
-      style={{ background: '#fff', border: '1px solid #e8ecf5', maxWidth: 400 }}
+      style={{ background: C.bg, border: `1px solid ${C.border}`, maxWidth: 400 }}
     >
       <div className="flex items-center gap-2">
         <span className="tool-spinner" />
-        <span className="text-sm font-medium" style={{ color: '#5a6a8a' }}>
+        <span className="text-sm font-medium" style={{ color: C.textSecondary }}>
           {title ? `正在生成「${title}」...` : '正在生成 artifact...'}
         </span>
       </div>
@@ -119,7 +120,7 @@ function StreamingTextBlock({ text }: { text: string }) {
         <div
           ref={containerRef}
           className="text-sm leading-7 whitespace-pre-wrap"
-          style={{ color: '#1a1f2e' }}
+          style={{ color: C.text }}
         />
       )}
       {hasPartialArtifact && <ArtifactGeneratingCard title={artifactTitle} />}
@@ -136,17 +137,17 @@ function LiveThinkingBlock({ text, startTime, elapsed }: { text: string; startTi
   const displayTime = elapsed ?? liveElapsed
 
   return (
-    <div className="mb-3 rounded-xl overflow-hidden" style={{ background: 'rgba(0,47,167,0.05)' }}>
-      <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer" style={{ color: '#5a6a8a' }}>
-        {isActive ? <span className="tool-spinner" /> : <span style={{ fontSize: 11 }}>⊘</span>}
+    <div className="mb-3 rounded-xl overflow-hidden" style={{ background: C.thinkingBg, border: `1px solid ${C.border}` }}>
+      <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer" style={{ color: C.textMuted }}>
+        {isActive ? <span className="tool-spinner" /> : <span style={{ fontSize: 11 }}>✦</span>}
         <span className="text-xs font-medium">
-          Thinking
-          {displayTime != null && displayTime > 0 && <span style={{ color: '#8a9ab5', marginLeft: 4 }}>({formatElapsed(displayTime)})</span>}
+          思考中
+          {displayTime != null && displayTime > 0 && <span style={{ marginLeft: 4 }}>({formatElapsed(displayTime)})</span>}
         </span>
         {open ? <ChevronDown size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} />}
       </button>
       {open && (
-        <p className="px-3.5 pb-2.5 text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#8a9ab5' }}>
+        <p className="px-3.5 pb-2.5 text-xs leading-relaxed whitespace-pre-wrap" style={{ color: C.textSecondary, fontStyle: 'italic' }}>
           {text}
         </p>
       )}
@@ -159,12 +160,12 @@ function LiveThinkingBlock({ text, startTime, elapsed }: { text: string; startTi
 function LiveToolSearchBlock({ query, startTime }: { query: string; startTime: number }) {
   const liveElapsed = useElapsedTimer(startTime)
   return (
-    <div className="mb-3 rounded-xl overflow-hidden" style={{ background: 'rgba(0,47,167,0.05)' }}>
-      <div className="flex items-center gap-2 px-3.5 py-2.5" style={{ color: '#5a6a8a' }}>
+    <div className="mb-3 rounded-xl overflow-hidden" style={{ background: C.toolBg, border: `1px solid ${C.border}` }}>
+      <div className="flex items-center gap-2 px-3.5 py-2.5" style={{ color: C.textSecondary }}>
         <span className="tool-spinner" />
         <span className="text-xs font-medium">
           Memory search{query ? `「${query}」` : ''}
-          <span style={{ color: '#8a9ab5', marginLeft: 4 }}>({formatElapsed(liveElapsed)})</span>
+          <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(liveElapsed)})</span>
         </span>
       </div>
     </div>
@@ -176,17 +177,17 @@ function LiveToolSearchBlock({ query, startTime }: { query: string; startTime: n
 function ToolResultBlock({ query, found, content, elapsed }: { query: string; found: number; content: string; elapsed: number | null }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="mb-3 rounded-xl overflow-hidden" style={{ background: 'rgba(0,47,167,0.05)' }}>
-      <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer" style={{ color: '#5a6a8a' }}>
+    <div className="mb-3 rounded-xl overflow-hidden" style={{ background: C.toolBg, border: `1px solid ${C.border}` }}>
+      <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer" style={{ color: C.textSecondary }}>
         <span style={{ fontSize: 11 }}>◎</span>
         <span className="text-xs font-medium">
           Memory search「{query}」 · found {found}
-          {elapsed != null && <span style={{ color: '#8a9ab5', marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
+          {elapsed != null && <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
         </span>
         {open ? <ChevronDown size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} />}
       </button>
       {open && content && (
-        <p className="px-3.5 pb-2.5 text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#8a9ab5' }}>
+        <p className="px-3.5 pb-2.5 text-xs leading-relaxed whitespace-pre-wrap" style={{ color: C.textMuted }}>
           {content || '（无内容）'}
         </p>
       )}
@@ -198,12 +199,12 @@ function ToolResultBlock({ query, found, content, elapsed }: { query: string; fo
 
 function MemoryOpBlock({ op, elapsed }: { op: MemoryOperation; elapsed: number | null }) {
   return (
-    <div className="mb-3 rounded-xl overflow-hidden" style={{ background: 'rgba(0,47,167,0.05)' }}>
-      <div className="flex items-center gap-2 px-3.5 py-2.5" style={{ color: '#5a6a8a' }}>
+    <div className="mb-3 rounded-xl overflow-hidden" style={{ background: C.toolBg, border: `1px solid ${C.border}` }}>
+      <div className="flex items-center gap-2 px-3.5 py-2.5" style={{ color: C.textSecondary }}>
         <span style={{ fontSize: 11 }}>{op.type === 'saved' ? '◉' : op.type === 'updated' ? '◎' : '⊗'}</span>
         <span className="text-xs font-medium">
           Memory {op.type}
-          {elapsed != null && <span style={{ color: '#8a9ab5', marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
+          {elapsed != null && <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
         </span>
       </div>
     </div>
@@ -242,13 +243,13 @@ function AiAvatar() {
   useSyncExternalStore(_subAv, _snapAv)
   const src = localStorage.getItem('avatar_claude')
   return src ? (
-    <img src={src} alt="✦" className="flex-shrink-0 rounded-full object-cover" style={{ width: 28, height: 28 }} />
+    <img src={src} alt="晨" className="flex-shrink-0 rounded-full object-cover" style={{ width: 34, height: 34, boxShadow: `0 2px 8px ${C.accent}25` }} />
   ) : (
     <div
-      className="flex-shrink-0 flex items-center justify-center select-none"
-      style={{ width: 28, height: 28, color: '#002FA7', fontSize: 16, lineHeight: 1 }}
+      className="flex-shrink-0 flex items-center justify-center rounded-full select-none"
+      style={{ width: 34, height: 34, background: C.accentGradient, color: '#fff', fontSize: 11, fontWeight: 600, letterSpacing: '-0.02em' }}
     >
-      ✦
+      Claude
     </div>
   )
 }
@@ -262,9 +263,12 @@ export default function StreamingMessage() {
   if (!isStreaming || streamBlocks.length === 0) return null
 
   return (
-    <div className="flex gap-3 mb-8">
+    <div className="flex gap-2.5 mb-8">
       <AiAvatar />
-      <div className="flex-1 min-w-0 pt-0.5">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className="text-sm font-semibold" style={{ color: C.text }}>Claude</span>
+        </div>
         {streamBlocks.map((block, i) => (
           <StreamBlockRenderer key={`sb-${i}`} block={block} />
         ))}

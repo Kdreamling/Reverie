@@ -57,7 +57,7 @@ export interface ChatMessage {
   memoryRef?: { query: string; found: number; content: string } | null
   memoryOps?: MemoryOperation[] | null
   conversationId?: string
-  tokens?: { input: number; output: number } | null
+  tokens?: { input: number; output: number; cached?: number } | null
   thinkingTime?: number | null
   debugInfo?: DebugInfo | null
   attachments?: MessageAttachment[] | null

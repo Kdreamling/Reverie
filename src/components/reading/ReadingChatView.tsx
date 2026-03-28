@@ -1,8 +1,17 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { X, Send } from 'lucide-react'
+import { X, Send, ChevronDown } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 import { useReadingStore } from '../../stores/readingStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useSessionStore } from '../../stores/sessionStore'
+import { C, getModelColor } from '../../theme'
+
+const MODELS = [
+  { value: 'deepseek-chat', label: 'DeepSeek Chat' },
+  { value: '[0.1]claude-opus-4-6-thinking', label: 'Claude Opus 4.6' },
+  { value: 'anthropic/claude-opus-4.6', label: 'Claude Opus (OR)' },
+  { value: 'claude-opus-4.6-zenmux', label: 'Claude Opus (ZM)' },
+]
 
 interface ReadingChatViewProps {
   sessionId: string
@@ -15,22 +24,22 @@ export default function ReadingChatView({ sessionId, onClose }: ReadingChatViewP
   const activeSelection = useReadingStore(s => s.activeSelection)
 
   const currentSession = useSessionStore(s => s.currentSession)
+  const updateSessionModel = useSessionStore(s => s.updateSessionModel)
   const messages = useChatStore(s => s.messages)
   const isStreaming = useChatStore(s => s.isStreaming)
   const sendMessage = useChatStore(s => s.sendMessage)
   const loadMessages = useChatStore(s => s.loadMessages)
 
   const [input, setInput] = useState('')
-  const [isMobile, setIsMobile] = useState(false)
+  const [showModelPicker, setShowModelPicker] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const hasLoadedRef = useRef(false)
+  const model = currentSession?.model ?? MODELS[0].value
+  const modelLabel = MODELS.find(m => m.value === model)?.label ?? model
 
+  // Always reload messages when panel opens
   useEffect(() => {
-    if (!hasLoadedRef.current) {
-      loadMessages(sessionId)
-      hasLoadedRef.current = true
-    }
+    loadMessages(sessionId)
   }, [sessionId, loadMessages])
 
   useEffect(() => {
@@ -38,17 +47,7 @@ export default function ReadingChatView({ sessionId, onClose }: ReadingChatViewP
   }, [messages])
 
   useEffect(() => {
-    setTimeout(() => inputRef.current?.focus(), 300)
-  }, [])
-
-  useEffect(() => {
-    const syncLayout = () => {
-      setIsMobile(window.innerWidth < 768)
-    }
-
-    syncLayout()
-    window.addEventListener('resize', syncLayout)
-    return () => window.removeEventListener('resize', syncLayout)
+    setTimeout(() => inputRef.current?.focus(), 350)
   }, [])
 
   const contextSection = chatSectionIndex !== null
@@ -59,18 +58,16 @@ export default function ReadingChatView({ sessionId, onClose }: ReadingChatViewP
     const text = input.trim()
     if (!text || isStreaming) return
 
-    const readingContext = activeSelection || contextSection
-      ? {
-          section_index: chatSectionIndex ?? undefined,
-          selected_text: activeSelection || undefined,
-          section_excerpt: contextSection?.content.slice(0, 180) || undefined,
-        }
-      : undefined
+    // Always send reading_context in reading mode (for discussion_count + anti-spoiler)
+    const readingContext = {
+      section_index: chatSectionIndex ?? undefined,
+      selected_text: activeSelection || undefined,
+      section_excerpt: contextSection?.content.slice(0, 180) || undefined,
+    }
 
-    const model = currentSession?.model ?? 'claude-sonnet-4.5'
     sendMessage(sessionId, model, text, { readingContext })
     setInput('')
-  }, [input, isStreaming, sessionId, activeSelection, contextSection, chatSectionIndex, sendMessage, currentSession])
+  }, [input, isStreaming, sessionId, activeSelection, contextSection, chatSectionIndex, sendMessage, model])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -81,108 +78,168 @@ export default function ReadingChatView({ sessionId, onClose }: ReadingChatViewP
 
   return (
     <>
+      {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 transition-opacity duration-300"
-        style={{ background: 'rgba(0,0,0,0.15)' }}
         onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 40,
+          background: 'rgba(50,42,34,0.3)',
+          backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+          animation: 'chatFadeIn 0.2s ease',
+        }}
       />
 
-      <div
-        className="fixed z-50 flex flex-col transition-transform duration-300"
-        style={{
-          top: 0,
-          right: 0,
-          bottom: 0,
-          left: isMobile ? 0 : 'auto',
-          width: isMobile ? '100%' : '40%',
-          minWidth: isMobile ? 0 : 360,
-          maxWidth: isMobile ? '100%' : 560,
-          background: '#faf9f7',
-          borderLeft: isMobile ? 'none' : '1px solid rgba(0,0,0,0.06)',
-          boxShadow: isMobile ? 'none' : '-8px 0 32px rgba(0,0,0,0.08)',
-        }}
-      >
-        <div
-          className="flex items-center justify-between px-4 py-3 shrink-0"
-          style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}
-        >
-          <div className="flex items-center gap-2">
-            <span style={{ fontSize: 13, color: '#002FA7', opacity: 0.5 }}>·</span>
-            <span style={{ fontSize: '0.85rem', color: '#5a6477', fontWeight: 500 }}>
-              讨论
-            </span>
-            {contextSection && (
-              <span style={{ fontSize: '0.75rem', color: '#a0aac0' }}>
-                · 段落 {chatSectionIndex}
-              </span>
-            )}
-          </div>
-          <button
-            onClick={onClose}
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors duration-150 cursor-pointer"
-            style={{ color: '#8a95aa' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.04)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-          >
-            <span style={{ fontSize: '0.8rem' }}>返回阅读</span>
-            <X size={16} />
-          </button>
+      {/* Bottom sheet */}
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0,
+        maxHeight: '85vh', zIndex: 50,
+        background: C.bg,
+        borderRadius: '24px 24px 0 0',
+        boxShadow: '0 -8px 40px rgba(92,75,58,0.12)',
+        display: 'flex', flexDirection: 'column',
+        animation: 'chatSlideUp 0.35s cubic-bezier(0.16,1,0.3,1)',
+        overflow: 'hidden',
+      }}>
+        {/* Drag handle */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: C.borderStrong }} />
         </div>
 
+        {/* Header */}
+        <div style={{
+          padding: '4px 16px 10px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill={C.accent}>
+              <path d="M12 2L14.09 8.26L20 9.27L15.55 13.97L16.91 20L12 16.9L7.09 20L8.45 13.97L4 9.27L9.91 8.26L12 2Z"/>
+            </svg>
+            <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>讨论</span>
+            {contextSection && (
+              <span style={{ fontSize: 11, color: C.textMuted }}>· 段落 {chatSectionIndex}</span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* Model picker */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowModelPicker(o => !o)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  padding: '4px 10px', borderRadius: 8,
+                  background: showModelPicker ? C.surface : 'transparent',
+                  border: 'none', cursor: 'pointer',
+                  fontSize: 11, color: C.textSecondary, fontWeight: 500,
+                }}
+              >
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: getModelColor(model) }} />
+                {modelLabel}
+                <ChevronDown size={10} style={{ transform: showModelPicker ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
+              </button>
+              {showModelPicker && (
+                <>
+                  <div onClick={() => setShowModelPicker(false)} style={{ position: 'fixed', inset: 0, zIndex: 10 }} />
+                  <div style={{
+                    position: 'absolute', top: '100%', right: 0, marginTop: 4,
+                    minWidth: 180, zIndex: 999,
+                    background: '#FFFCF7',
+                    borderRadius: 12, border: `1px solid ${C.border}`,
+                    boxShadow: '0 8px 32px rgba(100,80,50,0.12)',
+                    overflow: 'hidden',
+                  }}>
+                    {MODELS.map(m => (
+                      <div
+                        key={m.value}
+                        onClick={() => { updateSessionModel(m.value); setShowModelPicker(false) }}
+                        style={{
+                          padding: '10px 12px', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          background: m.value === model ? C.sidebarActive : 'transparent',
+                          fontSize: 12, color: m.value === model ? C.text : C.textSecondary,
+                          fontWeight: m.value === model ? 600 : 400,
+                        }}
+                      >
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: getModelColor(m.value) }} />
+                        {m.label}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <button
+              onClick={onClose}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: C.textMuted, display: 'flex' }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Selected text quote */}
         {(activeSelection || contextSection) && (
-          <div
-            className="mx-4 mt-3 px-3 py-2 rounded-lg"
-            style={{
-              background: 'rgba(0,47,167,0.03)',
-              borderLeft: '2px solid rgba(0,47,167,0.2)',
-              fontSize: '0.8rem',
-              color: '#6b7a94',
-              lineHeight: 1.6,
-            }}
-          >
-            <p className="line-clamp-3">
-              {activeSelection || contextSection?.content.slice(0, 150)}
-              {((activeSelection?.length ?? 0) > 150 || (contextSection?.content?.length ?? 0) > 150) && '...'}
-            </p>
+          <div style={{
+            margin: '0 16px 8px', padding: '10px 14px',
+            borderRadius: 12, background: C.memoryBg,
+            borderLeft: `3px solid ${C.accent}`,
+            fontSize: 13, color: C.textSecondary, lineHeight: 1.8,
+            maxHeight: 60, overflow: 'hidden',
+          }}>
+            "{(activeSelection || contextSection?.content || '').slice(0, 120)}"
+            {((activeSelection?.length ?? 0) > 120 || (contextSection?.content?.length ?? 0) > 120) && '...'}
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto" style={{ padding: '8px 16px', minHeight: 200, maxHeight: '50vh' }}>
+          {messages.length === 0 && !isStreaming && (
+            <div style={{ textAlign: 'center', padding: '32px 0', color: C.textMuted, fontSize: 13 }}>
+              选中文字或直接输入，和小克聊聊这本书
+            </div>
+          )}
           {messages.map((msg) => (
             <div
               key={msg.id}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`flex mb-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className="max-w-[85%] px-3 py-2 rounded-xl"
                 style={{
-                  background: msg.role === 'user'
-                    ? 'rgba(0,47,167,0.08)'
-                    : 'rgba(0,0,0,0.03)',
-                  fontSize: '0.88rem',
-                  lineHeight: 1.7,
-                  color: '#3a4559',
+                  maxWidth: '85%',
+                  padding: '10px 14px', borderRadius: 18,
+                  background: msg.role === 'user' ? C.userBubble : C.surface,
+                  border: `1px solid ${msg.role === 'user' ? C.userBubbleBorder : C.border}`,
+                  fontSize: 14, lineHeight: 1.75, color: C.text,
                 }}
               >
-                {msg.content}
+                {msg.role === 'user' ? (
+                  <span style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</span>
+                ) : (
+                  <div className="md-content" style={{ fontSize: 14 }}>
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  </div>
+                )}
               </div>
             </div>
           ))}
           {isStreaming && (
-            <div className="flex justify-start">
-              <div className="px-3 py-2 rounded-xl" style={{ background: 'rgba(0,0,0,0.03)' }}>
-                <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#002FA7' }} />
+            <div className="flex justify-start mb-3">
+              <div style={{ padding: '10px 14px', borderRadius: 18, background: C.surface, border: `1px solid ${C.border}` }}>
+                <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: C.accent }} />
               </div>
             </div>
           )}
           <div ref={messagesEndRef} />
         </div>
 
-        <div
-          className="shrink-0 px-4 py-3"
-          style={{ borderTop: '1px solid rgba(0,0,0,0.05)' }}
-        >
-          <div className="flex items-end gap-2">
+        {/* Input */}
+        <div style={{
+          padding: '8px 16px',
+          paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+          borderTop: `1px solid ${C.border}`,
+        }}>
+          <div className="flex items-end gap-2.5">
             <textarea
               ref={inputRef}
               value={input}
@@ -190,29 +247,29 @@ export default function ReadingChatView({ sessionId, onClose }: ReadingChatViewP
               onKeyDown={handleKeyDown}
               placeholder="说点什么..."
               rows={1}
-              className="flex-1 resize-none rounded-xl px-3 py-2 outline-none"
+              className="flex-1 resize-none outline-none"
               style={{
-                background: 'rgba(0,0,0,0.03)',
-                border: '1px solid rgba(0,0,0,0.06)',
-                fontSize: '0.88rem',
-                lineHeight: 1.6,
-                maxHeight: 120,
-                color: '#3a4559',
+                padding: '10px 14px', borderRadius: 20,
+                background: C.inputBg, border: `1px solid ${C.border}`,
+                fontSize: 14, lineHeight: 1.6, maxHeight: 100,
+                color: C.text,
               }}
               onInput={e => {
                 const t = e.currentTarget
                 t.style.height = 'auto'
-                t.style.height = Math.min(t.scrollHeight, 120) + 'px'
+                t.style.height = Math.min(t.scrollHeight, 100) + 'px'
               }}
             />
             <button
               onClick={handleSend}
               disabled={!input.trim() || isStreaming}
-              className="p-2 rounded-xl transition-colors duration-150 cursor-pointer shrink-0"
               style={{
-                background: input.trim() ? '#002FA7' : 'rgba(0,0,0,0.05)',
-                color: input.trim() ? '#fff' : '#a0aac0',
-                border: 'none',
+                width: 38, height: 38, borderRadius: '50%',
+                background: input.trim() ? C.accentGradient : C.surface,
+                color: input.trim() ? '#fff' : C.textMuted,
+                border: 'none', cursor: input.trim() ? 'pointer' : 'default',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
               }}
             >
               <Send size={16} />
@@ -220,6 +277,11 @@ export default function ReadingChatView({ sessionId, onClose }: ReadingChatViewP
           </div>
         </div>
       </div>
+
+      <style>{`
+        @keyframes chatFadeIn { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes chatSlideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
+      `}</style>
     </>
   )
 }
