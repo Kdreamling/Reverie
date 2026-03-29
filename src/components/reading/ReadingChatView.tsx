@@ -204,20 +204,29 @@ export default function ReadingChatView({ sessionId, onClose }: ReadingChatViewP
               key={msg.id}
               className={`flex mb-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              <div
-                style={{
-                  maxWidth: '85%',
-                  padding: '10px 14px', borderRadius: 18,
-                  background: msg.role === 'user' ? C.userBubble : C.surface,
-                  border: `1px solid ${msg.role === 'user' ? C.userBubbleBorder : C.border}`,
-                  fontSize: 14, lineHeight: 1.75, color: C.text,
-                }}
-              >
-                {msg.role === 'user' ? (
-                  <span style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</span>
-                ) : (
-                  <div className="md-content" style={{ fontSize: 14 }}>
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+              <div style={{ maxWidth: '85%' }}>
+                <div
+                  style={{
+                    padding: '10px 14px', borderRadius: 18,
+                    background: msg.role === 'user' ? C.userBubble : C.surface,
+                    border: `1px solid ${msg.role === 'user' ? C.userBubbleBorder : C.border}`,
+                    fontSize: 14, lineHeight: 1.75, color: C.text,
+                  }}
+                >
+                  {msg.role === 'user' ? (
+                    <span style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</span>
+                  ) : (
+                    <div className="md-content" style={{ fontSize: 14 }}>
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
+                  )}
+                </div>
+                {msg.role === 'assistant' && msg.tokens && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, paddingLeft: 4, fontSize: 10.5, color: C.metaText }}>
+                    <span>{(((msg.tokens.input || 0) + (msg.tokens.output || 0)) / 1000).toFixed(1)}k tokens</span>
+                    {(msg.tokens.cached || 0) > 0 && (
+                      <span style={{ color: '#22c55e' }}>⚡ {((msg.tokens.cached || 0) / 1000).toFixed(1)}k cached</span>
+                    )}
                   </div>
                 )}
               </div>
