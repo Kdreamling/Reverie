@@ -450,13 +450,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 })
                 break
               case 'text_delta': {
-                // If text arrives after tool blocks and no thinking_start cleared prev text,
-                // clear previous text blocks now to avoid duplication
+                // If text arrives after tool blocks, clear ALL previous text blocks to avoid duplication.
+                // The new round after tool calls outputs the full text again, so old text must go.
                 const st = get()
                 const hasTools = st.streamBlocks.some(b => b.kind === 'tool_result' || b.kind === 'memory_op')
                 const lastBlock = st.streamBlocks[st.streamBlocks.length - 1]
-                const textAfterTools = hasTools && lastBlock && lastBlock.kind !== 'text'
-                if (textAfterTools && st.currentText) {
+                if (hasTools && lastBlock && lastBlock.kind !== 'text') {
                   set(s => ({
                     currentText: '',
                     streamBlocks: s.streamBlocks.filter(b => b.kind !== 'text'),

@@ -72,57 +72,40 @@ function ArtifactGeneratingCard({ title }: { title?: string }) {
   )
 }
 
-// ─── Streaming text: update DOM directly via ref, render markdown only when idle
+// ─── Streaming text: always render markdown, throttle updates for performance
 
 function StreamingTextBlock({ text }: { text: string }) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const lastLenRef = useRef(0)
-  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [renderMarkdown, setRenderMarkdown] = useState(false)
-
   const { clean, hasPartialArtifact, artifactTitle } = stripArtifacts(text)
 
+  // Throttle markdown rendering: update at most every 150ms during fast streaming
+  const [rendered, setRendered] = useState(clean)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const latestRef = useRef(clean)
+  latestRef.current = clean
+
   useEffect(() => {
-    // If text grew by a small delta, update DOM directly (skip React re-render of markdown)
-    if (!renderMarkdown && containerRef.current) {
-      containerRef.current.textContent = clean
-    }
-    lastLenRef.current = clean.length
-
-    // Debounce: render markdown after 300ms of no updates
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
-    idleTimerRef.current = setTimeout(() => {
-      setRenderMarkdown(true)
-    }, 300)
-
+    if (timerRef.current) return // already scheduled
+    timerRef.current = setTimeout(() => {
+      setRendered(latestRef.current)
+      timerRef.current = null
+    }, 150)
     return () => {
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
     }
-  }, [clean, renderMarkdown])
+  }, [clean])
 
-  // Reset renderMarkdown when text changes after markdown was rendered
+  // Always flush on unmount or when text stops changing
   useEffect(() => {
-    if (renderMarkdown) {
-      const timer = setTimeout(() => {}, 0)
-      return () => clearTimeout(timer)
-    }
-  }, [clean, renderMarkdown])
+    return () => { setRendered(latestRef.current) }
+  }, [])
 
   return (
     <div>
-      {renderMarkdown ? (
-        <div className="md-content">
-          <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
-            {clean}
-          </ReactMarkdown>
-        </div>
-      ) : (
-        <div
-          ref={containerRef}
-          className="text-sm leading-7 whitespace-pre-wrap"
-          style={{ color: C.text }}
-        />
-      )}
+      <div className="md-content">
+        <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
+          {rendered}
+        </ReactMarkdown>
+      </div>
       {hasPartialArtifact && <ArtifactGeneratingCard title={artifactTitle} />}
     </div>
   )
