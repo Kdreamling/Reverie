@@ -1,4 +1,4 @@
-import { memo, useRef, useEffect, useSyncExternalStore } from 'react'
+import { memo, useEffect, useSyncExternalStore } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { useChatStore, type StreamBlock } from '../stores/chatStore'
@@ -72,38 +72,41 @@ function ArtifactGeneratingCard({ title }: { title?: string }) {
   )
 }
 
-// ─── Streaming text: always render markdown, throttle updates for performance
+// ─── Streaming text: real-time markdown rendering with incomplete syntax cleanup
+
+/** Remove trailing incomplete markdown syntax to prevent flickering */
+function cleanIncompleteMarkdown(text: string): string {
+  let s = text
+  // Trailing unclosed bold/italic: remove trailing *, **, ***, _ etc.
+  s = s.replace(/(\*{1,3}|\_{1,3})(?=[^*_]*$)/, (match) => {
+    // Only strip if it looks like an opening marker (preceded by space/start or after newline)
+    const idx = s.lastIndexOf(match)
+    if (idx >= 0) {
+      const before = idx > 0 ? s[idx - 1] : ' '
+      if (before === ' ' || before === '\n' || idx === 0) {
+        return ''
+      }
+    }
+    return match
+  })
+  // Trailing unclosed inline code
+  const backtickCount = (s.match(/`/g) || []).length
+  if (backtickCount % 2 !== 0) {
+    const lastIdx = s.lastIndexOf('`')
+    s = s.slice(0, lastIdx) + s.slice(lastIdx + 1)
+  }
+  return s
+}
 
 function StreamingTextBlock({ text }: { text: string }) {
   const { clean, hasPartialArtifact, artifactTitle } = stripArtifacts(text)
-
-  // Throttle markdown rendering: update at most every 150ms during fast streaming
-  const [rendered, setRendered] = useState(clean)
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const latestRef = useRef(clean)
-  latestRef.current = clean
-
-  useEffect(() => {
-    if (timerRef.current) return // already scheduled
-    timerRef.current = setTimeout(() => {
-      setRendered(latestRef.current)
-      timerRef.current = null
-    }, 150)
-    return () => {
-      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
-    }
-  }, [clean])
-
-  // Always flush on unmount or when text stops changing
-  useEffect(() => {
-    return () => { setRendered(latestRef.current) }
-  }, [])
+  const displayText = cleanIncompleteMarkdown(clean)
 
   return (
     <div>
       <div className="md-content">
         <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
-          {rendered}
+          {displayText}
         </ReactMarkdown>
       </div>
       {hasPartialArtifact && <ArtifactGeneratingCard title={artifactTitle} />}
