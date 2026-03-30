@@ -28,3 +28,35 @@ export async function updateSessionAPI(
 ): Promise<Session> {
   return client.patch<Session>(`/sessions/${id}`, data)
 }
+
+// Calendar API
+export interface CalendarSession {
+  id: string
+  title: string
+  scene_type: string
+  message_count: number
+}
+
+export interface CalendarDates {
+  year: number
+  month: number
+  dates: Record<string, CalendarSession[]>
+}
+
+export interface CalendarDetail {
+  date: string
+  sessions: (CalendarSession & {
+    model: string
+    created_at: string
+    updated_at: string
+    preview: { user_msg: string; assistant_msg: string; created_at: string }[]
+  })[]
+}
+
+export async function fetchCalendarDates(year: number, month: number): Promise<CalendarDates> {
+  return client.get<CalendarDates>(`/sessions/calendar/dates?year=${year}&month=${month}`)
+}
+
+export async function fetchCalendarDetail(date: string): Promise<CalendarDetail> {
+  return client.get<CalendarDetail>(`/sessions/calendar/${date}`)
+}

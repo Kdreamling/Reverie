@@ -1,13 +1,15 @@
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
 import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
 import { useAuthStore } from '../stores/authStore'
 import { updateSessionAPI } from '../api/sessions'
 import { uploadAttachment, type AttachmentInfo } from '../api/attachments'
-import type { MessageAttachment } from '../api/chat'
+import type { MessageAttachment, DreamEvent } from '../api/chat'
+import { fetchDreamEvents } from '../api/chat'
 import SettingsPanel from '../components/SettingsPanel'
+import EventBubble from '../components/EventBubble'
 import MessageItem from '../components/MessageItem'
 import StreamingMessage from '../components/StreamingMessage'
 import ArtifactPanel from '../components/artifact/ArtifactPanel'
@@ -21,6 +23,7 @@ function NavIcon({ type }: { type: string }) {
   if (type === 'scripts') return <svg {...s}><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M2 8h20" /><circle cx="8" cy="6" r="0.7" fill="currentColor" stroke="none" /><circle cx="11" cy="6" r="0.7" fill="currentColor" stroke="none" /><path d="M7 13l3 2-3 2" /><path d="M13 17h4" /></svg>
   if (type === 'reading') return <svg {...s}><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z" /><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" /></svg>
   if (type === 'graph') return <svg {...s}><circle cx="12" cy="5" r="2" /><circle cx="5" cy="19" r="2" /><circle cx="19" cy="19" r="2" /><path d="M12 7v4M7.5 17.5L11 13M16.5 17.5L13 13" /><circle cx="12" cy="12" r="1.5" /></svg>
+  if (type === 'calendar') return <svg {...s}><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /><circle cx="8" cy="14" r="1" fill="currentColor" stroke="none" /><circle cx="12" cy="14" r="1" fill="currentColor" stroke="none" /><circle cx="16" cy="14" r="1" fill="currentColor" stroke="none" /><circle cx="8" cy="18" r="1" fill="currentColor" stroke="none" /></svg>
   return null
 }
 
@@ -47,6 +50,7 @@ const NAV_ITEMS: { key: string; label: string; iconPath: string; enabled: boolea
   { key: 'scripts', label: '剧本世界', iconPath: '', enabled: true, badge: '3' }, // custom icon
   { key: 'reading', label: '共读', iconPath: 'M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z', enabled: true },
   { key: 'graph', label: '记忆图谱', iconPath: '', enabled: true }, // custom icon
+  { key: 'calendar', label: '回忆日历', iconPath: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z', enabled: true },
 ]
 
 const ACCEPTED_FILE_TYPES = 'image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,text/markdown,text/csv'
@@ -106,6 +110,8 @@ function WelcomeScreen() {
 export default function ChatPage() {
   const navigate = useNavigate()
   const { sessionId: urlSessionId } = useParams<{ sessionId?: string }>()
+  const [searchParams] = useSearchParams()
+  const fromCalendar = searchParams.get('from') === 'calendar'
   const { sessions, currentSession, loading, fetchSessions, createSession, selectSession, deleteSession, updateSessionModel } =
     useSessionStore()
   const { messages, isStreaming, loadMessages, sendMessage, clearMessages, deleteConversation, lastError, retryLast, clearError, stopStreaming } =
@@ -130,6 +136,7 @@ export default function ChatPage() {
   const itemSwipeRef = useRef<{ startX: number; startY: number; id: string; isSwiping: boolean } | null>(null)
   const itemSwipeActive = useRef(false)
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+  const [_dreamEvents, _setDreamEvents] = useState<DreamEvent[]>([])
   const [input, setInput] = useState('')
   const [isFocused, setIsFocused] = useState(false)
   const [attachments, setAttachments] = useState<PendingAttachment[]>([])
@@ -279,6 +286,18 @@ export default function ChatPage() {
     }
   }, [urlSessionId, sessions, currentSession?.id, selectSession])
 
+  // Poll Dream events every 30s
+  useEffect(() => {
+    if (!token) return
+    let active = true
+    const poll = () => {
+      fetchDreamEvents(8).then(evts => { if (active) _setDreamEvents(evts) }).catch(() => {})
+    }
+    poll()
+    const timer = setInterval(poll, 30000)
+    return () => { active = false; clearInterval(timer) }
+  }, [token])
+
   // Clean up swipe/rename state
   useEffect(() => {
     if (!sidebarOpen) { setSwipedId(null); setRenameModal(null) }
@@ -413,8 +432,8 @@ export default function ChatPage() {
         toastTimer.current = setTimeout(() => setToast(null), 2500)
         continue
       }
-      if (attachments.length + newAttachments.length >= 3) {
-        setToast('最多 3 个附件')
+      if (attachments.length + newAttachments.length >= 10) {
+        setToast('最多 10 个附件')
         if (toastTimer.current) clearTimeout(toastTimer.current)
         toastTimer.current = setTimeout(() => setToast(null), 2500)
         break
@@ -573,6 +592,9 @@ export default function ChatPage() {
                   } else if (n.key === 'scripts') {
                     setSidebarOpen(false)
                     navigate('/projects')
+                  } else if (n.key === 'calendar') {
+                    setSidebarOpen(false)
+                    navigate('/calendar')
                   }
                 }}
                 className="w-full flex items-center gap-3 transition-all duration-150"
@@ -800,13 +822,23 @@ export default function ChatPage() {
             zIndex: 30,
           }}
         >
-          <button
-            className="flex md:hidden items-center justify-center rounded-md cursor-pointer"
-            style={{ width: 32, height: 32, color: C.textSecondary, padding: 6 }}
-            onClick={() => { setSidebarOpen(true) }}
-          >
-            <Menu size={20} strokeWidth={1.8} />
-          </button>
+          {fromCalendar ? (
+            <button
+              className="flex items-center justify-center rounded-md cursor-pointer"
+              style={{ width: 32, height: 32, color: C.textSecondary, padding: 6, background: 'none', border: 'none', fontSize: 18 }}
+              onClick={() => navigate('/calendar')}
+            >
+              ←
+            </button>
+          ) : (
+            <button
+              className="flex md:hidden items-center justify-center rounded-md cursor-pointer"
+              style={{ width: 32, height: 32, color: C.textSecondary, padding: 6 }}
+              onClick={() => { setSidebarOpen(true) }}
+            >
+              <Menu size={20} strokeWidth={1.8} />
+            </button>
+          )}
           <div className="hidden md:block" style={{ width: 32 }} />
 
           {/* Center: model selector */}
@@ -901,22 +933,26 @@ export default function ChatPage() {
           ) : (
             <div className="mx-auto w-full px-4 md:px-6 pt-5" style={{ maxWidth: 720, paddingBottom: 16 }}>
 
-              {/* Completed messages — each item is memo'd */}
-              {Array.isArray(messages) && messages.map(msg => (
-                <MessageItem
-                  key={msg.id}
-                  msg={msg}
-                  modelLabel={msg.role === 'assistant' ? (MODELS.find(m => m.value === model)?.label ?? model) : undefined}
-                  isDebugOpen={_debugOpenMsgId === msg.id}
-                  isCopied={copiedMsgId === msg.id}
-                  onToggleDebug={() => {
-                    if (msg.debugInfo) setSheetDebugInfo(msg.debugInfo)
-                  }}
-                  onCopy={handleCopyMsg}
-                  onDelete={handleDeleteConv}
-                  onRetry={handleRetry}
-                />
-              ))}
+              {/* Completed messages + inline event bubbles */}
+              {Array.isArray(messages) && messages.map(msg =>
+                msg.role === 'event' ? (
+                  <EventBubble key={msg.id} content={msg.content} createdAt={msg.created_at} />
+                ) : (
+                  <MessageItem
+                    key={msg.id}
+                    msg={msg}
+                    modelLabel={msg.role === 'assistant' ? (MODELS.find(m => m.value === model)?.label ?? model) : undefined}
+                    isDebugOpen={_debugOpenMsgId === msg.id}
+                    isCopied={copiedMsgId === msg.id}
+                    onToggleDebug={() => {
+                      if (msg.debugInfo) setSheetDebugInfo(msg.debugInfo)
+                    }}
+                    onCopy={handleCopyMsg}
+                    onDelete={handleDeleteConv}
+                    onRetry={handleRetry}
+                  />
+                )
+              )}
 
               {/* Error / retry block */}
               {lastError && !isStreaming && (

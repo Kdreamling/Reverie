@@ -4,10 +4,11 @@ import ReactMarkdown from 'react-markdown'
 import type { DebugInfo } from '../api/chat'
 import { C } from '../theme'
 
-type Tab = 'memories' | 'search' | 'window' | 'summaries' | 'session_summary' | 'graph'
+type Tab = 'memories' | 'search' | 'window' | 'summaries' | 'session_summary' | 'session_memories' | 'graph'
 
 const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: 'memories', icon: '📌', label: '记忆' },
+  { key: 'session_memories', icon: '💾', label: '已存' },
   { key: 'search', icon: '🔍', label: '检索' },
   { key: 'window', icon: '💬', label: '历史' },
   { key: 'summaries', icon: '📝', label: '摘要' },
@@ -56,10 +57,12 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
   const usageRatio = token_usage.budget > 0 ? token_usage.total / token_usage.budget : 0
 
   const hasSessionSummary = debugInfo.session_summary?.exists ?? false
+  const sessionMemCount = debugInfo.session_memories?.length ?? 0
   const graphTotal = (debugInfo.graph?.seed_nodes?.length ?? 0) + (debugInfo.graph?.expanded_nodes?.length ?? 0)
 
   const counts: Record<Tab, number | string> = {
     memories: memCount,
+    session_memories: sessionMemCount,
     search: searchCount,
     window: windowRounds > 0 ? `${windowRounds}轮` : '0',
     summaries: summaryCount,
@@ -81,7 +84,7 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
       {activeTab === null ? (
         <div className="px-2.5 py-2.5 sm:px-3">
           <div className="flex flex-wrap gap-1.5 mb-2">
-            {TABS.filter(t => (t.key !== 'session_summary' || hasSessionSummary) && (t.key !== 'graph' || graphTotal > 0)).map(t => {
+            {TABS.filter(t => (t.key !== 'session_summary' || hasSessionSummary) && (t.key !== 'graph' || graphTotal > 0) && (t.key !== 'session_memories' || sessionMemCount > 0)).map(t => {
               const c = counts[t.key]
               const empty = c === 0 || c === '0'
               return (
@@ -138,6 +141,7 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
             style={{ maxHeight: 'min(60vh, 320px)', scrollbarWidth: 'thin', WebkitOverflowScrolling: 'touch' }}
           >
             {activeTab === 'memories' && <MemoryDetail debugInfo={debugInfo} />}
+            {activeTab === 'session_memories' && <SessionMemoriesDetail debugInfo={debugInfo} />}
             {activeTab === 'search' && <SearchDetail debugInfo={debugInfo} />}
             {activeTab === 'window' && <WindowDetail debugInfo={debugInfo} />}
             {activeTab === 'summaries' && <SummaryDetail debugInfo={debugInfo} />}
@@ -312,6 +316,41 @@ function SessionSummaryDetail({ debugInfo }: { debugInfo: DebugInfo }) {
       </span>
       <div className="leading-relaxed mt-1 md-content" style={{ color: C.text, wordBreak: 'break-word', fontSize: 12 }}><ReactMarkdown>{content}</ReactMarkdown></div>
     </div>
+  )
+}
+
+function SessionMemoriesDetail({ debugInfo }: { debugInfo: DebugInfo }) {
+  const items = debugInfo.session_memories ?? []
+  return (
+    <>
+      {items.map((m, i) => {
+        const lc = LAYER_COLORS.ai_journal
+        return (
+          <div
+            key={m.id}
+            className="rounded-lg px-2.5 py-2 text-xs"
+            style={{
+              background: 'rgba(255,255,255,0.6)',
+              border: `1px solid ${lc.dot}22`,
+            }}
+          >
+            <div className="flex flex-wrap items-center gap-1.5 mb-1">
+              <span
+                className="px-1.5 py-0.5 rounded text-xs font-medium"
+                style={{ background: lc.bg, color: lc.fg, fontSize: 10 }}
+              >
+                #{i + 1} {m.mem_type}
+              </span>
+              <span style={{ color: C.textMuted, fontSize: 10 }}>id: {m.id.slice(0, 8)}...</span>
+            </div>
+            <p className="leading-relaxed" style={{ color: C.text, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{m.content}</p>
+          </div>
+        )
+      })}
+      {items.length === 0 && (
+        <p className="text-xs py-2" style={{ color: C.textMuted }}>本次对话未记录记忆</p>
+      )}
+    </>
   )
 }
 

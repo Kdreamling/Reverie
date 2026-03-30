@@ -25,6 +25,7 @@ export interface DebugInfo {
   summaries: { dimension: string; content: string }[]
   token_usage: { budget: number; memories: number; search: number; summaries: number; total: number; graph?: number }
   session_summary?: { content: string; exists: boolean }
+  session_memories?: { id: string; content: string; mem_type: string }[]
   graph?: {
     seed_nodes: {
       id: string; content: string; category: string; similarity: number
@@ -49,7 +50,7 @@ export interface MessageAttachment {
 
 export interface ChatMessage {
   id: string
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'event'
   content: string
   thinking?: string | null
   thinking_summary?: string | null
@@ -80,6 +81,16 @@ export async function fetchMessagesAPI(sessionId: string): Promise<ChatMessage[]
 
 export async function deleteConversationAPI(sessionId: string, conversationId: string): Promise<void> {
   return client.delete(`/sessions/${sessionId}/messages/${conversationId}`)
+}
+
+export interface DreamEvent {
+  type: string
+  value: string | null
+  ts: string
+}
+
+export async function fetchDreamEvents(limit: number = 10): Promise<DreamEvent[]> {
+  return client.get<DreamEvent[]>(`/dream/events?limit=${limit}`)
 }
 
 export function streamChat(

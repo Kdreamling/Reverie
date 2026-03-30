@@ -119,7 +119,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
           cached_tokens?: number | null
           memory_ops?: string | null
           model?: string
+          scene_type?: string
           created_at: string
+        }
+        // Event messages (from Dream's device status)
+        if (r.scene_type === 'event' && r.user_msg) {
+          messages.push({
+            id: `${r.id}-event`,
+            role: 'event',
+            content: r.user_msg,
+            created_at: r.created_at,
+            conversationId: r.id,
+          })
+          continue
         }
         if (r.user_msg) {
           messages.push({
