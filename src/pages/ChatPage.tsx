@@ -112,7 +112,7 @@ export default function ChatPage() {
   const { sessionId: urlSessionId } = useParams<{ sessionId?: string }>()
   const [searchParams] = useSearchParams()
   const fromCalendar = searchParams.get('from') === 'calendar'
-  const { sessions, currentSession, loading, fetchSessions, createSession, selectSession, deleteSession, updateSessionModel } =
+  const { sessions, currentSession, loading, fetchSessions, ensureTodaySession, createSession, selectSession, deleteSession, updateSessionModel } =
     useSessionStore()
   const { messages, isStreaming, loadMessages, sendMessage, clearMessages, deleteConversation, lastError, retryLast, clearError, stopStreaming } =
     useChatStore()
@@ -276,8 +276,14 @@ export default function ChatPage() {
     el.style.height = Math.min(el.scrollHeight, 150) + 'px'
   }, [input, isFocused])
 
-  // Load sessions on mount
-  useEffect(() => { if (token) fetchSessions() }, [token, fetchSessions])
+  // Load sessions on mount + ensure today's daily session exists
+  useEffect(() => {
+    if (token) {
+      fetchSessions().then(() => {
+        if (!urlSessionId) ensureTodaySession()
+      })
+    }
+  }, [token, fetchSessions, ensureTodaySession, urlSessionId])
 
   // Auto-select session from URL param (e.g. from project chapters)
   useEffect(() => {

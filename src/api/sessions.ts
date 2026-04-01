@@ -22,6 +22,10 @@ export async function deleteSessionAPI(id: string): Promise<void> {
   return client.delete<void>(`/sessions/${id}`)
 }
 
+export async function fetchTodaySessionAPI(): Promise<Session> {
+  return client.get<Session>('/sessions/today')
+}
+
 export async function updateSessionAPI(
   id: string,
   data: Partial<Pick<Session, 'title' | 'model' | 'scene_type'>>,

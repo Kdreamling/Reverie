@@ -4,6 +4,7 @@ import {
   createSessionAPI,
   deleteSessionAPI,
   updateSessionAPI,
+  fetchTodaySessionAPI,
   type Session,
 } from '../api/sessions'
 
@@ -38,6 +39,7 @@ interface SessionState {
   loading: boolean
 
   fetchSessions: () => Promise<void>
+  ensureTodaySession: () => Promise<void>
   createSession: (scene_type: string, model: string) => Promise<Session>
   selectSession: (id: string) => void
   deleteSession: (id: string) => Promise<void>
@@ -59,6 +61,23 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       set({ sessions, loading: false })
     } catch {
       set({ loading: false })
+    }
+  },
+
+  async ensureTodaySession() {
+    try {
+      const todaySession = await fetchTodaySessionAPI()
+      const { sessions, currentSession } = get()
+      // 如果今天的 session 不在列表里，加进去
+      if (!sessions.find(s => s.id === todaySession.id)) {
+        set({ sessions: [todaySession, ...sessions] })
+      }
+      // 如果没有选中的 session，自动选中今天的
+      if (!currentSession) {
+        set({ currentSession: todaySession })
+      }
+    } catch (e) {
+      console.warn('[sessionStore] ensureTodaySession failed:', e)
     }
   },
 
