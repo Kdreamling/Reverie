@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown'
 import type { DebugInfo } from '../api/chat'
 import { C } from '../theme'
 
-type Tab = 'memories' | 'search' | 'window' | 'summaries' | 'session_summary' | 'session_memories' | 'graph'
+type Tab = 'memories' | 'search' | 'window' | 'summaries' | 'session_summary' | 'session_memories' | 'graph' | 'life_items' | 'events'
 
 const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: 'memories', icon: '📌', label: '记忆' },
@@ -14,6 +14,8 @@ const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: 'summaries', icon: '📝', label: '摘要' },
   { key: 'session_summary', icon: '📋', label: 'Session摘要' },
   { key: 'graph', icon: '🕸️', label: '图谱' },
+  { key: 'life_items', icon: '☑️', label: '待办' },
+  { key: 'events', icon: '📡', label: '感知' },
 ]
 
 const LAYER_COLORS: Record<string, { bg: string; fg: string; dot: string }> = {
@@ -59,6 +61,8 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
   const hasSessionSummary = debugInfo.session_summary?.exists ?? false
   const sessionMemCount = debugInfo.session_memories?.length ?? 0
   const graphTotal = (debugInfo.graph?.seed_nodes?.length ?? 0) + (debugInfo.graph?.expanded_nodes?.length ?? 0)
+  const lifeItemCount = debugInfo.life_items?.length ?? 0
+  const eventCount = debugInfo.events?.length ?? 0
 
   const counts: Record<Tab, number | string> = {
     memories: memCount,
@@ -68,6 +72,8 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
     summaries: summaryCount,
     session_summary: hasSessionSummary ? '有' : '无',
     graph: graphTotal,
+    life_items: lifeItemCount,
+    events: eventCount,
   }
 
   return (
@@ -84,7 +90,7 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
       {activeTab === null ? (
         <div className="px-2.5 py-2.5 sm:px-3">
           <div className="flex flex-wrap gap-1.5 mb-2">
-            {TABS.filter(t => (t.key !== 'session_summary' || hasSessionSummary) && (t.key !== 'graph' || graphTotal > 0) && (t.key !== 'session_memories' || sessionMemCount > 0)).map(t => {
+            {TABS.filter(t => (t.key !== 'session_summary' || hasSessionSummary) && (t.key !== 'graph' || graphTotal > 0) && (t.key !== 'session_memories' || sessionMemCount > 0) && (t.key !== 'life_items' || lifeItemCount > 0) && (t.key !== 'events' || eventCount > 0)).map(t => {
               const c = counts[t.key]
               const empty = c === 0 || c === '0'
               return (
@@ -147,6 +153,8 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
             {activeTab === 'summaries' && <SummaryDetail debugInfo={debugInfo} />}
             {activeTab === 'session_summary' && <SessionSummaryDetail debugInfo={debugInfo} />}
             {activeTab === 'graph' && <GraphDetail debugInfo={debugInfo} />}
+            {activeTab === 'life_items' && <LifeItemsDetail debugInfo={debugInfo} />}
+            {activeTab === 'events' && <EventsDetail debugInfo={debugInfo} />}
           </div>
         </div>
       )}
@@ -349,6 +357,86 @@ function SessionMemoriesDetail({ debugInfo }: { debugInfo: DebugInfo }) {
       })}
       {items.length === 0 && (
         <p className="text-xs py-2" style={{ color: C.textMuted }}>本次对话未记录记忆</p>
+      )}
+    </>
+  )
+}
+
+const PRIORITY_COLORS: Record<string, string> = {
+  urgent: '#D97757',
+  normal: '#A08060',
+  low: '#B8A898',
+}
+
+function LifeItemsDetail({ debugInfo }: { debugInfo: DebugInfo }) {
+  const items = debugInfo.life_items ?? []
+  return (
+    <>
+      {items.map((item, i) => (
+        <div
+          key={item.id || i}
+          className="rounded-lg px-2.5 py-2 text-xs"
+          style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${C.border}` }}
+        >
+          <div className="flex items-center gap-1.5 mb-1">
+            <span
+              className="px-1.5 py-0.5 rounded text-xs font-medium"
+              style={{ background: C.sidebarActive, color: C.accent, fontSize: 10 }}
+            >
+              {item.type === 'todo' ? '☐ 待办' : item.type === 'schedule' ? '📅 日程' : '📝 笔记'}
+            </span>
+            <span
+              className="px-1.5 py-0.5 rounded"
+              style={{
+                background: (PRIORITY_COLORS[item.priority] || PRIORITY_COLORS.normal) + '15',
+                color: PRIORITY_COLORS[item.priority] || PRIORITY_COLORS.normal,
+                fontSize: 10,
+              }}
+            >
+              {item.priority}
+            </span>
+            {(item.due_at || item.scheduled_at) && (
+              <span style={{ color: C.textMuted, fontSize: 10 }}>
+                {(item.scheduled_at || item.due_at || '').slice(0, 16)}
+              </span>
+            )}
+          </div>
+          <p style={{ color: C.text, wordBreak: 'break-word' }}>{item.content}</p>
+        </div>
+      ))}
+      {items.length === 0 && (
+        <p className="text-xs py-2" style={{ color: C.textMuted }}>无待办事项</p>
+      )}
+    </>
+  )
+}
+
+function EventsDetail({ debugInfo }: { debugInfo: DebugInfo }) {
+  const events = debugInfo.events ?? []
+  return (
+    <>
+      {events.map((ev, i) => (
+        <div
+          key={i}
+          className="rounded-lg px-2.5 py-2 text-xs"
+          style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${C.border}` }}
+        >
+          <div className="flex items-center gap-1.5">
+            <span style={{ color: C.accent, fontWeight: 600, fontSize: 11 }}>{ev.time}</span>
+            <span
+              className="px-1.5 py-0.5 rounded text-xs font-medium"
+              style={{ background: 'rgba(160,120,90,0.08)', color: '#A08060', fontSize: 10 }}
+            >
+              {ev.type}
+            </span>
+            {ev.value && (
+              <span style={{ color: C.textSecondary, fontSize: 11 }}>{ev.value}</span>
+            )}
+          </div>
+        </div>
+      ))}
+      {events.length === 0 && (
+        <p className="text-xs py-2" style={{ color: C.textMuted }}>无感知事件</p>
       )}
     </>
   )

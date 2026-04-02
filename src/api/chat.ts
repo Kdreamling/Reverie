@@ -37,6 +37,8 @@ export interface DebugInfo {
     }[]
     formatted_text?: string
   } | null
+  life_items?: { id: string; type: string; content: string; priority: string; due_at?: string; scheduled_at?: string }[]
+  events?: { type: string; value: string; time: string }[]
 }
 
 export interface MessageAttachment {
