@@ -16,6 +16,7 @@ const FLAG_META: FlagInfo[] = [
   { key: 'search_enabled', label: '语义检索', desc: '注入相关历史对话' },
   { key: 'memory_tool_enabled', label: 'AI 主动记忆', desc: 'AI 自主检索和保存记忆' },
   { key: 'graph_enabled', label: '记忆图谱', desc: '注入关联记忆的图谱脉络' },
+  { key: 'life_butler_enabled', label: '生活管家', desc: '待办/日程/习惯打卡工具' },
 ]
 
 interface Props {
