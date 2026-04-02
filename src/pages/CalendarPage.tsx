@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { C, FONT } from '../theme'
 import { fetchCalendarDates, fetchCalendarDetail, type CalendarSession } from '../api/sessions'
-import { fetchLifeItemsCalendar, fetchLifeItems, toggleLifeItemComplete, type LifeItem } from '../api/lifeItems'
+import { fetchLifeItemsCalendar, fetchLifeItems, toggleLifeItemComplete, fetchHabitsCalendar, type LifeItem, type HabitLog, type HabitInfo } from '../api/lifeItems'
 
 const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日']
 
@@ -40,11 +40,13 @@ export default function CalendarPage() {
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [dates, setDates] = useState<Record<string, CalendarSession[]>>({})
   const [lifeItemDates, setLifeItemDates] = useState<Record<string, LifeItem[]>>({})
+  const [habitLogs, setHabitLogs] = useState<Record<string, HabitLog[]>>({})
+  const [allHabits, setAllHabits] = useState<HabitInfo[]>([])
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [detail, setDetail] = useState<any>(null)
   const [dateLifeItems, setDateLifeItems] = useState<LifeItem[]>([])
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'chat' | 'life'>('chat')
+  const [activeTab, setActiveTab] = useState<'chat' | 'life' | 'habits'>('chat')
 
   // Fetch calendar data
   useEffect(() => {
@@ -52,6 +54,7 @@ export default function CalendarPage() {
     Promise.all([
       fetchCalendarDates(year, month).then(d => setDates(d.dates)).catch(() => setDates({})),
       fetchLifeItemsCalendar(year, month).then(d => setLifeItemDates(d.items)).catch(() => setLifeItemDates({})),
+      fetchHabitsCalendar(year, month).then(d => { setHabitLogs(d.logs); setAllHabits(d.habits) }).catch(() => { setHabitLogs({}); setAllHabits([]) }),
     ]).finally(() => setLoading(false))
   }, [year, month])
 
@@ -144,9 +147,11 @@ export default function CalendarPage() {
           const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
           const sessions = dates[dateStr]
           const items = lifeItemDates[dateStr]
+          const dayHabits = habitLogs[dateStr]
           const hasSessions = sessions && sessions.length > 0
           const hasItems = items && items.length > 0
-          const hasData = hasSessions || hasItems
+          const hasHabits = dayHabits && dayHabits.length > 0
+          const hasData = hasSessions || hasItems || hasHabits
           const isToday = dateStr === todayStr
           const isSelected = dateStr === selectedDate
 
@@ -172,18 +177,27 @@ export default function CalendarPage() {
             >
               {day}
               {hasData && (
-                <div style={{ display: 'flex', gap: 3, marginTop: 2 }}>
-                  {hasSessions && Array.from(new Set(sessions.map(s => s.scene_type))).slice(0, 2).map((scene, j) => (
-                    <div key={`s-${j}`} style={{
-                      width: 5, height: 5, borderRadius: '50%',
-                      background: scene === 'daily' ? C.accent : scene === 'reading' ? '#7A8A6A' : '#6A7A9A',
-                    }} />
-                  ))}
-                  {hasItems && (
-                    <div style={{
-                      width: 5, height: 5, borderRadius: '50%',
-                      background: pendingCount > 0 ? '#D97757' : '#7A9A70',
-                    }} />
+                <div style={{ display: 'flex', gap: 2, marginTop: 2, alignItems: 'center' }}>
+                  {hasHabits ? (
+                    // Show habit icons (unique, up to 3)
+                    Array.from(new Set(dayHabits.map(h => h.icon))).slice(0, 3).map((icon, j) => (
+                      <span key={`h-${j}`} style={{ fontSize: 8, lineHeight: 1 }}>{icon}</span>
+                    ))
+                  ) : (
+                    <>
+                      {hasSessions && Array.from(new Set(sessions.map(s => s.scene_type))).slice(0, 2).map((scene, j) => (
+                        <div key={`s-${j}`} style={{
+                          width: 5, height: 5, borderRadius: '50%',
+                          background: scene === 'daily' ? C.accent : scene === 'reading' ? '#7A8A6A' : '#6A7A9A',
+                        }} />
+                      ))}
+                      {hasItems && (
+                        <div style={{
+                          width: 5, height: 5, borderRadius: '50%',
+                          background: pendingCount > 0 ? '#D97757' : '#7A9A70',
+                        }} />
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -203,7 +217,8 @@ export default function CalendarPage() {
               {[
                 { key: 'chat' as const, label: '对话', count: detail?.sessions?.length ?? 0 },
                 { key: 'life' as const, label: '待办', count: dateLifeItems.length },
-              ].map(tab => (
+                { key: 'habits' as const, label: '打卡', count: habitLogs[selectedDate]?.length ?? 0 },
+              ].filter(t => t.count > 0 || t.key === 'chat').map(tab => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
@@ -272,6 +287,65 @@ export default function CalendarPage() {
                 </div>
               )}
             </>
+          )}
+
+          {/* Habits tab */}
+          {activeTab === 'habits' && selectedDate && (
+            (() => {
+              const dayLogs = habitLogs[selectedDate] || []
+              // Show all habits, mark which ones were logged today
+              const loggedNames = new Set(dayLogs.map(l => l.habit_name))
+              return dayLogs.length === 0 ? (
+                <div style={{ color: C.textMuted, fontSize: 13, textAlign: 'center', padding: 20 }}>这天没有打卡记录</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {dayLogs.map((log, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        background: 'rgba(255,255,255,0.7)',
+                        border: `1px solid ${C.border}`,
+                        borderRadius: 14,
+                        padding: '12px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                      }}
+                    >
+                      <span style={{ fontSize: 24 }}>{log.icon || '✅'}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>{log.habit_name}</div>
+                        {log.note && <div style={{ fontSize: 12, color: C.textSecondary, marginTop: 2 }}>{log.note}</div>}
+                        {log.value && <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{log.value}</div>}
+                      </div>
+                      <span style={{ fontSize: 10, color: '#7A9A70', fontWeight: 600 }}>已打卡</span>
+                    </div>
+                  ))}
+                  {/* Show unlogged habits */}
+                  {allHabits.filter(h => !loggedNames.has(h.name)).map(h => (
+                    <div
+                      key={h.id}
+                      style={{
+                        background: 'rgba(255,255,255,0.4)',
+                        border: `1px dashed ${C.border}`,
+                        borderRadius: 14,
+                        padding: '12px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        opacity: 0.5,
+                      }}
+                    >
+                      <span style={{ fontSize: 24, filter: 'grayscale(1)' }}>{h.icon || '⬜'}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: C.textMuted }}>{h.name}</div>
+                      </div>
+                      <span style={{ fontSize: 10, color: C.textMuted }}>未打卡</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()
           )}
 
           {/* Life items tab */}

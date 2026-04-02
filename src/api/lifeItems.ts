@@ -35,3 +35,28 @@ export async function fetchLifeItems(date?: string, status?: string): Promise<{ 
 export async function toggleLifeItemComplete(itemId: string): Promise<LifeItem> {
   return client.post<LifeItem>(`/sessions/life-items/${itemId}/complete`, {})
 }
+
+// Habits
+export interface HabitInfo {
+  id: string
+  name: string
+  icon: string
+}
+
+export interface HabitLog {
+  habit_name: string
+  icon: string
+  value?: string
+  note?: string
+}
+
+export interface HabitsCalendar {
+  year: number
+  month: number
+  habits: HabitInfo[]
+  logs: Record<string, HabitLog[]>
+}
+
+export async function fetchHabitsCalendar(year: number, month: number): Promise<HabitsCalendar> {
+  return client.get<HabitsCalendar>(`/sessions/habits/calendar?year=${year}&month=${month}`)
+}
