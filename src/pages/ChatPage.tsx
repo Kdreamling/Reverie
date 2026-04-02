@@ -14,6 +14,7 @@ import MessageItem from '../components/MessageItem'
 import StreamingMessage from '../components/StreamingMessage'
 import ArtifactPanel from '../components/artifact/ArtifactPanel'
 import MemorySheetPanel from '../components/MemorySheetPanel'
+import PushNotification from '../components/PushNotification'
 import { C, getModelColor } from '../theme'
 
 // Nav icons as inline SVGs
@@ -545,6 +546,13 @@ export default function ChatPage() {
 
   return (
     <div className="flex overflow-hidden" style={{ background: C.bg, height: '100%', overscrollBehavior: 'none' }}>
+
+      {/* ── Push notification banner ── */}
+      <PushNotification onTap={() => {
+        // Navigate to today's session
+        const todaySession = sessions.find(s => s.scene_type === 'daily')
+        if (todaySession) selectSession(todaySession.id)
+      }} />
 
       {/* ── Sidebar overlay ── */}
       {sidebarOpen && (
