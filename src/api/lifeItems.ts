@@ -60,3 +60,7 @@ export interface HabitsCalendar {
 export async function fetchHabitsCalendar(year: number, month: number): Promise<HabitsCalendar> {
   return client.get<HabitsCalendar>(`/sessions/habits/calendar?year=${year}&month=${month}`)
 }
+
+export async function logHabitAPI(habitId: string): Promise<any> {
+  return client.post(`/sessions/habits/${habitId}/log`, {})
+}

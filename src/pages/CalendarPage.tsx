@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { C, FONT } from '../theme'
 import { fetchCalendarDates, fetchCalendarDetail, type CalendarSession } from '../api/sessions'
-import { fetchLifeItemsCalendar, fetchLifeItems, toggleLifeItemComplete, fetchHabitsCalendar, type LifeItem, type HabitLog, type HabitInfo } from '../api/lifeItems'
+import { fetchLifeItemsCalendar, fetchLifeItems, toggleLifeItemComplete, fetchHabitsCalendar, logHabitAPI, type LifeItem, type HabitLog, type HabitInfo } from '../api/lifeItems'
 
 const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日']
 
@@ -217,8 +217,8 @@ export default function CalendarPage() {
               {[
                 { key: 'chat' as const, label: '对话', count: detail?.sessions?.length ?? 0 },
                 { key: 'life' as const, label: '待办', count: dateLifeItems.length },
-                { key: 'habits' as const, label: '打卡', count: habitLogs[selectedDate]?.length ?? 0 },
-              ].filter(t => t.count > 0 || t.key === 'chat').map(tab => (
+                { key: 'habits' as const, label: '打卡', count: habitLogs[selectedDate]?.length ?? 0, alwaysShow: selectedDate === todayStr && allHabits.length > 0 },
+              ].filter(t => t.count > 0 || t.key === 'chat' || ('alwaysShow' in t && t.alwaysShow)).map(tab => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
@@ -293,12 +293,25 @@ export default function CalendarPage() {
           {activeTab === 'habits' && selectedDate && (
             (() => {
               const dayLogs = habitLogs[selectedDate] || []
-              // Show all habits, mark which ones were logged today
               const loggedNames = new Set(dayLogs.map(l => l.habit_name))
-              return dayLogs.length === 0 ? (
-                <div style={{ color: C.textMuted, fontSize: 13, textAlign: 'center', padding: 20 }}>这天没有打卡记录</div>
-              ) : (
+              const isToday = selectedDate === todayStr
+              const unlogged = allHabits.filter(h => !loggedNames.has(h.name))
+
+              const handleLogHabit = async (habitId: string) => {
+                try {
+                  await logHabitAPI(habitId)
+                  // Refresh habits
+                  const d = await fetchHabitsCalendar(year, month)
+                  setHabitLogs(d.logs)
+                  setAllHabits(d.habits)
+                } catch (e) {
+                  console.error('Failed to log habit:', e)
+                }
+              }
+
+              return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {/* Logged habits */}
                   {dayLogs.map((log, i) => (
                     <div
                       key={i}
@@ -321,28 +334,50 @@ export default function CalendarPage() {
                       <span style={{ fontSize: 10, color: '#7A9A70', fontWeight: 600 }}>已打卡</span>
                     </div>
                   ))}
-                  {/* Show unlogged habits */}
-                  {allHabits.filter(h => !loggedNames.has(h.name)).map(h => (
+                  {/* Unlogged habits */}
+                  {unlogged.map(h => (
                     <div
                       key={h.id}
                       style={{
-                        background: 'rgba(255,255,255,0.4)',
+                        background: isToday ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.3)',
                         border: `1px dashed ${C.border}`,
                         borderRadius: 14,
                         padding: '12px 16px',
                         display: 'flex',
                         alignItems: 'center',
                         gap: 12,
-                        opacity: 0.5,
+                        opacity: isToday ? 0.8 : 0.5,
                       }}
                     >
-                      <span style={{ fontSize: 24, filter: 'grayscale(1)' }}>{h.icon || '⬜'}</span>
+                      <span style={{ fontSize: 24, filter: isToday ? 'none' : 'grayscale(1)' }}>{h.icon || '⬜'}</span>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 14, fontWeight: 500, color: C.textMuted }}>{h.name}</div>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: isToday ? C.text : C.textMuted }}>{h.name}</div>
                       </div>
-                      <span style={{ fontSize: 10, color: C.textMuted }}>未打卡</span>
+                      {isToday ? (
+                        <button
+                          onClick={() => handleLogHabit(h.id)}
+                          style={{
+                            padding: '4px 12px',
+                            borderRadius: 20,
+                            border: `1px solid ${C.accent}`,
+                            background: 'transparent',
+                            color: C.accent,
+                            fontSize: 11,
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          打卡
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: 10, color: C.textMuted }}>未打卡</span>
+                      )}
                     </div>
                   ))}
+                  {dayLogs.length === 0 && unlogged.length === 0 && (
+                    <div style={{ color: C.textMuted, fontSize: 13, textAlign: 'center', padding: 20 }}>没有习惯记录</div>
+                  )}
                 </div>
               )
             })()
