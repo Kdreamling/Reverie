@@ -303,12 +303,14 @@ export default function ChatPage() {
     el.style.height = Math.min(el.scrollHeight, 150) + 'px'
   }, [input, isFocused])
 
-  // Load sessions on mount + ensure today's daily session exists
+  // Load sessions on mount + ensure today's daily session exists + subscribe to push
   useEffect(() => {
     if (token) {
       fetchSessions().then(() => {
         if (!urlSessionId) ensureTodaySession()
       })
+      // Subscribe to push notifications (async, non-blocking)
+      import('../api/pushSubscription').then(m => m.subscribeToPush()).catch(() => {})
     }
   }, [token, fetchSessions, ensureTodaySession, urlSessionId])
 
