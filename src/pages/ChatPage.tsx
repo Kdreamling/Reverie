@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
-import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square } from 'lucide-react'
+import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square, MapPin } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
@@ -120,7 +120,7 @@ export default function ChatPage() {
 
   const model = currentSession?.model ?? MODELS[0].value
   const [showSettings, setShowSettings] = useState(false)
-  const [settingsPage, setSettingsPage] = useState<'menu' | 'memory' | 'features'>('menu')
+  const [settingsPage, setSettingsPage] = useState<'menu' | 'memory' | 'features' | 'prompt'>('menu')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [activeNav, setActiveNav] = useState('chats')
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -152,6 +152,32 @@ export default function ChatPage() {
   const sceneRef = useRef<HTMLDivElement>(null)
   const swipeStartX = useRef<number | null>(null)
   const swipeStartY = useRef<number | null>(null)
+  const [locating, setLocating] = useState(false)
+
+  function handleShareLocation() {
+    if (!navigator.geolocation) {
+      setToast('浏览器不支持定位')
+      return
+    }
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { longitude, latitude } = pos.coords
+        // 高德用 经度,纬度 格式
+        const locText = `[📍 我的位置: ${longitude.toFixed(6)},${latitude.toFixed(6)}]`
+        setInput(prev => prev ? `${prev} ${locText}` : locText)
+        setLocating(false)
+      },
+      (err) => {
+        setLocating(false)
+        const msgs: Record<number, string> = { 1: '定位权限被拒绝', 2: '无法获取位置', 3: '定位超时' }
+        setToast(msgs[err.code] || '定位失败')
+        if (toastTimer.current) clearTimeout(toastTimer.current)
+        toastTimer.current = setTimeout(() => setToast(null), 2500)
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
 
   // ─── Stable callbacks for MessageItem (prevent re-renders) ───
   const handleCopyMsg = useCallback(async (msgId: string, content: string) => {
@@ -1098,6 +1124,18 @@ export default function ChatPage() {
                   className="flex-1 resize-none bg-transparent text-sm outline-none leading-relaxed disabled:opacity-40"
                   style={{ color: C.text, minHeight: 24, maxHeight: 120, overflowY: 'auto', scrollbarWidth: 'none' }}
                 />
+                {/* Location button */}
+                <button
+                  onClick={handleShareLocation}
+                  disabled={isStreaming || locating || !currentSession}
+                  className="flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                  style={{ width: 30, height: 30, color: locating ? C.accent : C.textMuted }}
+                  onMouseEnter={e => { if (!isStreaming) e.currentTarget.style.color = C.accent }}
+                  onMouseLeave={e => { if (!locating) e.currentTarget.style.color = C.textMuted }}
+                  title="分享位置"
+                >
+                  {locating ? <Loader2 size={15} className="animate-spin" /> : <MapPin size={15} strokeWidth={1.8} />}
+                </button>
                 {isStreaming ? (
                   <button
                     onClick={stopStreaming}

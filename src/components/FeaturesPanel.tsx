@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ChevronLeft, RefreshCw } from 'lucide-react'
 import { client } from '../api/client'
+import { C } from '../theme'
 
 interface FlagInfo {
   key: string
@@ -14,7 +15,7 @@ const FLAG_META: FlagInfo[] = [
   { key: 'micro_summary_enabled', label: '自动记忆', desc: '对话后自动提取新记忆' },
   { key: 'search_enabled', label: '语义检索', desc: '注入相关历史对话' },
   { key: 'memory_tool_enabled', label: 'AI 主动记忆', desc: 'AI 自主检索和保存记忆' },
-  { key: 'list_tool_enabled', label: '记忆列表工具', desc: 'AI 可浏览和批量管理记忆' },
+  { key: 'graph_enabled', label: '记忆图谱', desc: '注入关联记忆的图谱脉络' },
 ]
 
 interface Props {
@@ -54,10 +55,8 @@ export default function FeaturesPanel({ onBack }: Props) {
   return (
     <div
       className="flex flex-col h-full"
-      style={{ background: '#fafbfd', color: '#1a1f2e' }}
+      style={{ background: C.bg, color: C.text }}
     >
-      <style>{`@media (min-width: 768px) { .features-root { background: #0a1a3a !important; color: #c8d4e8 !important; } }`}</style>
-
       {/* Header */}
       <button
         onClick={onBack}
@@ -65,16 +64,16 @@ export default function FeaturesPanel({ onBack }: Props) {
         style={{
           paddingTop: 'calc(16px + env(safe-area-inset-top))',
           paddingBottom: 16,
-          borderBottom: '1px solid #e8ecf5',
+          borderBottom: `1px solid ${C.border}`,
         }}
       >
-        <ChevronLeft size={18} strokeWidth={1.8} style={{ color: '#7a8399' }} />
+        <ChevronLeft size={18} strokeWidth={1.8} style={{ color: C.textSecondary }} />
         <span className="text-base md:text-sm font-medium select-none">Features</span>
       </button>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {loading ? (
-          <div className="flex items-center gap-2 text-sm" style={{ color: '#9aa3b8' }}>
+          <div className="flex items-center gap-2 text-sm" style={{ color: C.textMuted }}>
             <RefreshCw size={14} className="animate-spin" />
             加载中…
           </div>
@@ -89,7 +88,7 @@ export default function FeaturesPanel({ onBack }: Props) {
                   onClick={() => toggle(key)}
                   disabled={isSaving}
                   className="flex items-center gap-4 w-full px-4 py-4 md:py-3 rounded-xl md:rounded-lg transition-colors duration-150 cursor-pointer text-left disabled:opacity-60"
-                  style={{ background: '#fff', border: '1px solid #e8ecf5' }}
+                  style={{ background: C.sidebarBg, border: `1px solid ${C.border}` }}
                 >
                   {/* Toggle */}
                   <div
@@ -97,7 +96,7 @@ export default function FeaturesPanel({ onBack }: Props) {
                     style={{
                       width: 44,
                       height: 24,
-                      background: enabled ? '#002FA7' : '#d0d5e0',
+                      background: enabled ? C.accent : C.textMuted,
                     }}
                   >
                     <div
@@ -113,8 +112,8 @@ export default function FeaturesPanel({ onBack }: Props) {
                   </div>
                   {/* Text */}
                   <div className="min-w-0">
-                    <p className="text-sm font-medium" style={{ color: '#1a1f2e' }}>{label}</p>
-                    <p className="text-xs mt-0.5" style={{ color: '#9aa3b8' }}>{desc}</p>
+                    <p className="text-sm font-medium" style={{ color: C.text }}>{label}</p>
+                    <p className="text-xs mt-0.5" style={{ color: C.textSecondary }}>{desc}</p>
                   </div>
                 </button>
               )
@@ -123,10 +122,10 @@ export default function FeaturesPanel({ onBack }: Props) {
         )}
 
         {error && (
-          <p className="mt-3 text-xs px-1" style={{ color: '#c05050' }}>{error}</p>
+          <p className="mt-3 text-xs px-1" style={{ color: C.errorText }}>{error}</p>
         )}
 
-        <p className="mt-4 text-xs px-1" style={{ color: '#b0b8c8' }}>
+        <p className="mt-4 text-xs px-1" style={{ color: C.textMuted }}>
           修改立即生效，服务器重启后恢复默认值。
         </p>
       </div>

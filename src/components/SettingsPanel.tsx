@@ -1,12 +1,14 @@
 import { useRef, useState } from 'react'
-import { ChevronLeft, Brain, Settings, LogOut, Camera, Download } from 'lucide-react'
+import { ChevronLeft, Brain, Settings, LogOut, Camera, Download, FileText } from 'lucide-react'
+import { C } from '../theme'
 import { useAuthStore } from '../stores/authStore'
 import { useSessionStore } from '../stores/sessionStore'
 import { exportSession, downloadText } from '../api/export'
 import MemoryPanel from './MemoryPanel'
 import FeaturesPanel from './FeaturesPanel'
+import PromptPanel from './PromptPanel'
 
-type Page = 'menu' | 'memory' | 'features'
+type Page = 'menu' | 'memory' | 'features' | 'prompt'
 
 interface Props {
   page: Page
@@ -121,7 +123,7 @@ function ExportButton({ format }: { format: 'json' | 'md' }) {
       onClick={handleExport}
       disabled={loading || !currentSession}
       className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer disabled:opacity-40"
-      style={{ border: '1px solid #e8ecf5', color: '#5a6a8a' }}
+      style={{ border: `1px solid ${C.border}`, color: C.textSecondary }}
     >
       <Download size={13} />
       {loading ? '导出中...' : format === 'md' ? '导出 Markdown' : '导出 JSON'}
@@ -135,6 +137,7 @@ export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
   const menuItems = [
     { key: 'memory' as Page, icon: Brain, label: 'Memory', desc: '查看和管理记忆' },
     { key: 'features' as Page, icon: Settings, label: 'Features', desc: '功能开关' },
+    { key: 'prompt' as Page, icon: FileText, label: 'Prompt', desc: '编辑晨的提示词' },
   ]
 
   if (page === 'memory') {
@@ -153,10 +156,18 @@ export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
     )
   }
 
+  if (page === 'prompt') {
+    return (
+      <div className="fixed md:absolute inset-0 z-50 md:z-10">
+        <PromptPanel onBack={() => onPageChange('menu')} />
+      </div>
+    )
+  }
+
   return (
     <div
       className="fixed md:absolute inset-0 flex flex-col z-50 md:z-10"
-      style={{ background: '#fafbfd', color: '#1a1f2e' }}
+      style={{ background: C.bg, color: C.text }}
     >
       {/* Header */}
       <button
@@ -165,10 +176,10 @@ export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
         style={{
           paddingTop: 'calc(16px + env(safe-area-inset-top))',
           paddingBottom: 16,
-          borderBottom: '1px solid #e8ecf5',
+          borderBottom: `1px solid ${C.border}`,
         }}
       >
-        <ChevronLeft size={18} strokeWidth={1.8} style={{ color: '#7a8399' }} />
+        <ChevronLeft size={18} strokeWidth={1.8} style={{ color: C.textSecondary }} />
         <span className="text-base md:text-sm font-medium select-none" style={{ letterSpacing: '0.05em' }}>
           Settings
         </span>
@@ -176,18 +187,18 @@ export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
 
       <div className="flex-1 overflow-y-auto">
         {/* Avatar section */}
-        <div className="px-5 md:px-4 py-5" style={{ borderBottom: '1px solid #e8ecf5' }}>
-          <p className="text-xs font-medium uppercase tracking-wider mb-4" style={{ color: '#9aa3b8' }}>头像</p>
+        <div className="px-5 md:px-4 py-5" style={{ borderBottom: `1px solid ${C.border}` }}>
+          <p className="text-xs font-medium uppercase tracking-wider mb-4" style={{ color: C.textMuted }}>头像</p>
           <div className="flex flex-col gap-5">
             <AvatarEditor
               label="Dream"
               storageKey="avatar_dream"
-              fallback={<span className="text-lg font-semibold" style={{ color: '#002FA7' }}>D</span>}
+              fallback={<span className="text-lg font-semibold" style={{ color: C.accent }}>D</span>}
             />
             <AvatarEditor
               label="Claude"
               storageKey="avatar_claude"
-              fallback={<span style={{ color: '#002FA7', fontSize: 20 }}>✦</span>}
+              fallback={<span style={{ color: C.accent, fontSize: 20 }}>✦</span>}
             />
           </div>
         </div>
@@ -200,28 +211,28 @@ export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
               onClick={() => onPageChange(item.key)}
               className="flex items-center gap-4 md:gap-3 w-full px-4 md:px-3 py-4 md:py-3 rounded-xl md:rounded-lg transition-colors duration-150 cursor-pointer text-left mb-1"
               style={{ background: 'transparent' }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,47,167,0.04)')}
+              onMouseEnter={e => (e.currentTarget.style.background = C.sidebarActive)}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
               <div
                 className="flex items-center justify-center rounded-xl"
-                style={{ width: 40, height: 40, background: '#eef1f8', flexShrink: 0 }}
+                style={{ width: 40, height: 40, background: C.surface, flexShrink: 0 }}
               >
-                <item.icon size={18} strokeWidth={1.5} style={{ color: '#002FA7' }} />
+                <item.icon size={18} strokeWidth={1.5} style={{ color: C.accent }} />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-medium" style={{ color: '#1a1f2e' }}>{item.label}</p>
-                <p className="text-xs mt-0.5" style={{ color: '#9aa3b8' }}>{item.desc}</p>
+                <p className="text-sm font-medium" style={{ color: C.text }}>{item.label}</p>
+                <p className="text-xs mt-0.5" style={{ color: C.textSecondary }}>{item.desc}</p>
               </div>
-              <ChevronLeft size={14} strokeWidth={2} style={{ color: '#c0c8d8', transform: 'rotate(180deg)', marginLeft: 'auto', flexShrink: 0 }} />
+              <ChevronLeft size={14} strokeWidth={2} style={{ color: C.textMuted, transform: 'rotate(180deg)', marginLeft: 'auto', flexShrink: 0 }} />
             </button>
           ))}
         </nav>
       </div>
 
       {/* Export */}
-      <div className="px-5 md:px-4 py-4" style={{ borderTop: '1px solid #e8ecf5' }}>
-        <p className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: '#9aa3b8' }}>导出</p>
+      <div className="px-5 md:px-4 py-4" style={{ borderTop: `1px solid ${C.border}` }}>
+        <p className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: C.textMuted }}>导出</p>
         <div className="flex gap-2">
           <ExportButton format="json" />
           <ExportButton format="md" />
@@ -229,11 +240,11 @@ export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
       </div>
 
       {/* Logout */}
-      <div style={{ borderTop: '1px solid #e8ecf5', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div style={{ borderTop: `1px solid ${C.border}`, paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <button
           onClick={() => { logout() }}
           className="flex items-center gap-3 w-full px-5 py-4 text-sm transition-colors duration-150 cursor-pointer"
-          style={{ color: '#c05050' }}
+          style={{ color: C.errorText }}
         >
           <LogOut size={15} strokeWidth={1.6} />
           <span>退出登录</span>
