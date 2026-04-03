@@ -54,7 +54,7 @@ const NAV_ITEMS: { key: string; label: string; iconPath: string; enabled: boolea
   { key: 'calendar', label: '回忆日历', iconPath: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z', enabled: true },
 ]
 
-const ACCEPTED_FILE_TYPES = 'image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,text/markdown,text/csv'
+const ACCEPTED_FILE_TYPES = 'image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,text/markdown,text/csv,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,.docx,.doc,.xlsx,.xls'
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 const CLAUDE_MODELS = ['claude', 'opus', 'sonnet', 'dzzi', '按量']
 
