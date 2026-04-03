@@ -74,6 +74,18 @@ body { touch-action: none; }
 .md-content tr:nth-child(even) { background: rgba(160,120,90,0.03); }
 .md-content del { color: #B8A898; }
 
+/* ── Dashboard scroll override ─────────────────────────────────────────────── */
+html.dashboard-active,
+html.dashboard-active body,
+html.dashboard-active #root {
+  position: static !important;
+  overflow: auto !important;
+  touch-action: auto !important;
+}
+html.dashboard-active #root::after {
+  display: none !important;
+}
+
 /* ── Gradient fade border ───────────────────────────────────────────────────── */
 .chat-header {
   position: relative;

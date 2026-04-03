@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown'
 import type { DebugInfo } from '../api/chat'
 import { C } from '../theme'
 
-type Tab = 'memories' | 'search' | 'window' | 'summaries' | 'session_summary' | 'session_memories' | 'graph' | 'life_items' | 'events'
+type Tab = 'memories' | 'search' | 'window' | 'summaries' | 'session_summary' | 'session_memories' | 'graph' | 'life_items' | 'events' | 'keepalive'
 
 const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: 'memories', icon: '📌', label: '记忆' },
@@ -16,6 +16,7 @@ const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: 'graph', icon: '🕸️', label: '图谱' },
   { key: 'life_items', icon: '☑️', label: '待办' },
   { key: 'events', icon: '📡', label: '感知' },
+  { key: 'keepalive', icon: '🌙', label: '自由活动' },
 ]
 
 const LAYER_COLORS: Record<string, { bg: string; fg: string; dot: string }> = {
@@ -63,6 +64,7 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
   const graphTotal = (debugInfo.graph?.seed_nodes?.length ?? 0) + (debugInfo.graph?.expanded_nodes?.length ?? 0)
   const lifeItemCount = debugInfo.life_items?.length ?? 0
   const eventCount = debugInfo.events?.length ?? 0
+  const keepaliveCount = debugInfo.keepalive?.length ?? 0
 
   const counts: Record<Tab, number | string> = {
     memories: memCount,
@@ -74,6 +76,7 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
     graph: graphTotal,
     life_items: lifeItemCount,
     events: eventCount,
+    keepalive: keepaliveCount,
   }
 
   return (
@@ -90,7 +93,7 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
       {activeTab === null ? (
         <div className="px-2.5 py-2.5 sm:px-3">
           <div className="flex flex-wrap gap-1.5 mb-2">
-            {TABS.filter(t => (t.key !== 'session_summary' || hasSessionSummary) && (t.key !== 'graph' || graphTotal > 0) && (t.key !== 'session_memories' || sessionMemCount > 0) && (t.key !== 'life_items' || lifeItemCount > 0) && (t.key !== 'events' || eventCount > 0)).map(t => {
+            {TABS.filter(t => (t.key !== 'session_summary' || hasSessionSummary) && (t.key !== 'graph' || graphTotal > 0) && (t.key !== 'session_memories' || sessionMemCount > 0) && (t.key !== 'life_items' || lifeItemCount > 0) && (t.key !== 'events' || eventCount > 0) && (t.key !== 'keepalive' || keepaliveCount > 0)).map(t => {
               const c = counts[t.key]
               const empty = c === 0 || c === '0'
               return (
@@ -155,6 +158,7 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
             {activeTab === 'graph' && <GraphDetail debugInfo={debugInfo} />}
             {activeTab === 'life_items' && <LifeItemsDetail debugInfo={debugInfo} />}
             {activeTab === 'events' && <EventsDetail debugInfo={debugInfo} />}
+            {activeTab === 'keepalive' && <KeepaliveDetail debugInfo={debugInfo} />}
           </div>
         </div>
       )}
@@ -524,5 +528,28 @@ function GraphDetail({ debugInfo }: { debugInfo: DebugInfo }) {
         </div>
       )}
     </>
+  )
+}
+
+function KeepaliveDetail({ debugInfo }: { debugInfo: DebugInfo }) {
+  const items = debugInfo.keepalive || []
+  if (items.length === 0) return <p className="text-xs" style={{ color: C.textMuted }}>无自由活动记录</p>
+  const actionLabels: Record<string, string> = { none: '安静等待', message: '发了消息', explore: '探索记忆' }
+  return (
+    <div className="flex flex-col gap-2">
+      {items.map((ka, i) => (
+        <div key={i} className="rounded-lg p-2.5" style={{ background: C.memoryBg, border: `1px solid ${C.border}` }}>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-mono" style={{ color: C.accent }}>{ka.time}</span>
+            <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: C.surface, color: C.textSecondary, fontSize: 10 }}>{ka.mode}</span>
+            <span className="text-xs" style={{ color: ka.action === 'message' ? C.accent : ka.action === 'explore' ? '#7A9A70' : C.textMuted }}>
+              {actionLabels[ka.action] || ka.action}
+            </span>
+          </div>
+          {ka.thoughts && <p className="text-xs leading-relaxed mt-1" style={{ color: C.textSecondary, fontStyle: 'italic' }}>{ka.thoughts}</p>}
+          {ka.content && <p className="text-xs leading-relaxed mt-1" style={{ color: ka.action === 'message' ? C.accent : '#7A9A70' }}>{ka.content}</p>}
+        </div>
+      ))}
+    </div>
   )
 }

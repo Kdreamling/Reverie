@@ -39,6 +39,7 @@ export interface DebugInfo {
   } | null
   life_items?: { id: string; type: string; content: string; priority: string; due_at?: string; scheduled_at?: string }[]
   events?: { type: string; value: string; time: string }[]
+  keepalive?: { time: string; mode: string; thoughts: string; action: string; content: string }[]
 }
 
 export interface MessageAttachment {
