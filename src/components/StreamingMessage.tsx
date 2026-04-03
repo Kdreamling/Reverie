@@ -5,6 +5,7 @@ import { useChatStore, type StreamBlock } from '../stores/chatStore'
 import type { MemoryOperation } from '../api/chat'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
+import remarkGfm from 'remark-gfm'
 import { C } from '../theme'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -105,7 +106,7 @@ function StreamingTextBlock({ text }: { text: string }) {
   return (
     <div>
       <div className="md-content">
-        <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
           {displayText}
         </ReactMarkdown>
       </div>
