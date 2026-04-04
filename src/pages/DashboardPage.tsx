@@ -336,11 +336,11 @@ export default function DashboardPage() {
   const [habitLogs, setHabitLogs] = useState<Record<string, HabitLog[]>>({})
   const [allHabits, setAllHabits] = useState<HabitInfo[]>([])
 
-  // Calendar month navigation
-  const now = new Date()
-  const [calYear, setCalYear] = useState(now.getFullYear())
-  const [calMonth, setCalMonth] = useState(now.getMonth() + 1)
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  // Calendar month navigation — 强制用北京时间（Dream 手机是美区时区）
+  const bjNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }))
+  const [calYear, setCalYear] = useState(bjNow.getFullYear())
+  const [calMonth, setCalMonth] = useState(bjNow.getMonth() + 1)
+  const todayStr = `${bjNow.getFullYear()}-${String(bjNow.getMonth() + 1).padStart(2, '0')}-${String(bjNow.getDate()).padStart(2, '0')}`
 
   // Load stats on mount
   useEffect(() => {
@@ -356,9 +356,10 @@ export default function DashboardPage() {
         setWeekStats(week)
         setMonthStats(month)
         setCalendarData(cal)
-        // Auto-select today
-        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-        setSelectedDate(todayStr)
+        // Auto-select today (北京时间)
+        const bj = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }))
+        const todayBj = `${bj.getFullYear()}-${String(bj.getMonth() + 1).padStart(2, '0')}-${String(bj.getDate()).padStart(2, '0')}`
+        setSelectedDate(todayBj)
       } catch (e) {
         console.error('[dashboard] load failed:', e)
       } finally {
