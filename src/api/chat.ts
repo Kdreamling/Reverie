@@ -40,6 +40,19 @@ export interface DebugInfo {
   life_items?: { id: string; type: string; content: string; priority: string; due_at?: string; scheduled_at?: string }[]
   events?: { type: string; value: string; time: string }[]
   keepalive?: { time: string; mode: string; thoughts: string; action: string; content: string }[]
+  system_config?: {
+    history_budget: number
+    history_fetch_limit: number
+    rerank_threshold: number
+    dedup_threshold: number
+    micro_summary_model: string
+    graph_enabled: boolean
+  }
+  last_micro_summary?: {
+    content: string
+    layer: string
+    time: string
+  }
 }
 
 export interface MessageAttachment {

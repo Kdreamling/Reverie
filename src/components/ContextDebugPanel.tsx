@@ -4,16 +4,17 @@ import ReactMarkdown from 'react-markdown'
 import type { DebugInfo } from '../api/chat'
 import { C } from '../theme'
 
-type Tab = 'memories' | 'search' | 'window' | 'summaries' | 'session_summary' | 'session_memories' | 'graph' | 'life_items' | 'events' | 'keepalive'
+type Tab = 'memories' | 'search' | 'window' | 'summaries' | 'session_summary' | 'session_memories' | 'graph' | 'life_items' | 'events' | 'keepalive' | 'system'
 
 const TABS: { key: Tab; icon: string; label: string }[] = [
+  { key: 'system', icon: 'S', label: '系统' },
   { key: 'memories', icon: '📌', label: '记忆' },
   { key: 'session_memories', icon: '💾', label: '已存' },
   { key: 'search', icon: '🔍', label: '检索' },
   { key: 'window', icon: '💬', label: '历史' },
   { key: 'summaries', icon: '📝', label: '摘要' },
   { key: 'session_summary', icon: '📋', label: 'Session摘要' },
-  { key: 'graph', icon: '🕸️', label: '图谱' },
+  { key: 'graph', icon: '🕸���', label: '图谱' },
   { key: 'life_items', icon: '☑️', label: '待办' },
   { key: 'events', icon: '📡', label: '感知' },
   { key: 'keepalive', icon: '🌙', label: '自由活动' },
@@ -67,6 +68,7 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
   const keepaliveCount = debugInfo.keepalive?.length ?? 0
 
   const counts: Record<Tab, number | string> = {
+    system: debugInfo.system_config ? 'ON' : '-',
     memories: memCount,
     session_memories: sessionMemCount,
     search: searchCount,
@@ -149,6 +151,7 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
             className="flex flex-col gap-1.5 overflow-y-auto overscroll-contain"
             style={{ maxHeight: 'min(60vh, 320px)', scrollbarWidth: 'thin', WebkitOverflowScrolling: 'touch' }}
           >
+            {activeTab === 'system' && <SystemDetail debugInfo={debugInfo} />}
             {activeTab === 'memories' && <MemoryDetail debugInfo={debugInfo} />}
             {activeTab === 'session_memories' && <SessionMemoriesDetail debugInfo={debugInfo} />}
             {activeTab === 'search' && <SearchDetail debugInfo={debugInfo} />}
@@ -167,6 +170,44 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
 }
 
 /* ── Detail sub-components ── */
+
+function SystemDetail({ debugInfo }: { debugInfo: DebugInfo }) {
+  const config = debugInfo.system_config
+  const lastMicro = debugInfo.last_micro_summary
+  const itemStyle: React.CSSProperties = {
+    display: 'flex', justifyContent: 'space-between', padding: '6px 0',
+    borderBottom: `1px solid ${C.border}`, fontSize: 13,
+  }
+  const labelStyle: React.CSSProperties = { color: C.textSecondary }
+  const valueStyle: React.CSSProperties = { color: C.text, fontFamily: 'monospace' }
+
+  return (
+    <div style={{ padding: 12 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 8 }}>System Config</div>
+      {config ? (
+        <>
+          <div style={itemStyle}><span style={labelStyle}>history_budget</span><span style={valueStyle}>{config.history_budget}</span></div>
+          <div style={itemStyle}><span style={labelStyle}>history_fetch_limit</span><span style={valueStyle}>{config.history_fetch_limit}</span></div>
+          <div style={itemStyle}><span style={labelStyle}>rerank_threshold</span><span style={valueStyle}>{config.rerank_threshold}</span></div>
+          <div style={itemStyle}><span style={labelStyle}>dedup_threshold</span><span style={valueStyle}>{config.dedup_threshold}</span></div>
+          <div style={itemStyle}><span style={labelStyle}>micro_summary_model</span><span style={valueStyle}>{config.micro_summary_model}</span></div>
+          <div style={itemStyle}><span style={labelStyle}>graph_enabled</span><span style={valueStyle}>{config.graph_enabled ? 'ON' : 'OFF'}</span></div>
+        </>
+      ) : (
+        <div style={{ color: C.textSecondary, fontSize: 12 }}>no config data</div>
+      )}
+      <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginTop: 16, marginBottom: 8 }}>Last Micro Summary</div>
+      {lastMicro ? (
+        <div style={{ background: C.surface, borderRadius: 8, padding: 10, fontSize: 12 }}>
+          <div style={{ color: C.textSecondary, marginBottom: 4 }}>{lastMicro.layer} | {lastMicro.time?.slice(0, 16)}</div>
+          <div style={{ color: C.text, lineHeight: 1.5 }}>{lastMicro.content}</div>
+        </div>
+      ) : (
+        <div style={{ color: C.textSecondary, fontSize: 12 }}>no micro summary yet</div>
+      )}
+    </div>
+  )
+}
 
 function MemoryDetail({ debugInfo }: { debugInfo: DebugInfo }) {
   const layers = [
