@@ -25,16 +25,16 @@ const MemoryRefBlock = memo(function MemoryRefBlock({ query, found, content, ela
   const isActive = found === undefined || found === null
   return (
     <div className="mb-3 rounded-xl overflow-hidden" style={{ background: C.toolBg }}>
-      <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer" style={{ color: C.textSecondary }}>
+      <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer" style={{ color: C.textSecondary, minWidth: 0 }}>
         {isActive ? <span className="tool-spinner" /> : <span style={{ fontSize: 11 }}>◎</span>}
-        <span className="text-xs font-medium">
+        <span className="text-xs font-medium" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', minWidth: 0 }}>
           Memory search「{query}」{found != null && ` · found ${found}`}
           {elapsed != null && <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
         </span>
         {!isActive && (open ? <ChevronDown size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} />)}
       </button>
       {open && content && (
-        <p className="px-3.5 pb-2.5 text-xs leading-relaxed whitespace-pre-wrap" style={{ color: C.textMuted }}>
+        <p className="px-3.5 pb-2.5 text-xs leading-relaxed whitespace-pre-wrap" style={{ color: C.textMuted, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
           {content || '（无内容）'}
         </p>
       )}
@@ -253,6 +253,8 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
               border: `1px solid ${C.userBubbleBorder}`,
               color: C.text,
               boxShadow: '0 1px 6px rgba(180,160,130,0.08)',
+              wordBreak: 'break-word',
+              overflowWrap: 'anywhere',
             }}
           >
             {msg.content}
