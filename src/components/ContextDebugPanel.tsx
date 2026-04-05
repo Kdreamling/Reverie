@@ -1,10 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import type { DebugInfo } from '../api/chat'
+import { client } from '../api/client'
 import { C } from '../theme'
 
-type Tab = 'memories' | 'search' | 'window' | 'summaries' | 'session_summary' | 'session_memories' | 'graph' | 'life_items' | 'events' | 'keepalive' | 'system'
+interface Snapshot {
+  id: string
+  content: string
+  base_importance: number
+  scene_type: string
+  created_at: string
+  hits: number
+}
+
+type Tab = 'memories' | 'search' | 'window' | 'summaries' | 'session_summary' | 'session_memories' | 'graph' | 'life_items' | 'events' | 'keepalive' | 'system' | 'snapshots'
 
 const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: 'system', icon: 'S', label: '系统' },
@@ -14,6 +24,7 @@ const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: 'window', icon: '💬', label: '历史' },
   { key: 'summaries', icon: '📝', label: '摘要' },
   { key: 'session_summary', icon: '📋', label: 'Session摘要' },
+  { key: 'snapshots', icon: '📸', label: '快照' },
   { key: 'graph', icon: '🕸���', label: '图谱' },
   { key: 'life_items', icon: '☑️', label: '待办' },
   { key: 'events', icon: '📡', label: '感知' },
@@ -75,6 +86,7 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
     window: windowRounds > 0 ? `${windowRounds}轮` : '0',
     summaries: summaryCount,
     session_summary: hasSessionSummary ? '有' : '无',
+    snapshots: '查看',
     graph: graphTotal,
     life_items: lifeItemCount,
     events: eventCount,
@@ -158,6 +170,7 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
             {activeTab === 'window' && <WindowDetail debugInfo={debugInfo} />}
             {activeTab === 'summaries' && <SummaryDetail debugInfo={debugInfo} />}
             {activeTab === 'session_summary' && <SessionSummaryDetail debugInfo={debugInfo} />}
+            {activeTab === 'snapshots' && <SnapshotsDetail />}
             {activeTab === 'graph' && <GraphDetail debugInfo={debugInfo} />}
             {activeTab === 'life_items' && <LifeItemsDetail debugInfo={debugInfo} />}
             {activeTab === 'events' && <EventsDetail debugInfo={debugInfo} />}
@@ -482,6 +495,131 @@ function EventsDetail({ debugInfo }: { debugInfo: DebugInfo }) {
       ))}
       {events.length === 0 && (
         <p className="text-xs py-2" style={{ color: C.textMuted }}>无感知事件</p>
+      )}
+    </>
+  )
+}
+
+function SnapshotsDetail() {
+  const [snapshots, setSnapshots] = useState<Snapshot[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [deleting, setDeleting] = useState(false)
+
+  const fetchSnapshots = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await client.get<{ snapshots: Snapshot[]; total: number }>('/snapshots?limit=100')
+      setSnapshots(res.snapshots)
+      setTotal(res.total)
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchSnapshots() }, [fetchSnapshots])
+
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleAll = () => {
+    if (selected.size === snapshots.length) setSelected(new Set())
+    else setSelected(new Set(snapshots.map(s => s.id)))
+  }
+
+  const deleteSelected = async () => {
+    if (selected.size === 0) return
+    setDeleting(true)
+    try {
+      if (selected.size === 1) {
+        const id = [...selected][0]
+        await client.delete(`/snapshots/${id}`)
+      } else {
+        await client.post('/snapshots/batch-delete', { ids: [...selected] })
+      }
+      setSelected(new Set())
+      await fetchSnapshots()
+    } catch {
+      // ignore
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  if (loading) return <p className="text-xs py-2" style={{ color: C.textMuted }}>加载中...</p>
+
+  return (
+    <>
+      {/* toolbar */}
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className="text-xs" style={{ color: C.textMuted }}>共 {total} 条快照</span>
+        {snapshots.length > 0 && (
+          <button
+            onClick={toggleAll}
+            className="text-xs px-2 py-0.5 rounded cursor-pointer"
+            style={{ background: C.sidebarActive, color: C.accent }}
+          >
+            {selected.size === snapshots.length ? '取消全选' : '全选'}
+          </button>
+        )}
+        {selected.size > 0 && (
+          <button
+            onClick={deleteSelected}
+            disabled={deleting}
+            className="text-xs px-2 py-0.5 rounded cursor-pointer"
+            style={{ background: 'rgba(220,80,60,0.1)', color: '#D04030' }}
+          >
+            {deleting ? '删除中...' : `删除 (${selected.size})`}
+          </button>
+        )}
+      </div>
+
+      {snapshots.map(s => {
+        const isSelected = selected.has(s.id)
+        const date = s.created_at?.slice(0, 16).replace('T', ' ')
+        return (
+          <div
+            key={s.id}
+            className="rounded-lg px-2.5 py-2 text-xs"
+            style={{
+              background: isSelected ? 'rgba(160,128,96,0.08)' : 'rgba(255,255,255,0.6)',
+              border: `1px solid ${isSelected ? C.accent + '40' : C.border}`,
+              cursor: 'pointer',
+            }}
+            onClick={() => toggleSelect(s.id)}
+          >
+            <div className="flex items-center gap-1.5 mb-1">
+              <span style={{
+                width: 14, height: 14, borderRadius: 3,
+                border: `1.5px solid ${isSelected ? C.accent : C.textMuted}`,
+                background: isSelected ? C.accent : 'transparent',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 9, color: '#fff', flexShrink: 0,
+              }}>
+                {isSelected && '✓'}
+              </span>
+              <span style={{ color: C.textMuted, fontSize: 10 }}>{date}</span>
+              <span style={{ color: C.textMuted, fontSize: 10 }}>重要度: {s.base_importance}</span>
+              {s.hits > 0 && <span style={{ color: C.textMuted, fontSize: 10 }}>命中: {s.hits}</span>}
+            </div>
+            <p className="leading-relaxed" style={{ color: C.text, wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>
+              {s.content}
+            </p>
+          </div>
+        )
+      })}
+
+      {snapshots.length === 0 && (
+        <p className="text-xs py-2" style={{ color: C.textMuted }}>暂无对话快照</p>
       )}
     </>
   )
