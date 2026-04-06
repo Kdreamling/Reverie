@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowUp, BookOpen, ChevronLeft, ChevronRight, Loader2, RotateCcw } from 'lucide-react'
 import { generateQuestions, explainChat, saveErrorsBatch, createStudySession, getStudySession, updateStudySession, listStudySessions, type Question, type ChatMessage as StudyChatMessage, type StudySession, type ExplainData } from '../api/study'
 import ReactMarkdown from 'react-markdown'
+import { toast } from '../stores/toastStore'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,7 @@ function SetupScreen({ onStart, pendingSessions, onResume }: {
       onStart(result.questions)
     } catch (e) {
       setError('出题失败，请重试')
+      toast.error('出题失败，请重试')
       console.error(e)
     } finally {
       setLoading(false)

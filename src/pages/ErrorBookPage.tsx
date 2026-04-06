@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, BookOpen, CheckCircle, Trash2, Loader2 } from 'lucide-react'
 import { listErrors, updateError, deleteError, getErrorStats, type StudyError } from '../api/study'
+import { toast } from '../stores/toastStore'
 
 const TYPE_LABELS: Record<string, string> = {
   choice: '选择题',
@@ -40,6 +41,7 @@ export default function ErrorBookPage() {
       setStats(statsResult)
     } catch (e) {
       console.error('Failed to load errors:', e)
+      toast.error('加载错题本失败')
     } finally {
       setLoading(false)
     }
@@ -58,6 +60,7 @@ export default function ErrorBookPage() {
       }
     } catch (e) {
       console.error('Failed to update:', e)
+      toast.error('更新失败')
     }
   }
 
@@ -68,6 +71,7 @@ export default function ErrorBookPage() {
       if (stats) setStats({ ...stats, total: stats.total - 1 })
     } catch (e) {
       console.error('Failed to delete:', e)
+      toast.error('删除失败')
     }
   }
 

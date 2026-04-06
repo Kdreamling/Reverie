@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Plus, MessageCircle, X, FileText, Upload } from 'lucide-react'
 import { listBooksAPI, createBookAPI, startReadingAPI, deleteBookAPI, type Book } from '../api/reading'
 import { C } from '../theme'
+import { toast } from '../stores/toastStore'
 
 // ─── Add Book Sheet ───
 
@@ -282,6 +283,7 @@ export default function BookshelfPage() {
       setBooks(data)
     } catch (e) {
       console.error('Failed to load books:', e)
+      toast.error('加载书架失败')
     } finally {
       setLoading(false)
     }
@@ -298,6 +300,7 @@ export default function BookshelfPage() {
       navigate(`/read/${result.session_id}`)
     } catch (e) {
       console.error('Failed to start reading:', e)
+      toast.error('打开书籍失败')
     }
   }
 

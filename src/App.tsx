@@ -11,6 +11,7 @@ import ProjectsPage from './pages/ProjectsPage'
 import ProjectDetailPage from './pages/ProjectDetailPage'
 import DashboardPage from './pages/DashboardPage'
 import AuthGuard from './components/AuthGuard'
+import ToastContainer from './components/ToastContainer'
 import { useAuthStore } from './stores/authStore'
 
 export default function App() {
@@ -26,6 +27,7 @@ export default function App() {
 
   return (
     <BrowserRouter basename="/chat">
+      <ToastContainer />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route element={<AuthGuard />}>
