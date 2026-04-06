@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { toast } from './toastStore'
 import {
   fetchMessagesAPI,
   deleteConversationAPI,
@@ -120,6 +121,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           memory_ops?: string | null
           model?: string
           scene_type?: string
+          source?: string | null
           created_at: string
         }
         // Event messages (from Dream's device status)
@@ -178,6 +180,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             memoryOps: parsedOps,
             thinkingTime: r.thinking_time ?? null,
             tokens: (r.input_tokens || r.output_tokens) ? { input: r.input_tokens ?? 0, output: r.output_tokens ?? 0, cached: r.cached_tokens ?? 0 } : null,
+            source: r.source ?? null,
           })
         }
       }
@@ -305,6 +308,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         if (!gotFirstChunk && get().isStreaming) {
           reader.cancel()
           set({ isStreaming: false, ...EMPTY_STREAM, lastError: '连接超时，请重试' })
+          toast.error('连接超时，请重试')
         }
       }, 30000)
 
@@ -522,10 +526,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // 如果是用户主动停止（abort），不显示错误
       if (e instanceof DOMException && e.name === 'AbortError') return
       set({ isStreaming: false, ...EMPTY_STREAM, _abortController: null, _reader: null, lastError: '发送失败，请重试' })
+      toast.error('发送失败，请重试')
       return
     } finally {
       if (get().isStreaming) {
         set({ isStreaming: false, ...EMPTY_STREAM, _abortController: null, _reader: null, lastError: '连接中断，请重试' })
+        toast.warning('连接中断，请重试')
       }
     }
   },

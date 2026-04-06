@@ -9,6 +9,7 @@ import { C, getModelColor } from '../../theme'
 const MODELS = [
   { value: 'deepseek-chat', label: 'DeepSeek Chat' },
   { value: '[0.1]claude-opus-4-6-thinking', label: 'Claude Opus 4.6' },
+  { value: 'claude-opus-4-6', label: 'Claude Opus (闲鱼)' },
   { value: 'anthropic/claude-opus-4.6', label: 'Claude Opus (OR)' },
   { value: 'claude-opus-4.6-zenmux', label: 'Claude Opus (ZM)' },
 ]

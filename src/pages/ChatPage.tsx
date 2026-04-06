@@ -41,6 +41,7 @@ const MODELS: { value: string; label: string }[] = [
   { value: 'deepseek-reasoner', label: 'DeepSeek Reasoner' },
   { value: '[0.1]claude-opus-4-6-thinking', label: 'Claude Opus 4.6' },
   { value: '[按量]claude-opus-4-6-thinking', label: 'Claude Opus 4.6 (按量)' },
+  { value: 'claude-opus-4-6', label: 'Claude Opus (闲鱼)' },
   { value: 'anthropic/claude-opus-4.6', label: 'Claude Opus (OR)' },
   { value: 'claude-opus-4.6-zenmux', label: 'Claude Opus (ZM)' },
 ]
@@ -56,7 +57,7 @@ const NAV_ITEMS: { key: string; label: string; iconPath: string; enabled: boolea
 
 const ACCEPTED_FILE_TYPES = 'image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,text/markdown,text/csv,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,.docx,.doc,.xlsx,.xls'
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
-const CLAUDE_MODELS = ['claude', 'opus', 'sonnet', 'dzzi', '按量']
+const CLAUDE_MODELS = ['claude', 'opus', 'sonnet', 'dzzi', '按量', 'xianyu']
 
 interface PendingAttachment {
   file: File

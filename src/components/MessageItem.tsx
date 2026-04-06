@@ -145,12 +145,14 @@ import { parseArtifacts } from './artifact/parseArtifacts'
 import ArtifactCard from './artifact/ArtifactCard'
 
 const MarkdownContent = memo(function MarkdownContent({ content }: { content: string }) {
-  const { artifacts, cleanContent } = parseArtifacts(content)
+  // 将 HTML <br/> / <br> 替换为 Markdown 换行
+  const normalized = content.replace(/<br\s*\/?>/gi, '\n')
+  const { artifacts, cleanContent } = parseArtifacts(normalized)
 
   if (artifacts.length === 0) {
     return (
       <div className="md-content">
-        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{content}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{normalized}</ReactMarkdown>
       </div>
     )
   }
@@ -275,13 +277,17 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
   }
 
   // AI 消息
+  const isKeepalive = msg.source === 'keepalive'
   return (
-    <div className="flex gap-2.5 mb-7 msg-fade-in">
+    <div className="flex gap-2.5 mb-7 msg-fade-in" style={isKeepalive ? { opacity: 0.75 } : undefined}>
       <AiAvatar />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1.5">
           <span className="text-sm font-semibold" style={{ color: C.text }}>Claude</span>
-          {modelLabel && (
+          {isKeepalive && (
+            <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 6, background: `${C.accent}18`, color: C.accent, fontWeight: 600, letterSpacing: '0.04em' }}>自由时间</span>
+          )}
+          {modelLabel && !isKeepalive && (
             <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 6, background: C.surface, color: C.textMuted, fontWeight: 600, letterSpacing: '0.04em' }}>{modelLabel}</span>
           )}
           <span className="text-xs" style={{ color: C.metaText }}>{formatMsgTime(msg.created_at)}</span>

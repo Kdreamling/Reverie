@@ -78,6 +78,7 @@ export interface ChatMessage {
   thinkingTime?: number | null
   debugInfo?: DebugInfo | null
   attachments?: MessageAttachment[] | null
+  source?: string | null
 }
 
 export interface ReadingContextPayload {
