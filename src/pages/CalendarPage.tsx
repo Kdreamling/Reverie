@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { C, FONT } from '../theme'
-import { fetchCalendarDates, fetchCalendarDetail, type CalendarSession } from '../api/sessions'
+import { fetchCalendarDates, fetchCalendarDetail, type KeepaliveLog } from '../api/dashboard'
 import { fetchLifeItemsCalendar, fetchLifeItems, toggleLifeItemComplete, fetchHabitsCalendar, logHabitAPI, type LifeItem, type HabitLog, type HabitInfo } from '../api/lifeItems'
 
 const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日']
@@ -38,7 +38,8 @@ export default function CalendarPage() {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
-  const [dates, setDates] = useState<Record<string, CalendarSession[]>>({})
+  const [dates, setDates] = useState<Record<string, { id: string; title: string; scene_type: string; message_count: number }[]>>({})
+  const [keepaliveDates, setKeepaliveDates] = useState<Set<string>>(new Set())
   const [lifeItemDates, setLifeItemDates] = useState<Record<string, LifeItem[]>>({})
   const [habitLogs, setHabitLogs] = useState<Record<string, HabitLog[]>>({})
   const [allHabits, setAllHabits] = useState<HabitInfo[]>([])
@@ -46,13 +47,14 @@ export default function CalendarPage() {
   const [detail, setDetail] = useState<any>(null)
   const [dateLifeItems, setDateLifeItems] = useState<LifeItem[]>([])
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'chat' | 'life' | 'habits'>('chat')
+  const [activeTab, setActiveTab] = useState<'chat' | 'life' | 'habits' | 'keepalive'>('chat')
+  const [expandedKa, setExpandedKa] = useState<Set<number>>(new Set())
 
   // Fetch calendar data
   useEffect(() => {
     setLoading(true)
     Promise.all([
-      fetchCalendarDates(year, month).then(d => setDates(d.dates)).catch(() => setDates({})),
+      fetchCalendarDates(year, month).then(d => { setDates(d.dates); setKeepaliveDates(new Set(d.keepalive_dates || [])) }).catch(() => { setDates({}); setKeepaliveDates(new Set()) }),
       fetchLifeItemsCalendar(year, month).then(d => setLifeItemDates(d.items)).catch(() => setLifeItemDates({})),
       fetchHabitsCalendar(year, month).then(d => { setHabitLogs(d.logs); setAllHabits(d.habits) }).catch(() => { setHabitLogs({}); setAllHabits([]) }),
     ]).finally(() => setLoading(false))
@@ -60,15 +62,21 @@ export default function CalendarPage() {
 
   // Fetch detail when date selected
   useEffect(() => {
-    if (!selectedDate) { setDetail(null); setDateLifeItems([]); return }
-    fetchCalendarDetail(selectedDate).then(d => setDetail(d)).catch(() => setDetail(null))
+    if (!selectedDate) { setDetail(null); setDateLifeItems([]); setExpandedKa(new Set()); return }
+    fetchCalendarDetail(selectedDate).then(d => {
+      setDetail(d)
+      setExpandedKa(new Set())
+      // Auto-switch to keepalive tab if only keepalive data
+      const hasSessions = d.sessions && d.sessions.length > 0
+      const hasKa = d.keepalive_logs && d.keepalive_logs.length > 0
+      if (hasKa && !hasSessions) setActiveTab('keepalive')
+    }).catch(() => setDetail(null))
     fetchLifeItems(selectedDate, 'all').then(d => {
       setDateLifeItems(d.items)
-      // Auto-switch to life tab if there are life items but no sessions
       const hasSessions = dates[selectedDate] && dates[selectedDate].length > 0
       const hasItems = d.items.length > 0
       if (hasItems && !hasSessions) setActiveTab('life')
-      else setActiveTab('chat')
+      else if (!hasSessions && !keepaliveDates.has(selectedDate)) setActiveTab(hasItems ? 'life' : 'chat')
     }).catch(() => setDateLifeItems([]))
   }, [selectedDate])
 
@@ -148,10 +156,11 @@ export default function CalendarPage() {
           const sessions = dates[dateStr]
           const items = lifeItemDates[dateStr]
           const dayHabits = habitLogs[dateStr]
+          const hasKeepalive = keepaliveDates.has(dateStr)
           const hasSessions = sessions && sessions.length > 0
           const hasItems = items && items.length > 0
           const hasHabits = dayHabits && dayHabits.length > 0
-          const hasData = hasSessions || hasItems || hasHabits
+          const hasData = hasSessions || hasItems || hasHabits || hasKeepalive
           const isToday = dateStr === todayStr
           const isSelected = dateStr === selectedDate
 
@@ -191,6 +200,12 @@ export default function CalendarPage() {
                           background: scene === 'daily' ? C.accent : scene === 'reading' ? '#7A8A6A' : '#6A7A9A',
                         }} />
                       ))}
+                      {hasKeepalive && (
+                        <div style={{
+                          width: 5, height: 5, borderRadius: '50%',
+                          background: '#D4A56A',
+                        }} />
+                      )}
                       {hasItems && (
                         <div style={{
                           width: 5, height: 5, borderRadius: '50%',
@@ -216,6 +231,7 @@ export default function CalendarPage() {
             <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
               {[
                 { key: 'chat' as const, label: '对话', count: detail?.sessions?.length ?? 0 },
+                { key: 'keepalive' as const, label: '自主活动', count: detail?.keepalive_logs?.length ?? 0 },
                 { key: 'life' as const, label: '待办', count: dateLifeItems.length },
                 { key: 'habits' as const, label: '打卡', count: habitLogs[selectedDate]?.length ?? 0, alwaysShow: selectedDate === todayStr && allHabits.length > 0 },
               ].filter(t => t.count > 0 || t.key === 'chat' || ('alwaysShow' in t && t.alwaysShow)).map(tab => (
@@ -284,6 +300,89 @@ export default function CalendarPage() {
                       )}
                     </button>
                   ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Keepalive tab */}
+          {activeTab === 'keepalive' && (
+            <>
+              {!detail ? (
+                <div style={{ color: C.textMuted, fontSize: 13, textAlign: 'center', padding: 20 }}>加载中...</div>
+              ) : !detail.keepalive_logs || detail.keepalive_logs.length === 0 ? (
+                <div style={{ color: C.textMuted, fontSize: 13, textAlign: 'center', padding: 20 }}>这天没有自主活动</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {detail.keepalive_logs.map((ka: KeepaliveLog, idx: number) => {
+                    const isExpanded = expandedKa.has(idx)
+                    const modeLabel = ka.mode?.includes('自由') ? '自由' : '轻量'
+                    const modeColor = ka.mode?.includes('自由') ? '#D4A56A' : C.textMuted
+                    const actionLabel = ka.action === 'none' ? '安静等待' : ka.action === 'message' ? '发送了消息' : ka.action === 'diary' ? '写了日记' : '探索了记忆'
+                    const timeStr = (() => {
+                      try { const d = new Date(ka.time); return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}` }
+                      catch { return '' }
+                    })()
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          const next = new Set(expandedKa)
+                          if (isExpanded) next.delete(idx); else next.add(idx)
+                          setExpandedKa(next)
+                        }}
+                        style={{
+                          background: isExpanded ? 'rgba(212,165,106,0.08)' : 'rgba(255,255,255,0.7)',
+                          border: `1px solid ${isExpanded ? 'rgba(212,165,106,0.25)' : C.border}`,
+                          borderRadius: 14,
+                          padding: '14px 16px',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 16 }}>{ka.action === 'message' ? '💬' : ka.action === 'diary' ? '📝' : ka.action === 'explore' ? '🔍' : '🌙'}</span>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontSize: 12, color: C.textMuted }}>{timeStr}</span>
+                              <span style={{
+                                fontSize: 10, padding: '1px 6px', borderRadius: 4,
+                                background: `${modeColor}18`, color: modeColor,
+                              }}>{modeLabel}</span>
+                            </div>
+                            <div style={{ fontSize: 12, color: C.textSecondary, marginTop: 3 }}>{actionLabel}</div>
+                          </div>
+                          <span style={{ fontSize: 12, color: C.textMuted, transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0)' }}>›</span>
+                        </div>
+                        {isExpanded && (
+                          <div style={{ marginTop: 12 }}>
+                            {ka.thoughts && (
+                              <div style={{
+                                fontSize: 13, lineHeight: 1.8, color: C.textSecondary,
+                                padding: '12px 14px', background: 'rgba(255,255,255,0.5)', borderRadius: 10,
+                                borderLeft: `2px solid ${C.border}`,
+                              }}>
+                                {ka.thoughts}
+                              </div>
+                            )}
+                            {ka.content && (
+                              <div style={{
+                                fontSize: 12, lineHeight: 1.7,
+                                color: ka.action === 'message' ? '#D4A56A' : '#7A9A70',
+                                padding: '10px 14px', marginTop: 8,
+                                background: ka.action === 'message' ? 'rgba(212,165,106,0.08)' : 'rgba(122,154,112,0.08)',
+                                borderRadius: 10, display: 'flex', alignItems: 'flex-start', gap: 8,
+                              }}>
+                                <span style={{ flexShrink: 0, marginTop: 2 }}>{ka.action === 'message' ? '📨' : '🧭'}</span>
+                                <span>{ka.content}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </>
