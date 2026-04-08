@@ -428,17 +428,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 flushDeltas()
                 const now = Date.now()
                 set(s => {
-                  // If there are already tool blocks + text blocks, this is a new round after tool calls.
-                  // Remove previous text blocks to avoid duplication (the new round will output full text).
-                  const hasToolBlocks = s.streamBlocks.some(b => b.kind === 'tool_result' || b.kind === 'memory_op')
-                  const blocks = hasToolBlocks
-                    ? s.streamBlocks.filter(b => b.kind !== 'text')
-                    : [...s.streamBlocks]
                   return {
                     thinkingStartTime: now,
                     thinkingElapsedTime: null,
-                    currentText: hasToolBlocks ? '' : s.currentText,
-                    streamBlocks: [...blocks, { kind: 'thinking', text: '', startTime: now, elapsed: null }],
+                    streamBlocks: [...s.streamBlocks, { kind: 'thinking', text: '', startTime: now, elapsed: null }],
                   }
                 })
                 break
@@ -466,17 +459,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 })
                 break
               case 'text_delta': {
-                // If text arrives after tool blocks, clear ALL previous text blocks to avoid duplication.
-                // The new round after tool calls outputs the full text again, so old text must go.
-                const st = get()
-                const hasTools = st.streamBlocks.some(b => b.kind === 'tool_result' || b.kind === 'memory_op')
-                const lastBlock = st.streamBlocks[st.streamBlocks.length - 1]
-                if (hasTools && lastBlock && lastBlock.kind !== 'text') {
-                  set(s => ({
-                    currentText: '',
-                    streamBlocks: s.streamBlocks.filter(b => b.kind !== 'text'),
-                  }))
-                }
                 // Batch: accumulate and schedule flush
                 pendingTextDelta += event.content ?? ''
                 scheduleFlush()
