@@ -15,12 +15,6 @@ export interface ChapterSummary {
   summary: string
 }
 
-export interface AiBookmark {
-  section_index: number
-  type: 'proactive' | 'chapter_end'
-  content: string
-}
-
 export interface ReadProgress {
   current_section: number
   commented_sections: number[]
@@ -33,7 +27,6 @@ export interface ReadingContent {
   sections: ReadingSection[]
   total_sections: number
   chapter_summary: ChapterSummary[] | null
-  ai_bookmarks: AiBookmark[] | null
   read_progress: ReadProgress
   source_type: string
   created_at: string
@@ -113,47 +106,5 @@ export async function updateReadingProgressAPI(
   return client.patch(`/sessions/${sessionId}/reading-progress`, {
     current_section: currentSection,
     commented_sections: commentedSections,
-  })
-}
-
-/**
- * 请求AI批注（SSE流）
- * 返回原始 Response，由 store 处理 SSE 解析
- */
-export function streamReadingComment(
-  sessionId: string,
-  sectionIndex: number,
-  token: string,
-  selectedText?: string,
-  signal?: AbortSignal,
-): Promise<Response> {
-  const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
-  return fetch(`${BASE_URL}/sessions/${sessionId}/reading-comment`, {
-    method: 'POST',
-    signal,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      section_index: sectionIndex,
-      selected_text: selectedText,
-    }),
-  })
-}
-
-/**
- * 读完章节/全书 → 生成 scene 记忆
- */
-export async function completeChapterAPI(
-  sessionId: string,
-  chapterIndex: number,
-  chapterTitle?: string,
-  isBookComplete: boolean = false,
-): Promise<{ ok: boolean; memory_id: string }> {
-  return client.post(`/sessions/${sessionId}/reading-chapter-complete`, {
-    chapter_index: chapterIndex,
-    chapter_title: chapterTitle,
-    is_book_complete: isBookComplete,
   })
 }
