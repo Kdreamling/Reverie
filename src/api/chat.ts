@@ -72,6 +72,8 @@ export interface ChatMessage {
   thinking_summary?: string | null
   created_at: string
   memoryRef?: { query: string; found: number; content: string } | null
+  memoryRefs?: Array<{ query: string; found: number; content: string }> | null
+  silentRead?: boolean
   memoryOps?: MemoryOperation[] | null
   conversationId?: string
   tokens?: { input: number; output: number; cached?: number } | null

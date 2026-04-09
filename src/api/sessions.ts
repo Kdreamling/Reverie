@@ -7,6 +7,8 @@ export interface Session {
   scene_type: string
   created_at: string
   updated_at: string
+  closed_by_ai?: boolean
+  closed_at?: string | null
 }
 
 export async function fetchSessionsAPI(): Promise<Session[]> {

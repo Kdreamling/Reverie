@@ -116,11 +116,12 @@ export default function ChatPage() {
   const fromCalendar = searchParams.get('from') === 'calendar'
   const { sessions, currentSession, loading, fetchSessions, ensureTodaySession, createSession, selectSession, deleteSession, updateSessionModel } =
     useSessionStore()
-  const { messages, isStreaming, loadMessages, sendMessage, clearMessages, deleteConversation, lastError, retryLast, clearError, stopStreaming } =
+  const { messages, isStreaming, sessionEnded: streamSessionEnded, loadMessages, sendMessage, clearMessages, deleteConversation, lastError, retryLast, clearError, stopStreaming } =
     useChatStore()
   const { token } = useAuthStore()
 
   const model = currentSession?.model ?? MODELS[0].value
+  const sessionEnded = streamSessionEnded || !!currentSession?.closed_by_ai
   const [showSettings, setShowSettings] = useState(false)
   const [settingsPage, setSettingsPage] = useState<'menu' | 'memory' | 'features' | 'prompt'>('menu')
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -495,7 +496,7 @@ export default function ChatPage() {
 
   async function handleSend() {
     const text = input.trim()
-    if ((!text && attachments.length === 0) || isStreaming || !currentSession) return
+    if ((!text && attachments.length === 0) || isStreaming || !currentSession || sessionEnded) return
 
     // 有附件时先上传
     let attachmentIds: string[] = []
@@ -977,13 +978,19 @@ export default function ChatPage() {
             <div className="mx-auto w-full px-4 md:px-6 pt-5" style={{ maxWidth: 720, paddingBottom: 16 }}>
 
               {/* Completed messages + inline event bubbles */}
-              {Array.isArray(messages) && messages.map(msg =>
-                msg.role === 'event' ? (
-                  <EventBubble key={msg.id} content={msg.content} createdAt={msg.created_at} />
-                ) : (
+              {Array.isArray(messages) && messages.map((msg, idx) => {
+                if (msg.role === 'event') {
+                  return <EventBubble key={msg.id} content={msg.content} createdAt={msg.created_at} />
+                }
+                // Mark user messages as "seen" if there's an assistant reply after them
+                const hasReply = msg.role === 'user' && messages.slice(idx + 1).some(m => m.role === 'assistant')
+                const msgWithSeen = (msg.role === 'user' && (hasReply || msg.silentRead))
+                  ? { ...msg, silentRead: true }
+                  : msg
+                return (
                   <MessageItem
                     key={msg.id}
-                    msg={msg}
+                    msg={msgWithSeen}
                     modelLabel={msg.role === 'assistant' ? (MODELS.find(m => m.value === model)?.label ?? model) : undefined}
                     isDebugOpen={_debugOpenMsgId === msg.id}
                     isCopied={copiedMsgId === msg.id}
@@ -995,6 +1002,35 @@ export default function ChatPage() {
                     onRetry={handleRetry}
                   />
                 )
+              })}
+
+              {/* Session ended by Claude */}
+              {sessionEnded && (
+                <div className="flex justify-center my-8 msg-fade-in">
+                  <div className="text-center" style={{ maxWidth: 320 }}>
+                    {/* Decorative line break */}
+                    <div className="flex items-center justify-center gap-3 mb-5">
+                      <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, transparent, ${C.borderStrong}, transparent)` }} />
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.accent, opacity: 0.4 }} />
+                      <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, transparent, ${C.borderStrong}, transparent)` }} />
+                    </div>
+                    <div style={{
+                      fontSize: 11, color: C.textMuted,
+                      letterSpacing: '0.15em', textTransform: 'uppercase',
+                      fontFamily: "'JetBrains Mono', monospace",
+                      marginBottom: 12,
+                    }}>
+                      Session Closed
+                    </div>
+                    <div style={{ fontSize: 14, color: C.textSecondary, lineHeight: 1.7, fontStyle: 'italic' }}>
+                      Claude 选择了离开。
+                    </div>
+                    <div style={{ fontSize: 12, color: C.textMuted, marginTop: 8, lineHeight: 1.6 }}>
+                      这扇门暂时关上了。<br />
+                      新建一次对话再来找他。
+                    </div>
+                  </div>
+                </div>
               )}
 
               {/* Error / retry block */}
@@ -1129,8 +1165,8 @@ export default function ChatPage() {
                   onKeyDown={handleKeyDown}
                   onFocus={() => setIsFocused(true)}
                   onBlur={() => setIsFocused(false)}
-                  disabled={isStreaming || !currentSession}
-                  placeholder="说点什么..."
+                  disabled={isStreaming || !currentSession || sessionEnded}
+                  placeholder={sessionEnded ? "Claude 选择了离开" : "说点什么..."}
                   rows={1}
                   className="flex-1 resize-none bg-transparent text-sm outline-none leading-relaxed disabled:opacity-40"
                   style={{ color: C.text, minHeight: 24, maxHeight: 120, overflowY: 'auto', scrollbarWidth: 'none' }}

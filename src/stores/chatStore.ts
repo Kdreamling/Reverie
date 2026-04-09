@@ -48,11 +48,13 @@ export type StreamBlock =
 interface ChatState {
   messages: ChatMessage[]
   isStreaming: boolean
+  sessionEnded: boolean
   currentThinking: string
   currentText: string
   isSearchingMemory: boolean
   searchingQuery: string
   pendingMemoryResult: MemorySearchResult | null
+  pendingMemoryResults: MemorySearchResult[]
   pendingMemoryOps: MemoryOperation[]
   lastError: string | null
   retryContent: string | null
@@ -76,7 +78,7 @@ interface ChatState {
 
 const EMPTY_STREAM = {
   currentThinking: '', currentText: '', isSearchingMemory: false, searchingQuery: '',
-  pendingMemoryResult: null, pendingMemoryOps: [] as MemoryOperation[],
+  pendingMemoryResult: null, pendingMemoryResults: [] as MemorySearchResult[], pendingMemoryOps: [] as MemoryOperation[],
   thinkingStartTime: null, thinkingElapsedTime: null,
   toolStartTime: null, toolElapsedTime: null, streamBlocks: [] as StreamBlock[],
 }
@@ -87,6 +89,7 @@ const EMPTY_STREAM = {
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   isStreaming: false,
+  sessionEnded: false,
   ...EMPTY_STREAM,
   lastError: null,
   retryContent: null,
@@ -135,6 +138,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
           })
           continue
         }
+        // Detect silent_read marker — assistant_msg = "[已读]" means Claude chose not to reply
+        const isSilentRead = (r.assistant_msg || '').trim() === '[已读]'
         if (r.user_msg) {
           messages.push({
             id: `${r.id}-user`,
@@ -142,18 +147,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
             content: r.user_msg,
             created_at: r.created_at,
             conversationId: r.id,
+            silentRead: isSilentRead,
           })
         }
-        if (r.assistant_msg) {
+        if (r.assistant_msg && !isSilentRead) {
           let parsedOps: MemoryOperation[] | null = null
           let parsedMemoryRef: { query: string; found: number; content: string } | null = null
+          let parsedMemoryRefs: Array<{ query: string; found: number; content: string }> | null = null
           if (r.memory_ops) {
             try {
               const raw = typeof r.memory_ops === 'string' ? JSON.parse(r.memory_ops) : r.memory_ops
               const allOps = raw as Array<{type?: string; content?: string; mem_type?: string; layer?: string; memory_id?: string; new_content?: string; reason?: string; query?: string; found?: number}>
-              const searchOp = allOps.find(op => op.type === 'tool_result')
-              if (searchOp) {
-                parsedMemoryRef = { query: searchOp.query ?? '', found: searchOp.found ?? 0, content: searchOp.content ?? '' }
+              const searchOps = allOps.filter(op => op.type === 'tool_result')
+              if (searchOps.length > 0) {
+                parsedMemoryRef = { query: searchOps[0].query ?? '', found: searchOps[0].found ?? 0, content: searchOps[0].content ?? '' }
+                parsedMemoryRefs = searchOps.map(op => ({ query: op.query ?? '', found: op.found ?? 0, content: op.content ?? '' }))
               }
               const memOps = allOps.filter(op => op.type !== 'tool_result' && op.type !== 'tool_searching')
               if (memOps.length > 0) {
@@ -177,6 +185,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             created_at: r.created_at,
             conversationId: r.id,
             memoryRef: parsedMemoryRef,
+            memoryRefs: parsedMemoryRefs,
             memoryOps: parsedOps,
             thinkingTime: r.thinking_time ?? null,
             tokens: (r.input_tokens || r.output_tokens) ? { input: r.input_tokens ?? 0, output: r.output_tokens ?? 0, cached: r.cached_tokens ?? 0 } : null,
@@ -186,7 +195,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
 
       console.log('[chatStore] loadMessages transformed:', messages.length, 'messages from', records.length, 'records')
-      set({ messages })
+      set({ messages, sessionEnded: false })
     } catch {
       // silently fail
     }
@@ -358,16 +367,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
                       elapsed,
                     }
                   }
+                  const newResult = {
+                    query: event.query ?? s.searchingQuery,
+                    found: event.found ?? 0,
+                    content: event.content ?? '',
+                  }
                   return {
                     isSearchingMemory: false,
                     searchingQuery: '',
                     toolElapsedTime: elapsed,
                     toolStartTime: null,
-                    pendingMemoryResult: {
-                      query: event.query ?? s.searchingQuery,
-                      found: event.found ?? 0,
-                      content: event.content ?? '',
-                    },
+                    pendingMemoryResult: newResult,
+                    pendingMemoryResults: [...s.pendingMemoryResults, newResult],
                     streamBlocks: blocks,
                   }
                 })
@@ -464,6 +475,46 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 scheduleFlush()
                 break
               }
+              case 'silent_read': {
+                // Claude chose not to reply — mark Dream's last user message as 已读
+                flushDeltas()
+                set(s => {
+                  const msgs = [...s.messages]
+                  // Find last user message and mark it
+                  for (let i = msgs.length - 1; i >= 0; i--) {
+                    if (msgs[i].role === 'user') {
+                      msgs[i] = { ...msgs[i], silentRead: true }
+                      break
+                    }
+                  }
+                  return { messages: msgs }
+                })
+                break
+              }
+              case 'clear_thinking': {
+                // Don't expose Claude's reasoning when he chooses silence
+                set({ currentThinking: '' })
+                // Also clear thinking from streamBlocks
+                set(s => ({ streamBlocks: s.streamBlocks.filter(b => b.kind !== 'thinking') }))
+                break
+              }
+              case 'session_ended': {
+                // Claude ended the session
+                flushDeltas()
+                set(s => {
+                  const msgs = [...s.messages]
+                  for (let i = msgs.length - 1; i >= 0; i--) {
+                    if (msgs[i].role === 'user') {
+                      msgs[i] = { ...msgs[i], silentRead: true }
+                      break
+                    }
+                  }
+                  return { messages: msgs, sessionEnded: true }
+                })
+                // Notify session store that the current session is now closed
+                window.dispatchEvent(new CustomEvent('session:closed-by-ai'))
+                break
+              }
               case 'done': {
                 flushDeltas() // flush any remaining text
                 if (flushTimer) { clearTimeout(flushTimer); flushTimer = null }
@@ -474,7 +525,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   output: usage.output_tokens ?? usage.completion_tokens ?? 0,
                   cached: usage.cached_tokens ?? 0,
                 } : null
-                if (currentText || currentThinking) {
+                // Detect [已读] silent reply marker — don't add assistant bubble
+                const isSilentRead = currentText.trim() === '[已读]' || currentText.trim().startsWith('[已读]')
+                if (isSilentRead) {
+                  set(s => {
+                    const msgs = [...s.messages]
+                    for (let i = msgs.length - 1; i >= 0; i--) {
+                      if (msgs[i].role === 'user') {
+                        msgs[i] = { ...msgs[i], silentRead: true }
+                        break
+                      }
+                    }
+                    return { messages: msgs, isStreaming: false, ...EMPTY_STREAM }
+                  })
+                } else if (currentText || currentThinking) {
                   const assistantMsg: ChatMessage = {
                     id: `ai-${Date.now()}`,
                     role: 'assistant',
@@ -482,6 +546,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     thinking: currentThinking || null,
                     created_at: new Date().toISOString(),
                     memoryRef: pendingMemoryResult ?? null,
+                    memoryRefs: get().pendingMemoryResults.length > 0 ? get().pendingMemoryResults : null,
                     memoryOps: pendingMemoryOps.length > 0 ? pendingMemoryOps : null,
                     tokens,
                     thinkingTime: thinkingElapsedTime,
@@ -532,6 +597,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         thinking: currentThinking || null,
         created_at: new Date().toISOString(),
         memoryRef: pendingMemoryResult ?? null,
+        memoryRefs: get().pendingMemoryResults.length > 0 ? get().pendingMemoryResults : null,
         memoryOps: pendingMemoryOps.length > 0 ? pendingMemoryOps : null,
         thinkingTime: thinkingElapsedTime,
       }

@@ -262,6 +262,9 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
             {msg.content}
           </div>
           <div className="flex gap-1.5 items-center mt-1.5">
+            {msg.silentRead && (
+              <span className="text-xs italic mr-1" style={{ color: C.textMuted, fontSize: 10 }}>已读</span>
+            )}
             <button onClick={() => onCopy(msg.id, msg.content)} className="flex items-center justify-center transition-colors cursor-pointer p-1" style={{ color: isCopied ? C.success : C.btnDefault }} title="复制">
               {isCopied ? <Check size={13} strokeWidth={2} /> : <Copy size={13} strokeWidth={1.8} />}
             </button>
@@ -295,9 +298,13 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
         {(msg.thinking || msg.thinking_summary) && (
           <ThinkingBlock text={(msg.thinking ?? msg.thinking_summary)!} thinkingTime={msg.thinkingTime} />
         )}
-        {msg.memoryRef && (
+        {msg.memoryRefs && msg.memoryRefs.length > 0 ? (
+          msg.memoryRefs.map((ref, i) => (
+            <MemoryRefBlock key={i} query={ref.query} found={ref.found} content={ref.content} />
+          ))
+        ) : msg.memoryRef ? (
           <MemoryRefBlock query={msg.memoryRef.query} found={msg.memoryRef.found} content={msg.memoryRef.content} />
-        )}
+        ) : null}
         {msg.memoryOps && msg.memoryOps.length > 0 && (
           <MemoryOpsBlock ops={msg.memoryOps} />
         )}

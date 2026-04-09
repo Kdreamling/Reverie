@@ -10,6 +10,7 @@ import GraphPage from './pages/GraphPage'
 import ProjectsPage from './pages/ProjectsPage'
 import ProjectDetailPage from './pages/ProjectDetailPage'
 import DashboardPage from './pages/DashboardPage'
+import DiaryPage from './pages/DiaryPage'
 import AuthGuard from './components/AuthGuard'
 import ToastContainer from './components/ToastContainer'
 import { useAuthStore } from './stores/authStore'
@@ -42,6 +43,7 @@ export default function App() {
           <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
           <Route path="/calendar" element={<DashboardPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/diary/:date" element={<DiaryPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

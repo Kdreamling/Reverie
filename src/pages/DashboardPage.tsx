@@ -4,6 +4,7 @@ import { Moon, Sun, Send, Compass, MessageCircle, Clock, TrendingUp, DollarSign,
 import { fetchUsageStats, fetchCalendarDates, fetchCalendarDetail } from '../api/dashboard'
 import type { UsageStats, CalendarDates, CalendarDetail, KeepaliveLog } from '../api/dashboard'
 import { fetchLifeItemsCalendar, fetchLifeItems, toggleLifeItemComplete, fetchHabitsCalendar, logHabitAPI, type LifeItem, type HabitLog, type HabitInfo } from '../api/lifeItems'
+import { fetchDiaryDates, fetchDiariesByDate, type DiaryDates, type Diary } from '../api/diary'
 
 // === Dual Theme Tokens ===
 const THEMES = {
@@ -130,9 +131,9 @@ function StatCard({ icon: Icon, label, value, sub, color, C }: { icon: typeof Do
 }
 
 // === Mini Calendar ===
-function MiniCalendar({ year, month, selected, onSelect, sessionDates, keepaliveDates, lifeDates, C }: {
+function MiniCalendar({ year, month, selected, onSelect, sessionDates, keepaliveDates, lifeDates, diaryDates, C }: {
   year: number; month: number; selected: string | null; onSelect: (d: string) => void
-  sessionDates: Set<string>; keepaliveDates: Set<string>; lifeDates: Set<string>; C: Theme
+  sessionDates: Set<string>; keepaliveDates: Set<string>; lifeDates: Set<string>; diaryDates: Set<string>; C: Theme
 }) {
   const firstDay = new Date(year, month - 1, 1).getDay()
   const daysInMonth = new Date(year, month, 0).getDate()
@@ -156,7 +157,8 @@ function MiniCalendar({ year, month, selected, onSelect, sessionDates, keepalive
           const hasSession = sessionDates.has(dateStr)
           const hasKeepalive = keepaliveDates.has(dateStr)
           const hasLife = lifeDates.has(dateStr)
-          const active = hasSession || hasKeepalive || hasLife
+          const hasDiary = diaryDates.has(dateStr)
+          const active = hasSession || hasKeepalive || hasLife || hasDiary
           const sel = dateStr === selected
           return (
             <div key={d} onClick={() => active && onSelect(dateStr)} style={{
@@ -176,6 +178,7 @@ function MiniCalendar({ year, month, selected, onSelect, sessionDates, keepalive
                   {hasSession && <div style={{ width: 4, height: 4, borderRadius: '50%', background: C.session }} />}
                   {hasLife && <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#D97757' }} />}
                   {hasKeepalive && <div style={{ width: 4, height: 4, borderRadius: '50%', background: C.amberSoft }} />}
+                  {hasDiary && <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#8A6CAA' }} />}
                 </div>
               )}
             </div>
@@ -335,6 +338,8 @@ export default function DashboardPage() {
   const [lifeItemDates, setLifeItemDates] = useState<Record<string, LifeItem[]>>({})
   const [habitLogs, setHabitLogs] = useState<Record<string, HabitLog[]>>({})
   const [allHabits, setAllHabits] = useState<HabitInfo[]>([])
+  const [diaryDateMap, setDiaryDateMap] = useState<DiaryDates>({})
+  const [dateDiaries, setDateDiaries] = useState<{ dream: Diary[]; chen: Diary[] }>({ dream: [], chen: [] })
 
   // Calendar month navigation — 强制用北京时间（Dream 手机是美区时区）
   const bjNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }))
@@ -374,6 +379,7 @@ export default function DashboardPage() {
     fetchCalendarDates(calYear, calMonth).then(setCalendarData).catch(console.error)
     fetchHabitsCalendar(calYear, calMonth).then(d => { setHabitLogs(d.logs); setAllHabits(d.habits) }).catch(() => {})
     fetchLifeItemsCalendar(calYear, calMonth).then(d => setLifeItemDates(d.items)).catch(() => setLifeItemDates({}))
+    fetchDiaryDates(calYear, calMonth).then(d => setDiaryDateMap(d.dates)).catch(() => setDiaryDateMap({}))
   }, [calYear, calMonth])
 
   // Load detail + life items when date selected
@@ -385,6 +391,7 @@ export default function DashboardPage() {
       setExpanded(new Set())
     }).catch(console.error)
     fetchLifeItems(selectedDate, 'all').then(d => setDateLifeItems(d.items)).catch(() => setDateLifeItems([]))
+    fetchDiariesByDate(selectedDate).then(d => setDateDiaries({ dream: d.dream, chen: d.chen })).catch(() => setDateDiaries({ dream: [], chen: [] }))
   }, [selectedDate])
 
   // Toggle todo completion
@@ -421,6 +428,7 @@ export default function DashboardPage() {
   const sessionDates = new Set(Object.keys(calendarData?.dates || {}))
   const keepaliveDates = new Set(calendarData?.keepalive_dates || [])
   const lifeDates = new Set(Object.keys(lifeItemDates))
+  const diaryDatesSet = new Set(Object.keys(diaryDateMap))
 
   // Timeline
   const timeline = detail ? buildTimeline(detail) : []
@@ -437,7 +445,8 @@ export default function DashboardPage() {
 
   return (
     <div style={{
-      maxWidth: 420, margin: '0 auto', minHeight: '100vh',
+      maxWidth: 420, margin: '0 auto', height: '100vh', overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch',
       background: `linear-gradient(180deg, ${C.bg} 0%, ${C.bgAlt} 50%, ${C.bgEnd} 100%)`,
       fontFamily: "'Noto Sans SC', sans-serif",
       touchAction: 'pan-y',
@@ -538,7 +547,7 @@ export default function DashboardPage() {
               }} />
             </div>
             <MiniCalendar year={calYear} month={calMonth} selected={selectedDate} onSelect={setSelectedDate}
-              sessionDates={sessionDates} keepaliveDates={keepaliveDates} lifeDates={lifeDates} C={C} />
+              sessionDates={sessionDates} keepaliveDates={keepaliveDates} lifeDates={lifeDates} diaryDates={diaryDatesSet} C={C} />
             {selectedDate && (
               <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: C.text, fontFamily: "'Space Grotesk'", transition: 'color 0.35s' }}>{selectedDate}</div>
@@ -551,6 +560,23 @@ export default function DashboardPage() {
                     borderTop: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontFamily: "'Noto Sans SC'",
                   }}>
                     查看时间轴 <ChevronRight size={14} />
+                  </div>
+                )}
+                {/* Diary entry */}
+                {(dateDiaries.dream.length > 0 || dateDiaries.chen.length > 0) && (
+                  <div onClick={() => navigate(`/diary/${selectedDate}`)} style={{
+                    marginTop: 8, padding: '10px 0', textAlign: 'center', fontSize: 12, color: '#8A6CAA', cursor: 'pointer',
+                    borderTop: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontFamily: "'Noto Sans SC'",
+                  }}>
+                    {dateDiaries.dream.length + dateDiaries.chen.length} 篇日记 <ChevronRight size={14} />
+                  </div>
+                )}
+                {dateDiaries.dream.length === 0 && dateDiaries.chen.length === 0 && (
+                  <div onClick={() => navigate(`/diary/${selectedDate}`)} style={{
+                    marginTop: 8, padding: '10px 0', textAlign: 'center', fontSize: 12, color: C.textMuted, cursor: 'pointer',
+                    borderTop: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontFamily: "'Noto Sans SC'",
+                  }}>
+                    写一篇日记 <ChevronRight size={14} />
                   </div>
                 )}
               </div>
@@ -730,6 +756,43 @@ export default function DashboardPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Diary cards in timeline */}
+          {(dateDiaries.dream.length > 0 || dateDiaries.chen.length > 0) && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 10, fontFamily: "'JetBrains Mono'", letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 6 }}>
+                DIARY
+              </div>
+              {[...dateDiaries.dream.map(d => ({ ...d, _source: 'dream' as const })), ...dateDiaries.chen.map(d => ({ ...d, _source: 'chen' as const }))].map(d => (
+                <div key={d.id} onClick={() => navigate(`/diary/${selectedDate}`)} style={{
+                  background: C.bgCard, borderRadius: 14, padding: '14px 16px', marginBottom: 8,
+                  border: `1px solid ${C.border}`, cursor: 'pointer', transition: 'all 0.2s',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <div style={{
+                      width: 20, height: 20, borderRadius: 6,
+                      background: d._source === 'dream' ? C.amberGlow : 'rgba(138,108,170,0.1)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 9, fontWeight: 600, color: d._source === 'dream' ? C.amber : '#8A6CAA',
+                    }}>
+                      {d._source === 'dream' ? 'D' : 'C'}
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: d._source === 'dream' ? C.amber : '#8A6CAA', fontFamily: "'Space Grotesk'" }}>
+                      {d._source === 'dream' ? 'Dream' : 'Claude'}
+                    </span>
+                    {d.time && <span style={{ fontSize: 9, color: C.textMuted, fontFamily: "'JetBrains Mono'" }}>{d.time}</span>}
+                    {d.is_locked && <span style={{ fontSize: 9, color: '#B8604A' }}>locked</span>}
+                  </div>
+                  {d.title && <div style={{ fontSize: 13, fontWeight: 600, color: C.text, fontFamily: "'Noto Sans SC'" }}>{d.title}</div>}
+                  {!d.is_locked && d.content && (
+                    <div style={{ fontSize: 11, color: C.textSoft, marginTop: 4, fontFamily: "'Noto Sans SC'", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {d.content.slice(0, 60)}…
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
 
