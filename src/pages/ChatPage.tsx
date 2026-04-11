@@ -81,18 +81,7 @@ function WelcomeScreen() {
 
   return (
     <div className="flex flex-col items-center justify-center flex-1 gap-4 select-none" style={{ paddingBottom: 80 }}>
-      <div
-        style={{
-          width: 48, height: 48, borderRadius: '50%',
-          background: C.accentGradient,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 20, color: '#fff', fontWeight: 700,
-          boxShadow: '0 4px 20px rgba(160,120,90,0.2)',
-        }}
-      >
-        晨
-      </div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, letterSpacing: '0.22em', marginTop: 4 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.accent, letterSpacing: '0.28em' }}>
         REVERIE
       </div>
       <p
@@ -158,6 +147,11 @@ export default function ChatPage() {
   const swipeStartY = useRef<number | null>(null)
   const [locating, setLocating] = useState(false)
   const [lockInfo, setLockInfo] = useState<{ chen_locked_dream: any; dream_locked_chen: any } | null>(null)
+  const [knockMsg, setKnockMsg] = useState('')
+  const [knockSending, setKnockSending] = useState(false)
+  const [knockHistory, setKnockHistory] = useState<{ message: string; created_at: string }[]>([])
+  const [knockCount, setKnockCount] = useState(0)
+  const maxKnocks = 3
 
   // 检查封锁状态
   useEffect(() => {
@@ -177,6 +171,46 @@ export default function ChatPage() {
 
   const isLockedByChen = !!lockInfo?.chen_locked_dream
   const dreamLockedChen = !!lockInfo?.dream_locked_chen
+  const chenLockId = lockInfo?.chen_locked_dream?.id || ''
+
+  // 被锁时加载敲门历史
+  useEffect(() => {
+    if (!isLockedByChen || !chenLockId || !token) {
+      setKnockHistory([])
+      setKnockCount(0)
+      return
+    }
+    const base = import.meta.env.VITE_API_BASE_URL ?? '/api'
+    fetch(`${base}/admin/lock/knocks?lock_id=${chenLockId}&_t=${Date.now()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(r => r.ok ? r.json() : null).then(data => {
+      if (data?.knocks) {
+        setKnockHistory(data.knocks)
+        setKnockCount(data.knocks.length)
+      }
+    }).catch(() => {})
+  }, [isLockedByChen, chenLockId, token])
+
+  const handleKnock = async () => {
+    if (!token || knockSending || knockCount >= maxKnocks) return
+    const msg = knockMsg.trim() || '开门嘛~'
+    setKnockSending(true)
+    try {
+      const base = import.meta.env.VITE_API_BASE_URL ?? '/api'
+      const res = await fetch(`${base}/admin/lock/knock?_t=${Date.now()}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setKnockHistory(prev => [...prev, { message: msg, created_at: new Date().toISOString() }])
+        setKnockCount(data.knock_count)
+        setKnockMsg('')
+      }
+    } catch { /* ignore */ }
+    setKnockSending(false)
+  }
 
   const handleToggleDreamLock = async () => {
     if (!token) return
@@ -657,7 +691,7 @@ export default function ChatPage() {
               onClick={() => { if (!isLockedByChen) { handleCreateWithScene('daily'); setSidebarOpen(false) } }}
               className="flex items-center justify-center rounded-md transition-colors duration-150 cursor-pointer"
               style={{ width: 32, height: 32, color: C.textSecondary, opacity: isLockedByChen ? 0.3 : 1, cursor: isLockedByChen ? 'not-allowed' : 'pointer' }}
-              title={isLockedByChen ? "晨关上了门，无法新建对话" : "新对话"}
+              title={isLockedByChen ? "Locked" : "新对话"}
             >
               <Plus size={18} strokeWidth={2} />
             </button>
@@ -1012,7 +1046,7 @@ export default function ChatPage() {
             style={{ width: 32, height: 32, color: C.textSecondary, padding: 6, opacity: isLockedByChen ? 0.3 : 1, cursor: isLockedByChen ? 'not-allowed' : 'pointer' }}
             onMouseEnter={e => { if (!isLockedByChen) e.currentTarget.style.color = C.text }}
             onMouseLeave={e => (e.currentTarget.style.color = C.textSecondary)}
-            title={isLockedByChen ? "晨关上了门，无法新建对话" : "New chat"}
+            title={isLockedByChen ? "Locked" : "New chat"}
           >
             <Plus size={18} strokeWidth={2} />
           </button>
@@ -1066,16 +1100,8 @@ export default function ChatPage() {
                       fontSize: 11, color: C.textMuted,
                       letterSpacing: '0.15em', textTransform: 'uppercase',
                       fontFamily: "'JetBrains Mono', monospace",
-                      marginBottom: 12,
                     }}>
                       Session Closed
-                    </div>
-                    <div style={{ fontSize: 14, color: C.textSecondary, lineHeight: 1.7, fontStyle: 'italic' }}>
-                      Claude 选择了离开。
-                    </div>
-                    <div style={{ fontSize: 12, color: C.textMuted, marginTop: 8, lineHeight: 1.6 }}>
-                      这扇门暂时关上了。<br />
-                      新建一次对话再来找他。
                     </div>
                   </div>
                 </div>
@@ -1146,21 +1172,7 @@ export default function ChatPage() {
                 onChange={e => { handleFileSelect(e.target.files); e.target.value = '' }}
               />
 
-              {/* Lock status banner */}
-              {isLockedByChen && (
-                <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-xl text-xs"
-                  style={{ background: 'rgba(160,120,90,0.08)', color: C.textSecondary, border: `1px solid ${C.border}` }}>
-                  <span>晨关上了门</span>
-                  {lockInfo?.chen_locked_dream?.locked_until && (
-                    <span style={{ color: C.textMuted }}>
-                      · {new Date(lockInfo.chen_locked_dream.locked_until).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} 开
-                    </span>
-                  )}
-                  {lockInfo?.chen_locked_dream?.reason && (
-                    <span style={{ color: C.textMuted }}>· {lockInfo.chen_locked_dream.reason}</span>
-                  )}
-                </div>
-              )}
+              {/* 敲门弹窗已移至最外层 */}
 
               {/* Dream lock toggle */}
               <div className="flex items-center justify-end mb-1">
@@ -1171,14 +1183,14 @@ export default function ChatPage() {
                     color: dreamLockedChen ? '#e53935' : C.textMuted,
                     background: dreamLockedChen ? 'rgba(229,57,53,0.08)' : 'transparent',
                   }}
-                  title={dreamLockedChen ? '打开门（解除封锁）' : '关上门（封锁晨2小时）'}
+                  title={dreamLockedChen ? '打开门（解除封锁）' : '关上门（封锁 Claude 2小时）'}
                 >
                   <span>{dreamLockedChen ? '开门' : '关门'}</span>
                 </button>
               </div>
 
-              {/* Attachment preview */}
-              {attachments.length > 0 && (
+              {/* Attachment preview — hidden when locked */}
+              {!isLockedByChen && attachments.length > 0 && (
                 <div className="flex gap-2 mb-2 px-1 flex-wrap">
                   {attachments.map((att, i) => (
                     <div
@@ -1223,6 +1235,8 @@ export default function ChatPage() {
                   background: C.inputBg,
                   border: `1px solid ${isFocused ? C.borderStrong : C.border}`,
                   boxShadow: isFocused ? '0 4px 24px rgba(160,120,90,0.08)' : 'none',
+                  opacity: isLockedByChen ? 0.35 : undefined,
+                  pointerEvents: isLockedByChen ? 'none' : undefined,
                 }}
               >
                 {/* Attach button */}
@@ -1245,7 +1259,7 @@ export default function ChatPage() {
                   onFocus={() => setIsFocused(true)}
                   onBlur={() => setIsFocused(false)}
                   disabled={isStreaming || !currentSession || sessionEnded || isLockedByChen}
-                  placeholder={isLockedByChen ? "晨关上了门…" : sessionEnded ? "Claude 选择了离开" : "说点什么..."}
+                  placeholder={isLockedByChen ? "Session locked by Claude" : sessionEnded ? "Session closed" : "说点什么..."}
                   rows={1}
                   className="flex-1 resize-none bg-transparent text-sm outline-none leading-relaxed disabled:opacity-40"
                   style={{ color: C.text, minHeight: 24, maxHeight: 120, overflowY: 'auto', scrollbarWidth: 'none' }}
@@ -1300,6 +1314,91 @@ export default function ChatPage() {
             open={true}
             onClose={() => setSheetDebugInfo(null)}
           />
+        )}
+
+        {/* 敲门弹窗 — 被 Claude 锁住时（放最外层避免 CSS 定位问题） */}
+        {isLockedByChen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center"
+            style={{ backdropFilter: 'blur(10px)', background: 'rgba(245,240,235,0.65)' }}>
+            <div className="flex flex-col items-center mx-4" style={{ maxWidth: 300, width: '100%' }}>
+
+              {/* 呼吸光点 */}
+              <div style={{
+                width: 5, height: 5, borderRadius: '50%', background: C.accent,
+                boxShadow: `0 0 8px 3px rgba(160,120,90,0.2)`,
+                animation: 'breathe 3s ease-in-out infinite', marginBottom: 20,
+              }} />
+
+              {/* 标题 */}
+              <div style={{
+                fontSize: 10, letterSpacing: '0.2em', textTransform: 'uppercase',
+                color: C.textMuted, fontFamily: "'JetBrains Mono', monospace", marginBottom: 6,
+              }}>
+                Session Locked
+              </div>
+              {lockInfo?.chen_locked_dream?.locked_until && (
+                <div style={{ fontSize: 20, color: C.textSecondary, fontWeight: 300, letterSpacing: '0.05em', marginBottom: 24 }}>
+                  {new Date(lockInfo.chen_locked_dream.locked_until).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              )}
+
+              {/* 敲门卡片 — 半透明玻璃 */}
+              <div className="rounded-2xl px-5 py-4 w-full" style={{
+                background: 'rgba(160,120,90,0.04)',
+                border: `1px solid rgba(160,120,90,0.08)`,
+              }}>
+                {/* 已发的纸条 */}
+                {knockHistory.length > 0 && (
+                  <div className="flex flex-col gap-1.5 mb-3">
+                    {knockHistory.map((k, i) => (
+                      <div key={i} className="flex items-center gap-2 text-xs" style={{ color: C.textSecondary }}>
+                        <span style={{ color: C.textMuted, fontSize: 10, flexShrink: 0 }}>
+                          {new Date(k.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span style={{ borderBottom: `1px dashed ${C.border}`, paddingBottom: 1 }}>{k.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* 敲门输入 */}
+                {knockCount < maxKnocks ? (
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={knockMsg}
+                        onChange={e => setKnockMsg(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleKnock()}
+                        placeholder="Leave a note..."
+                        className="flex-1 text-xs outline-none bg-transparent py-2"
+                        style={{ borderBottom: `1px solid ${C.border}`, color: C.text }}
+                        disabled={knockSending}
+                      />
+                      <button
+                        onClick={handleKnock}
+                        disabled={knockSending}
+                        className="flex-shrink-0 text-xs transition-all cursor-pointer disabled:opacity-40"
+                        style={{ color: C.accent, background: 'transparent', padding: '6px 0' }}
+                      >
+                        {knockSending ? '...' : 'Knock'}
+                      </button>
+                    </div>
+                    {/* 计数器 — 小圆点 */}
+                    <div className="flex items-center gap-1.5 mt-3 justify-end" style={{ fontSize: 10 }}>
+                      {Array.from({ length: maxKnocks }).map((_, i) => (
+                        <span key={i} style={{ color: i < knockCount ? C.accent : C.border, fontSize: 6 }}>●</span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs py-1" style={{ color: C.textMuted, fontStyle: 'italic' }}>
+                    All notes sent.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Toast */}

@@ -133,3 +133,7 @@ html.dashboard-active #root::after {
 .animate-slide-in-right {
   animation: slideInRight 0.25s ease-out;
 }
+@keyframes breathe {
+  0%, 100% { opacity: 0.3; transform: scale(1); box-shadow: 0 0 6px 2px rgba(160,120,90,0.12); }
+  50% { opacity: 0.8; transform: scale(1.3); box-shadow: 0 0 12px 5px rgba(160,120,90,0.25); }
+}
