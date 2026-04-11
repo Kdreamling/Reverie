@@ -15,6 +15,7 @@ interface ChannelInfo {
   supports_thinking: boolean
   thinking_format: string
   enabled: boolean
+  source: 'hardcoded' | 'db'
 }
 
 interface ServerStatus {
@@ -98,8 +99,15 @@ function StatItem({ label, value }: { label: string; value: string }) {
   )
 }
 
-function ChannelCard({ ch, onTest }: { ch: ChannelInfo; onTest: (ch: ChannelInfo) => void }) {
+function ChannelCard({ ch, onTest, onEdit, onDelete, onToggle }: {
+  ch: ChannelInfo
+  onTest: (ch: ChannelInfo) => void
+  onEdit: (ch: ChannelInfo) => void
+  onDelete: (ch: ChannelInfo) => void
+  onToggle: (ch: ChannelInfo) => void
+}) {
   const [testing, setTesting] = useState(false)
+  const isDb = ch.source === 'db'
 
   const handleTest = async () => {
     setTesting(true)
@@ -108,7 +116,7 @@ function ChannelCard({ ch, onTest }: { ch: ChannelInfo; onTest: (ch: ChannelInfo
   }
 
   return (
-    <div style={{ ...cardStyle, padding: 14 }}>
+    <div style={{ ...cardStyle, padding: 14, opacity: ch.enabled ? 1 : 0.5 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{
@@ -117,11 +125,19 @@ function ChannelCard({ ch, onTest }: { ch: ChannelInfo; onTest: (ch: ChannelInfo
             boxShadow: ch.enabled ? `0 0 6px ${C.success}40` : 'none',
           }} />
           <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{ch.name}</span>
+          {!ch.enabled && <span style={{ fontSize: 10, color: C.textMuted }}>(已停用)</span>}
         </div>
-        <span style={{
-          fontSize: 10, padding: '2px 8px', borderRadius: 10,
-          background: C.thinkingBg, color: C.textSecondary,
-        }}>{ch.provider}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{
+            fontSize: 10, padding: '2px 8px', borderRadius: 10,
+            background: C.thinkingBg, color: C.textSecondary,
+          }}>{ch.provider}</span>
+          <span style={{
+            fontSize: 9, padding: '2px 6px', borderRadius: 8,
+            background: isDb ? '#e8f5e9' : C.surface,
+            color: isDb ? '#4caf50' : C.textMuted,
+          }}>{isDb ? 'DB' : '内置'}</span>
+        </div>
       </div>
 
       <div style={{ fontSize: 12, color: C.textSecondary, marginBottom: 6, wordBreak: 'break-all' }}>
@@ -137,11 +153,12 @@ function ChannelCard({ ch, onTest }: { ch: ChannelInfo; onTest: (ch: ChannelInfo
         ))}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ fontSize: 11, color: C.textMuted }}>
-          Key: {ch.api_key_masked}
-          {ch.supports_thinking && <span style={{ marginLeft: 8, color: C.accent }}>⚡ thinking</span>}
-        </div>
+      <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 8 }}>
+        Key: {ch.api_key_masked}
+        {ch.supports_thinking && <span style={{ marginLeft: 8, color: C.accent }}>⚡ thinking</span>}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <button
           onClick={handleTest}
           disabled={testing}
@@ -151,8 +168,19 @@ function ChannelCard({ ch, onTest }: { ch: ChannelInfo; onTest: (ch: ChannelInfo
             color: testing ? C.textMuted : C.accent, cursor: testing ? 'default' : 'pointer',
           }}
         >
-          {testing ? '测试中...' : '测试连通'}
+          {testing ? '测试中...' : '测试'}
         </button>
+        {isDb && (
+          <>
+            <button onClick={() => onEdit(ch)} style={smallBtnStyle}>编辑</button>
+            <button onClick={() => onToggle(ch)} style={smallBtnStyle}>
+              {ch.enabled ? '停用' : '启用'}
+            </button>
+            <button onClick={() => onDelete(ch)} style={{ ...smallBtnStyle, color: '#e53935' }}>
+              删除
+            </button>
+          </>
+        )}
       </div>
     </div>
   )
@@ -179,6 +207,7 @@ function AddChannelForm({ onSubmit, onCancel }: {
           <label style={labelStyle}>协议类型</label>
           <select value={provider} onChange={e => setProvider(e.target.value)} style={inputStyle}>
             <option value="openai_compatible">OpenAI Compatible</option>
+            <option value="anthropic">Anthropic</option>
             <option value="openrouter">OpenRouter</option>
             <option value="zenmux">ZenMux</option>
           </select>
@@ -208,6 +237,73 @@ function AddChannelForm({ onSubmit, onCancel }: {
             style={{ ...btnStyle, flex: 1, background: C.accentGradient, color: '#fff' }}
           >
             添加
+          </button>
+          <button onClick={onCancel} style={{ ...btnStyle, flex: 1, background: 'none', border: `1px solid ${C.border}`, color: C.textSecondary }}>
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EditChannelForm({ ch, onSubmit, onCancel }: {
+  ch: ChannelInfo
+  onSubmit: (name: string, data: Record<string, unknown>) => void
+  onCancel: () => void
+}) {
+  const [provider, setProvider] = useState(ch.provider)
+  const [baseUrl, setBaseUrl] = useState(ch.base_url)
+  const [apiKey, setApiKey] = useState('')
+  const [models, setModels] = useState(ch.models.join(', '))
+  const [thinking, setThinking] = useState(ch.supports_thinking)
+  const [thinkingFmt, setThinkingFmt] = useState(ch.thinking_format)
+
+  return (
+    <div style={cardStyle}>
+      <h3 style={cardTitleStyle}>编辑 — {ch.name}</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div>
+          <label style={labelStyle}>协议类型</label>
+          <select value={provider} onChange={e => setProvider(e.target.value)} style={inputStyle}>
+            <option value="openai_compatible">OpenAI Compatible</option>
+            <option value="anthropic">Anthropic</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="zenmux">ZenMux</option>
+          </select>
+        </div>
+        <FormField label="Base URL" value={baseUrl} onChange={setBaseUrl} />
+        <FormField label="API Key（留空不修改）" value={apiKey} onChange={setApiKey} placeholder="留空保持原 Key" type="password" />
+        <FormField label="模型名（逗号分隔）" value={models} onChange={setModels} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <label style={{ ...labelStyle, marginBottom: 0, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+            <input type="checkbox" checked={thinking} onChange={e => setThinking(e.target.checked)} />
+            支持 Thinking
+          </label>
+          {thinking && (
+            <select value={thinkingFmt} onChange={e => setThinkingFmt(e.target.value)} style={{ ...inputStyle, width: 'auto', flex: 1 }}>
+              <option value="openai">openai</option>
+              <option value="openai_xml">openai_xml</option>
+              <option value="native">native</option>
+            </select>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+          <button
+            onClick={() => {
+              const data: Record<string, unknown> = {
+                provider,
+                base_url: baseUrl,
+                models: models.split(',').map(s => s.trim()).filter(Boolean),
+                supports_thinking: thinking,
+                thinking_format: thinkingFmt,
+              }
+              if (apiKey) data.api_key = apiKey
+              onSubmit(ch.name, data)
+            }}
+            style={{ ...btnStyle, flex: 1, background: C.accentGradient, color: '#fff' }}
+          >
+            保存
           </button>
           <button onClick={onCancel} style={{ ...btnStyle, flex: 1, background: 'none', border: `1px solid ${C.border}`, color: C.textSecondary }}>
             取消
@@ -348,6 +444,12 @@ const btnStyle: React.CSSProperties = {
   border: 'none', cursor: 'pointer', textAlign: 'center',
 }
 
+const smallBtnStyle: React.CSSProperties = {
+  fontSize: 11, padding: '4px 10px', borderRadius: 8,
+  background: 'none', border: `1px solid ${C.border}`,
+  color: C.textSecondary, cursor: 'pointer',
+}
+
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
   if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K'
@@ -376,6 +478,39 @@ export default function AdminPage() {
   const [logs, setLogs] = useState<RequestLog[] | null>(null)
   const [usage, setUsage] = useState<UsageSummary | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
+  const [editingChannel, setEditingChannel] = useState<ChannelInfo | null>(null)
+  const [lockStatus, setLockStatus] = useState<{ chen_locked_dream: any; dream_locked_chen: any } | null>(null)
+  const [lockMinutes, setLockMinutes] = useState(120)
+
+  const loadLockStatus = useCallback(async () => {
+    try {
+      const data = await adminFetch<{ chen_locked_dream: any; dream_locked_chen: any }>('/admin/lock/status')
+      setLockStatus(data)
+    } catch { /* ignore */ }
+  }, [])
+
+  const handleDreamLock = async () => {
+    try {
+      await adminFetch('/admin/lock/dream', {
+        method: 'POST',
+        body: JSON.stringify({ duration_minutes: lockMinutes, reason: 'Dream 关上了门' }),
+      })
+      toast.success(`门已关上，${lockMinutes}分钟后自动开`)
+      loadLockStatus()
+    } catch (e) {
+      toast.error(`关门失败: ${e instanceof Error ? e.message : '未知错误'}`)
+    }
+  }
+
+  const handleDreamUnlock = async () => {
+    try {
+      await adminFetch('/admin/lock/dream', { method: 'DELETE' })
+      toast.success('门已打开')
+      loadLockStatus()
+    } catch (e) {
+      toast.error(`开门失败: ${e instanceof Error ? e.message : '未知错误'}`)
+    }
+  }
 
   const loadStatus = useCallback(async () => {
     try {
@@ -406,10 +541,10 @@ export default function AdminPage() {
   }, [])
 
   useEffect(() => {
-    if (tab === 'status') { loadStatus(); loadUsage() }
+    if (tab === 'status') { loadStatus(); loadUsage(); loadLockStatus() }
     if (tab === 'channels') loadChannels()
     if (tab === 'logs') loadLogs()
-  }, [tab, loadStatus, loadChannels, loadLogs, loadUsage])
+  }, [tab, loadStatus, loadChannels, loadLogs, loadUsage, loadLockStatus])
 
   const handleTestChannel = async (ch: ChannelInfo) => {
     try {
@@ -441,6 +576,59 @@ export default function AdminPage() {
       loadChannels()
     } catch (e) {
       toast.error(`添加失败: ${e instanceof Error ? e.message : '未知错误'}`)
+    }
+  }
+
+  const handleEditChannel = async (name: string, data: Record<string, unknown>) => {
+    try {
+      const resp = await adminFetch<{ success: boolean; message: string }>(
+        `/admin/channels/${encodeURIComponent(name)}`,
+        { method: 'PUT', body: JSON.stringify(data) },
+      )
+      if (resp.success) {
+        toast.success(resp.message)
+        setEditingChannel(null)
+        loadChannels()
+      } else {
+        toast.error(resp.message)
+      }
+    } catch (e) {
+      toast.error(`编辑失败: ${e instanceof Error ? e.message : '未知错误'}`)
+    }
+  }
+
+  const handleDeleteChannel = async (ch: ChannelInfo) => {
+    if (!confirm(`确定删除渠道「${ch.name}」？此操作不可撤销。`)) return
+    try {
+      const resp = await adminFetch<{ success: boolean; message: string }>(
+        `/admin/channels/${encodeURIComponent(ch.name)}`,
+        { method: 'DELETE' },
+      )
+      if (resp.success) {
+        toast.success(resp.message)
+        loadChannels()
+      } else {
+        toast.error(resp.message)
+      }
+    } catch (e) {
+      toast.error(`删除失败: ${e instanceof Error ? e.message : '未知错误'}`)
+    }
+  }
+
+  const handleToggleChannel = async (ch: ChannelInfo) => {
+    try {
+      const resp = await adminFetch<{ success: boolean; enabled?: boolean; message: string }>(
+        `/admin/channels/${encodeURIComponent(ch.name)}/toggle`,
+        { method: 'PATCH' },
+      )
+      if (resp.success) {
+        toast.success(resp.message)
+        loadChannels()
+      } else {
+        toast.error(resp.message)
+      }
+    } catch (e) {
+      toast.error(`操作失败: ${e instanceof Error ? e.message : '未知错误'}`)
     }
   }
 
@@ -503,13 +691,61 @@ export default function AdminPage() {
         {tab === 'status' && (
           <>
             <StatusCard status={status} />
+
+            {/* 封锁系统 */}
+            <div style={cardStyle}>
+              <h3 style={cardTitleStyle}>封锁系统</h3>
+
+              {/* 晨→Dream 锁状态 */}
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>晨 → Dream</div>
+                {lockStatus?.chen_locked_dream ? (
+                  <div style={{ fontSize: 13, color: '#e53935' }}>
+                    门已关 · 到 {new Date(lockStatus.chen_locked_dream.locked_until).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                    {lockStatus.chen_locked_dream.reason && <span style={{ color: C.textMuted }}> · {lockStatus.chen_locked_dream.reason}</span>}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 13, color: C.success }}>门开着</div>
+                )}
+              </div>
+
+              {/* Dream→晨 锁控制 */}
+              <div>
+                <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>Dream → 晨</div>
+                {lockStatus?.dream_locked_chen ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 13, color: '#e53935' }}>
+                      门已关 · 到 {new Date(lockStatus.dream_locked_chen.locked_until).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    <button onClick={handleDreamUnlock} style={{ ...smallBtnStyle, color: C.accent }}>开门</button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 13, color: C.success }}>门开着</span>
+                    <select
+                      value={lockMinutes}
+                      onChange={e => setLockMinutes(Number(e.target.value))}
+                      style={{ fontSize: 11, padding: '2px 6px', borderRadius: 6, border: `1px solid ${C.border}`, background: C.inputBg, color: C.text }}
+                    >
+                      <option value={30}>30分钟</option>
+                      <option value={60}>1小时</option>
+                      <option value={120}>2小时</option>
+                      <option value={240}>4小时</option>
+                      <option value={480}>8小时</option>
+                    </select>
+                    <button onClick={handleDreamLock} style={{ ...smallBtnStyle, color: '#e53935' }}>关门</button>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <UsageSection usage={usage} />
           </>
         )}
 
         {tab === 'channels' && (
           <>
-            {!showAddForm && (
+            {!showAddForm && !editingChannel && (
               <button
                 onClick={() => setShowAddForm(true)}
                 style={{
@@ -522,8 +758,22 @@ export default function AdminPage() {
               </button>
             )}
             {showAddForm && <AddChannelForm onSubmit={handleAddChannel} onCancel={() => setShowAddForm(false)} />}
+            {editingChannel && (
+              <EditChannelForm
+                ch={editingChannel}
+                onSubmit={handleEditChannel}
+                onCancel={() => setEditingChannel(null)}
+              />
+            )}
             {channels === null ? <CardSkeleton /> : channels.map(ch => (
-              <ChannelCard key={ch.name} ch={ch} onTest={handleTestChannel} />
+              <ChannelCard
+                key={ch.name}
+                ch={ch}
+                onTest={handleTestChannel}
+                onEdit={(c) => { setShowAddForm(false); setEditingChannel(c) }}
+                onDelete={handleDeleteChannel}
+                onToggle={handleToggleChannel}
+              />
             ))}
           </>
         )}

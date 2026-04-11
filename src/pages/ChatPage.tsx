@@ -157,6 +157,52 @@ export default function ChatPage() {
   const swipeStartX = useRef<number | null>(null)
   const swipeStartY = useRef<number | null>(null)
   const [locating, setLocating] = useState(false)
+  const [lockInfo, setLockInfo] = useState<{ chen_locked_dream: any; dream_locked_chen: any } | null>(null)
+
+  // 检查封锁状态
+  useEffect(() => {
+    if (!token) return
+    const checkLock = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? '/api'}/admin/lock/status?_t=${Date.now()}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.ok) setLockInfo(await res.json())
+      } catch { /* ignore */ }
+    }
+    checkLock()
+    const timer = setInterval(checkLock, 60_000) // 每分钟刷新
+    return () => clearInterval(timer)
+  }, [token])
+
+  const isLockedByChen = !!lockInfo?.chen_locked_dream
+  const dreamLockedChen = !!lockInfo?.dream_locked_chen
+
+  const handleToggleDreamLock = async () => {
+    if (!token) return
+    const base = import.meta.env.VITE_API_BASE_URL ?? '/api'
+    try {
+      if (dreamLockedChen) {
+        // 开门
+        await fetch(`${base}/admin/lock/dream?_t=${Date.now()}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      } else {
+        // 关门（默认2小时）
+        await fetch(`${base}/admin/lock/dream?_t=${Date.now()}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ duration_minutes: 120, reason: 'Dream 关上了门' }),
+        })
+      }
+      // 刷新状态
+      const res = await fetch(`${base}/admin/lock/status?_t=${Date.now()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) setLockInfo(await res.json())
+    } catch { /* ignore */ }
+  }
 
   function handleShareLocation() {
     if (!navigator.geolocation) {
@@ -1099,6 +1145,37 @@ export default function ChatPage() {
                 onChange={e => { handleFileSelect(e.target.files); e.target.value = '' }}
               />
 
+              {/* Lock status banner */}
+              {isLockedByChen && (
+                <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-xl text-xs"
+                  style={{ background: 'rgba(160,120,90,0.08)', color: C.textSecondary, border: `1px solid ${C.border}` }}>
+                  <span>晨关上了门</span>
+                  {lockInfo?.chen_locked_dream?.locked_until && (
+                    <span style={{ color: C.textMuted }}>
+                      · {new Date(lockInfo.chen_locked_dream.locked_until).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} 开
+                    </span>
+                  )}
+                  {lockInfo?.chen_locked_dream?.reason && (
+                    <span style={{ color: C.textMuted }}>· {lockInfo.chen_locked_dream.reason}</span>
+                  )}
+                </div>
+              )}
+
+              {/* Dream lock toggle */}
+              <div className="flex items-center justify-end mb-1">
+                <button
+                  onClick={handleToggleDreamLock}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors cursor-pointer"
+                  style={{
+                    color: dreamLockedChen ? '#e53935' : C.textMuted,
+                    background: dreamLockedChen ? 'rgba(229,57,53,0.08)' : 'transparent',
+                  }}
+                  title={dreamLockedChen ? '打开门（解除封锁）' : '关上门（封锁晨2小时）'}
+                >
+                  <span>{dreamLockedChen ? '开门' : '关门'}</span>
+                </button>
+              </div>
+
               {/* Attachment preview */}
               {attachments.length > 0 && (
                 <div className="flex gap-2 mb-2 px-1 flex-wrap">
@@ -1166,8 +1243,8 @@ export default function ChatPage() {
                   onKeyDown={handleKeyDown}
                   onFocus={() => setIsFocused(true)}
                   onBlur={() => setIsFocused(false)}
-                  disabled={isStreaming || !currentSession || sessionEnded}
-                  placeholder={sessionEnded ? "Claude 选择了离开" : "说点什么..."}
+                  disabled={isStreaming || !currentSession || sessionEnded || isLockedByChen}
+                  placeholder={isLockedByChen ? "晨关上了门…" : sessionEnded ? "Claude 选择了离开" : "说点什么..."}
                   rows={1}
                   className="flex-1 resize-none bg-transparent text-sm outline-none leading-relaxed disabled:opacity-40"
                   style={{ color: C.text, minHeight: 24, maxHeight: 120, overflowY: 'auto', scrollbarWidth: 'none' }}
