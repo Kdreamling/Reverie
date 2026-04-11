@@ -151,7 +151,7 @@ function LiveToolSearchBlock({ query, startTime }: { query: string; startTime: n
       <div className="flex items-center gap-2 px-3.5 py-2.5" style={{ color: C.textSecondary }}>
         <span className="tool-spinner" />
         <span className="text-xs font-medium">
-          Memory search{query ? `「${query}」` : ''}
+          {query || 'Memory search'}
           <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(liveElapsed)})</span>
         </span>
       </div>
@@ -168,7 +168,7 @@ function ToolResultBlock({ query, found, content, elapsed }: { query: string; fo
       <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer" style={{ color: C.textSecondary }}>
         <span style={{ fontSize: 11 }}>◎</span>
         <span className="text-xs font-medium">
-          Memory search「{query}」 · found {found}
+          {query || 'Memory search'} · found {found}
           {elapsed != null && <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
         </span>
         {open ? <ChevronDown size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} />}

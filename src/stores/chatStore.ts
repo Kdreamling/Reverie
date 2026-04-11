@@ -251,7 +251,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         return
       }
       if (!res.ok || !res.body) {
-        set({ isStreaming: false, _abortController: null })
+        set({ isStreaming: false, _abortController: null, lastError: `请求失败 (${res.status})` })
+        toast.error(`请求失败 (${res.status})`)
         return
       }
 
@@ -498,6 +499,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 set(s => ({ streamBlocks: s.streamBlocks.filter(b => b.kind !== 'thinking') }))
                 break
               }
+              case 'error': {
+                flushDeltas()
+                const errMsg = event.message ?? '上游服务异常'
+                set({ isStreaming: false, ...EMPTY_STREAM, lastError: errMsg })
+                toast.error(errMsg)
+                return
+              }
               case 'session_ended': {
                 // Claude ended the session
                 flushDeltas()
@@ -558,7 +566,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     ...EMPTY_STREAM,
                   }))
                 } else {
-                  set({ isStreaming: false, ...EMPTY_STREAM })
+                  set({ isStreaming: false, ...EMPTY_STREAM, lastError: '未收到回复' })
+                  toast.warning('未收到回复，请重试')
                 }
                 break
               }

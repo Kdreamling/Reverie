@@ -28,7 +28,7 @@ const MemoryRefBlock = memo(function MemoryRefBlock({ query, found, content, ela
       <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer" style={{ color: C.textSecondary, minWidth: 0 }}>
         {isActive ? <span className="tool-spinner" /> : <span style={{ fontSize: 11 }}>◎</span>}
         <span className="text-xs font-medium" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', minWidth: 0 }}>
-          Memory search「{query}」{found != null && ` · found ${found}`}
+          {query || 'Memory search'}{found != null && ` · found ${found}`}
           {elapsed != null && <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
         </span>
         {!isActive && (open ? <ChevronDown size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} />)}

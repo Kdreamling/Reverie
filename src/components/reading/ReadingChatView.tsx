@@ -12,6 +12,7 @@ const MODELS = [
   { value: 'claude-opus-4-6', label: 'Claude Opus (闲鱼)' },
   { value: 'anthropic/claude-opus-4.6', label: 'Claude Opus (OR)' },
   { value: 'claude-opus-4.6-zenmux', label: 'Claude Opus (ZM)' },
+  { value: 'claude-opus-4.6-guagua', label: 'Claude Opus (呱呱)' },
 ]
 
 interface ReadingChatViewProps {
