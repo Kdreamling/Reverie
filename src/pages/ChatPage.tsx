@@ -654,10 +654,10 @@ export default function ChatPage() {
             </span>
 
             <button
-              onClick={() => { handleCreateWithScene('daily'); setSidebarOpen(false) }}
+              onClick={() => { if (!isLockedByChen) { handleCreateWithScene('daily'); setSidebarOpen(false) } }}
               className="flex items-center justify-center rounded-md transition-colors duration-150 cursor-pointer"
-              style={{ width: 32, height: 32, color: C.textSecondary }}
-              title="新对话"
+              style={{ width: 32, height: 32, color: C.textSecondary, opacity: isLockedByChen ? 0.3 : 1, cursor: isLockedByChen ? 'not-allowed' : 'pointer' }}
+              title={isLockedByChen ? "晨关上了门，无法新建对话" : "新对话"}
             >
               <Plus size={18} strokeWidth={2} />
             </button>
@@ -1004,14 +1004,15 @@ export default function ChatPage() {
           {/* Right: new chat */}
           <button
             onClick={() => {
+              if (isLockedByChen) return
               const scene = currentSession?.scene_type || 'daily'
               handleCreateWithScene(scene)
             }}
             className="flex items-center justify-center rounded-md cursor-pointer transition-colors"
-            style={{ width: 32, height: 32, color: C.textSecondary, padding: 6 }}
-            onMouseEnter={e => (e.currentTarget.style.color = C.text)}
+            style={{ width: 32, height: 32, color: C.textSecondary, padding: 6, opacity: isLockedByChen ? 0.3 : 1, cursor: isLockedByChen ? 'not-allowed' : 'pointer' }}
+            onMouseEnter={e => { if (!isLockedByChen) e.currentTarget.style.color = C.text }}
             onMouseLeave={e => (e.currentTarget.style.color = C.textSecondary)}
-            title="New chat"
+            title={isLockedByChen ? "晨关上了门，无法新建对话" : "New chat"}
           >
             <Plus size={18} strokeWidth={2} />
           </button>
