@@ -151,6 +151,7 @@ export default function ChatPage() {
   const [knockSending, setKnockSending] = useState(false)
   const [knockHistory, setKnockHistory] = useState<{ message: string; created_at: string }[]>([])
   const [knockCount, setKnockCount] = useState(0)
+  const [lockDismissed, setLockDismissed] = useState(false)
   const maxKnocks = 3
 
   // 检查封锁状态
@@ -172,6 +173,15 @@ export default function ChatPage() {
   const isLockedByChen = !!lockInfo?.chen_locked_dream
   const dreamLockedChen = !!lockInfo?.dream_locked_chen
   const chenLockId = lockInfo?.chen_locked_dream?.id || ''
+
+  // 锁解除时重新加载 session（清除 closed_by_ai 状态）
+  const prevLockedRef = useRef(isLockedByChen)
+  useEffect(() => {
+    if (prevLockedRef.current && !isLockedByChen) {
+      fetchSessions()
+    }
+    prevLockedRef.current = isLockedByChen
+  }, [isLockedByChen, fetchSessions])
 
   // 被锁时加载敲门历史
   useEffect(() => {
@@ -1317,10 +1327,11 @@ export default function ChatPage() {
         )}
 
         {/* 敲门弹窗 — 被 Claude 锁住时（放最外层避免 CSS 定位问题） */}
-        {isLockedByChen && (
+        {isLockedByChen && !lockDismissed && (
           <div className="fixed inset-0 z-50 flex items-center justify-center"
-            style={{ backdropFilter: 'blur(10px)', background: 'rgba(245,240,235,0.65)' }}>
-            <div className="flex flex-col items-center mx-4" style={{ maxWidth: 300, width: '100%' }}>
+            style={{ backdropFilter: 'blur(10px)', background: 'rgba(245,240,235,0.65)' }}
+            onClick={() => setLockDismissed(true)}>
+            <div className="flex flex-col items-center mx-4" style={{ maxWidth: 300, width: '100%' }} onClick={e => e.stopPropagation()}>
 
               {/* 呼吸光点 */}
               <div style={{
