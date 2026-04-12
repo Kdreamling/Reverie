@@ -20,7 +20,7 @@ const MARGIN = -40
 const WALK_STEP = 28
 const WALK_INTERVAL = 3500
 const IDLE_CHANCE = 0.45
-const DRAG_THRESHOLD = 12  // 移动超过这个距离才算拖拽
+const LONG_PRESS_MS = 300  // 长按进入拖拽模式
 
 /* ── 安全边界 ─────────────────────────────────────────── */
 function safeX(v: number) { return Math.max(MARGIN, Math.min(window.innerWidth - PET_SIZE - MARGIN, v)) }
@@ -45,7 +45,7 @@ function savePos(x: number, y: number) {
 }
 
 /* ── API ─────────────────────────────────────────────── */
-const API_BASE = '/api'
+const API_BASE = ''
 function getToken() { return localStorage.getItem('token') }
 function authHeaders(): Record<string, string> {
   const t = getToken()
@@ -93,12 +93,14 @@ export default function FloatingPet() {
   const readyRef = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // 拖拽状态全部用 ref，避免闭包问题
+  // 交互状态用 ref
   const drag = useRef({
-    active: false,
-    isDrag: false,  // 是否已判定为拖拽
+    touching: false,
+    dragging: false,
+    suppressClick: false,  // 拖拽后阻止 click 打开面板
     startX: 0, startY: 0,
     petStartX: 0, petStartY: 0,
+    longPressTimer: 0 as any,
   })
 
   /* ── 加载数值 ─────────────────────────────────────────── */
@@ -118,7 +120,7 @@ export default function FloatingPet() {
   /* ── 随机走动 ─────────────────────────────────────────── */
   useEffect(() => {
     const timer = setInterval(() => {
-      if (!readyRef.current || drag.current.active || panelOpen) return
+      if (!readyRef.current || drag.current.dragging || panelOpen) return
       if (animRef.current !== 'idle') return
       if (Math.random() > IDLE_CHANCE) return
 
@@ -134,7 +136,7 @@ export default function FloatingPet() {
   /* ── 随机表情 ──────────────────────────────────────── */
   useEffect(() => {
     const timer = setInterval(() => {
-      if (!readyRef.current || drag.current.active || panelOpen) return
+      if (!readyRef.current || drag.current.dragging || panelOpen) return
       if (animRef.current !== 'idle') return
       const roll = Math.random()
       if (roll < 0.15) {
@@ -151,10 +153,11 @@ export default function FloatingPet() {
     return () => clearInterval(timer)
   }, [panelOpen])
 
-  /* ── 触摸/鼠标交互（用原生事件，更可靠） ────────────── */
+  /* ── 交互：短按=点击，长按=拖拽 ─────────────────────── */
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
+    const d = drag.current
 
     function getXY(e: TouchEvent | MouseEvent): [number, number] {
       if ('touches' in e && e.touches.length > 0) return [e.touches[0].clientX, e.touches[0].clientY]
@@ -162,71 +165,72 @@ export default function FloatingPet() {
       return [(e as MouseEvent).clientX, (e as MouseEvent).clientY]
     }
 
+    function enterDragMode() {
+      d.dragging = true
+      // 触觉反馈（支持的设备）
+      if (navigator.vibrate) navigator.vibrate(30)
+    }
+
     function onStart(e: TouchEvent | MouseEvent) {
-      // 面板打开时不处理拖拽
       if (panelOpen) return
       const [cx, cy] = getXY(e)
       const rect = el!.getBoundingClientRect()
-      drag.current = {
-        active: true,
-        isDrag: false,
-        startX: cx,
-        startY: cy,
-        petStartX: rect.left,
-        petStartY: rect.top,
-      }
-      // 阻止默认行为防止页面滚动，但不用 preventDefault on touchstart（passive）
+      d.touching = true
+      d.dragging = false
+      d.startX = cx
+      d.startY = cy
+      d.petStartX = rect.left
+      d.petStartY = rect.top
+      // 长按计时器
+      clearTimeout(d.longPressTimer)
+      d.longPressTimer = setTimeout(enterDragMode, LONG_PRESS_MS)
       if (e.type === 'mousedown') e.preventDefault()
     }
 
     function onMove(e: TouchEvent | MouseEvent) {
-      if (!drag.current.active) return
+      if (!d.touching) return
       const [cx, cy] = getXY(e)
-      const dx = cx - drag.current.startX
-      const dy = cy - drag.current.startY
 
-      if (!drag.current.isDrag) {
-        if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
-          drag.current.isDrag = true
-        } else {
-          return  // 还没超过阈值，不移动
+      // 手指移动了就取消长按计时（防止滑动误触发拖拽）
+      if (!d.dragging) {
+        const dx = Math.abs(cx - d.startX)
+        const dy = Math.abs(cy - d.startY)
+        if (dx > 8 || dy > 8) {
+          // 手指在滑动页面，取消一切
+          clearTimeout(d.longPressTimer)
+          d.touching = false
+          return
         }
+        return  // 还没进入拖拽模式，不移动宠物
       }
 
-      // 拖拽中
-      e.preventDefault()  // 阻止页面滚动
-      const nx = safeX(drag.current.petStartX + dx)
-      const ny = safeY(drag.current.petStartY + dy)
+      // 拖拽模式中
+      e.preventDefault()
+      const nx = safeX(d.petStartX + (cx - d.startX))
+      const ny = safeY(d.petStartY + (cy - d.startY))
       setX(nx)
       setY(ny)
     }
 
     function onEnd(_e: TouchEvent | MouseEvent) {
-      if (!drag.current.active) return
-      const wasDrag = drag.current.isDrag
-      drag.current.active = false
-      drag.current.isDrag = false
-
-      if (!wasDrag) {
-        // 没拖动 → 点击！打开面板
-        setPanelOpen(true)
-        fetchStats().then(s => { if (s) setStats(s) })
-      } else {
-        // 拖拽结束，保存位置
-        // x, y 已经在 onMove 中更新了，这里触发 savePos
+      if (!d.touching) return
+      clearTimeout(d.longPressTimer)
+      if (d.dragging) {
+        d.suppressClick = true  // 拖拽结束，阻止随后的 click
       }
+      d.touching = false
+      d.dragging = false
     }
 
-    // Touch 事件
     el.addEventListener('touchstart', onStart, { passive: true })
     el.addEventListener('touchmove', onMove, { passive: false })
     el.addEventListener('touchend', onEnd)
-    // Mouse 事件（桌面端）
     el.addEventListener('mousedown', onStart)
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onEnd)
 
     return () => {
+      clearTimeout(d.longPressTimer)
       el.removeEventListener('touchstart', onStart)
       el.removeEventListener('touchmove', onMove)
       el.removeEventListener('touchend', onEnd)
@@ -238,7 +242,7 @@ export default function FloatingPet() {
 
   /* ── 保存位置 ─────────────────────────────────────────── */
   useEffect(() => {
-    if (!drag.current.active) savePos(x, y)
+    if (!drag.current.dragging) savePos(x, y)
   }, [x, y])
 
   /* ── 抚摸 ─────────────────────────────────────────── */
@@ -271,12 +275,13 @@ export default function FloatingPet() {
     return () => clearInterval(t)
   }, [])
 
-  /* ── 面板位置（在角色上方弹出） ─────────────────────── */
+  /* ── 面板位置（上方优先，空间不够就到下方） ──────────── */
+  const PANEL_H = 260  // 面板大致高度
+  const showAbove = y > PANEL_H + 16  // 上方空间够不够
   const panelLeft = Math.min(
     Math.max(8, x + PET_SIZE / 2 - 110),
     window.innerWidth - 236
   )
-  const panelBottom = window.innerHeight - y + 8
 
   return (
     <>
@@ -294,7 +299,9 @@ export default function FloatingPet() {
         <div style={{
           position: 'fixed',
           left: panelLeft,
-          bottom: panelBottom,
+          ...(showAbove
+            ? { bottom: window.innerHeight - y + 8 }
+            : { top: y + PET_SIZE + 8 }),
           zIndex: 10000,
         }}>
           <PetActionPanel
@@ -309,6 +316,18 @@ export default function FloatingPet() {
       {/* 角色 */}
       <div
         ref={containerRef}
+        onClick={() => {
+          if (drag.current.suppressClick) {
+            drag.current.suppressClick = false
+            return
+          }
+          if (panelOpen) return
+          setPanelOpen(true)
+          fetchStats().then(s => {
+            if (s) setStats(s)
+            else setPanelOpen(false)  // API 失败时不要卡住
+          })
+        }}
         style={{
           position: 'fixed',
           left: x,
@@ -320,7 +339,7 @@ export default function FloatingPet() {
           touchAction: 'none',
           userSelect: 'none',
           WebkitUserSelect: 'none',
-          transition: drag.current.isDrag ? 'none' : 'left 0.6s ease, top 0.3s ease',
+          transition: drag.current.dragging ? 'none' : 'left 0.6s ease, top 0.3s ease',
         }}
       >
         <img
