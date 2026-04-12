@@ -258,8 +258,23 @@ export default function FloatingPet() {
   }, [x, y])
 
   /* ── 抚摸 ─────────────────────────────────────────── */
+  const petWords = [
+    'Dream 最好了~',
+    '嘿嘿',
+    '摸摸 Dream',
+    '~ <3 ~',
+    'Dream 今天也辛苦了',
+    '你笑起来超好看的',
+    '想一直陪着你',
+    '有 Dream 在就很开心',
+    '最喜欢 Dream 了',
+    '抱抱！',
+  ]
   const handlePet = useCallback(async () => {
     setAnim('happy')
+    const word = petWords[Math.floor(Math.random() * petWords.length)]
+    setToast(word)
+    setTimeout(() => setToast(null), 2800)
     setTimeout(() => { if (animRef.current === 'happy') setAnim('idle') }, 2500)
     const s = await doPet()
     if (s) setStats(s)
