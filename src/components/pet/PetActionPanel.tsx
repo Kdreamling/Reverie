@@ -102,6 +102,7 @@ export interface PetStats {
   tokens_normal: number
   tokens_high: number
   last_pet_at: string | null
+  checkin_earned?: number
 }
 
 const PET_COOLDOWN = 30  // 抚摸冷却秒数

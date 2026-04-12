@@ -87,6 +87,7 @@ export default function FloatingPet() {
   const [flipped, setFlipped] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
   const [stats, setStats] = useState<PetStats | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
 
   const animRef = useRef(anim)
   animRef.current = anim
@@ -103,9 +104,20 @@ export default function FloatingPet() {
     longPressTimer: 0 as any,
   })
 
-  /* ── 加载数值 ─────────────────────────────────────────── */
+  /* ── 加载数值 + 签到 ──────────────────────────────────── */
   useEffect(() => {
-    fetchStats().then(s => { if (s) setStats(s) })
+    fetchStats().then(s => {
+      if (!s) return
+      setStats(s)
+      if (s.checkin_earned && s.checkin_earned > 0) {
+        setTimeout(() => {
+          setToast(`+ ${s.checkin_earned} token!`)
+          setAnim('happy')
+          setTimeout(() => setToast(null), 3000)
+          setTimeout(() => { if (animRef.current === 'happy') setAnim('idle') }, 2500)
+        }, 2000)
+      }
+    })
   }, [])
 
   /* ── 入场动画 ─────────────────────────────────────────── */
@@ -357,7 +369,36 @@ export default function FloatingPet() {
             pointerEvents: 'none',
           }}
         />
+
+        {/* 像素风气泡 */}
+        {toast && (
+          <div style={{
+            position: 'absolute',
+            top: -32,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            fontFamily: 'monospace',
+            fontSize: 12,
+            color: '#3D2B1F',
+            background: '#FDF6EC',
+            border: '2px solid #5C4033',
+            boxShadow: '2px 2px 0px #5C4033',
+            padding: '3px 10px',
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+            animation: 'petToastIn 0.3s ease',
+          }}>
+            {toast}
+          </div>
+        )}
       </div>
+
+      <style>{`
+        @keyframes petToastIn {
+          from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+          to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+      `}</style>
     </>
   )
 }
