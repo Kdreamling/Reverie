@@ -603,6 +603,27 @@ function LockedView({ diary, source, onBack, onUnlocked }: {
               </div>
             </>
           )}
+
+          {source === 'dream' && (
+            <div
+              onClick={async () => {
+                try {
+                  await removeLock(diary.id)
+                  toast.success('已解锁')
+                  const d = await fetchDreamDiary(diary.id)
+                  onUnlocked(d)
+                } catch { toast.error('解锁失败') }
+              }}
+              style={{
+                marginTop: 16, padding: '10px 0', borderRadius: 10,
+                background: 'rgba(160,120,90,0.04)', border: `1px solid ${C.border}`,
+                color: C.textSecondary, fontSize: 12, cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+            >
+              这是我的日记，直接解锁
+            </div>
+          )}
         </div>
       </div>
 

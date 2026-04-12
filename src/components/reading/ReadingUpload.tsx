@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { Upload, ClipboardPaste } from 'lucide-react'
 import { useReadingStore } from '../../stores/readingStore'
+import { parseFileToText, getBaseName, UnsupportedFormatError } from '../../utils/fileParser'
 import { C } from '../../theme'
 
 interface ReadingUploadProps {
@@ -18,14 +19,26 @@ export default function ReadingUpload({ sessionId, onUploaded }: ReadingUploadPr
   const uploadContent = useReadingStore(s => s.uploadContent)
   const isUploading = useReadingStore(s => s.isUploading)
 
+  const [parsing, setParsing] = useState(false)
+
   const handleFileUpload = useCallback(async (file: File) => {
-    if (!file.name.endsWith('.txt') && !file.name.endsWith('.md')) {
-      alert('目前只支持 .txt 和 .md 文件')
+    setParsing(true)
+    let text: string
+    try {
+      text = await parseFileToText(file)
+    } catch (e) {
+      setParsing(false)
+      if (e instanceof UnsupportedFormatError) {
+        alert('目前支持 .txt / .md / .pdf / .docx')
+      } else {
+        alert('文件解析失败，可能是受保护或损坏的文件')
+        console.error(e)
+      }
       return
     }
-    const text = await file.text()
+    setParsing(false)
     if (!text.trim()) { alert('文件内容为空'); return }
-    const fileName = file.name.replace(/\.(txt|md)$/, '')
+    const fileName = getBaseName(file.name)
     try {
       await uploadContent(sessionId, text, fileName, 'file')
       onUploaded()
@@ -53,11 +66,11 @@ export default function ReadingUpload({ sessionId, onUploaded }: ReadingUploadPr
     if (file) handleFileUpload(file)
   }, [handleFileUpload])
 
-  if (isUploading) {
+  if (isUploading || parsing) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 gap-4">
         <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: C.accent, borderTopColor: 'transparent' }} />
-        <p style={{ color: C.textMuted, fontSize: '0.9rem' }}>正在处理文本...</p>
+        <p style={{ color: C.textMuted, fontSize: '0.9rem' }}>{parsing ? '正在解析文件...' : '正在处理文本...'}</p>
       </div>
     )
   }
@@ -137,12 +150,12 @@ export default function ReadingUpload({ sessionId, onUploaded }: ReadingUploadPr
         >
           <Upload size={24} style={{ color: C.textSecondary }} />
           <span style={{ fontSize: '0.9rem', color: C.text, fontWeight: 500 }}>上传文件</span>
-          <span style={{ fontSize: '0.7rem', color: C.textMuted }}>.txt / .md</span>
+          <span style={{ fontSize: '0.7rem', color: C.textMuted }}>.txt / .md / .pdf / .docx</span>
         </button>
       </div>
 
       <input
-        ref={fileInputRef} type="file" accept=".txt,.md" className="hidden"
+        ref={fileInputRef} type="file" accept=".txt,.md,.pdf,.docx" className="hidden"
         onChange={e => { const file = e.target.files?.[0]; if (file) handleFileUpload(file); e.target.value = '' }}
       />
     </div>

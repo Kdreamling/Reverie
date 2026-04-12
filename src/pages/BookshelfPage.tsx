@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Plus, MessageCircle, X, FileText, Upload } from 'lucide-react'
 import { listBooksAPI, createBookAPI, startReadingAPI, deleteBookAPI, type Book } from '../api/reading'
+import { parseFileToText, getBaseName, UnsupportedFormatError } from '../utils/fileParser'
 import { C } from '../theme'
 import { toast } from '../stores/toastStore'
 
@@ -13,6 +14,7 @@ function AddBookSheet({ show, onClose, onCreated }: { show: boolean; onClose: ()
   const [author, setAuthor] = useState('')
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
+  const [parsing, setParsing] = useState(false)
 
   if (!show) return null
 
@@ -31,15 +33,30 @@ function AddBookSheet({ show, onClose, onCreated }: { show: boolean; onClose: ()
     }
   }
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      setText(reader.result as string)
-      if (!title) setTitle(file.name.replace(/\.(txt|md)$/, ''))
+    setParsing(true)
+    try {
+      const parsed = await parseFileToText(file)
+      if (!parsed.trim()) {
+        toast('文件里没解析出文字，可能是扫描版 PDF（图片形式）')
+      } else {
+        setText(parsed)
+        if (!title) setTitle(getBaseName(file.name))
+      }
+    } catch (err) {
+      if (err instanceof UnsupportedFormatError) {
+        toast('目前支持 .txt / .md / .pdf / .docx')
+      } else {
+        toast('文件解析失败，可能是受保护或损坏的文件')
+        console.error(err)
+      }
+    } finally {
+      setParsing(false)
+      // reset input so user can re-pick the same file after error
+      e.target.value = ''
     }
-    reader.readAsText(file)
   }
 
   return (
@@ -72,7 +89,7 @@ function AddBookSheet({ show, onClose, onCreated }: { show: boolean; onClose: ()
             <div style={{ display: 'flex', gap: 12 }}>
               {[
                 { key: 'paste' as const, icon: <FileText size={26} strokeWidth={1.3} />, label: '粘贴文本', sub: '直接粘贴内容' },
-                { key: 'file' as const, icon: <Upload size={26} strokeWidth={1.3} />, label: '导入文件', sub: '.txt / .md' },
+                { key: 'file' as const, icon: <Upload size={26} strokeWidth={1.3} />, label: '导入文件', sub: '.txt / .md / .pdf / .docx' },
               ].map(item => (
                 <button key={item.key} onClick={() => setMode(item.key)} style={{
                   flex: 1, display: 'flex', flexDirection: 'column',
@@ -126,8 +143,10 @@ function AddBookSheet({ show, onClose, onCreated }: { show: boolean; onClose: ()
                 cursor: 'pointer', color: C.textSecondary, marginBottom: 10,
               }}>
                 <Upload size={16} />
-                <span style={{ fontSize: 13 }}>{text ? '已导入，点击重新选择' : '选择 .txt / .md 文件'}</span>
-                <input type="file" accept=".txt,.md" onChange={handleFile} style={{ display: 'none' }} />
+                <span style={{ fontSize: 13 }}>
+                  {parsing ? '正在解析...' : text ? '已导入，点击重新选择' : '选择 .txt / .md / .pdf / .docx 文件'}
+                </span>
+                <input type="file" accept=".txt,.md,.pdf,.docx" onChange={handleFile} style={{ display: 'none' }} />
               </label>
             )}
 
@@ -181,7 +200,7 @@ function FeaturedCard({ book, onClick }: { book: Book; onClick: () => void }) {
         background: '#E8D9C5', opacity: 0.4,
       }} />
 
-      <h3 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 4px', color: C.text, lineHeight: 1.3 }}>
+      <h3 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 4px', color: C.text, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {book.title}
       </h3>
       <p style={{ fontSize: 13, color: C.textSecondary, margin: '0 0 16px' }}>
@@ -221,7 +240,7 @@ function CompactCard({ book, onClick, onDelete }: { book: Book; onClick: () => v
       background: '#FFFCF7', borderRadius: 16,
       padding: 16, position: 'relative',
       boxShadow: '0 2px 12px rgba(92,75,58,0.06)',
-      textAlign: 'left', minHeight: 140,
+      textAlign: 'left', minHeight: 140, minWidth: 0, overflow: 'hidden',
     }}>
       {/* Delete button */}
       <button
@@ -238,7 +257,7 @@ function CompactCard({ book, onClick, onDelete }: { book: Book; onClick: () => v
       </button>
 
       <div onClick={onClick} style={{ cursor: 'pointer', flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <h4 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 3px', color: C.text, lineHeight: 1.3, paddingRight: 20 }}>
+        <h4 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 3px', color: C.text, lineHeight: 1.3, paddingRight: 20, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const }}>
           {book.title}
         </h4>
         <p style={{ fontSize: 11, color: C.textSecondary, margin: '0 0 12px' }}>
@@ -306,7 +325,7 @@ export default function BookshelfPage() {
 
   return (
     <div style={{
-      height: '100%', overflow: 'auto',
+      height: '100%', overflow: 'auto', overflowX: 'hidden',
       background: C.bg,
       fontFamily: "'Noto Serif SC', 'Source Han Serif SC', Georgia, serif",
       color: C.text,
