@@ -90,10 +90,22 @@ export default function FloatingPet() {
   const [panelOpen, setPanelOpen] = useState(false)
   const [stats, setStats] = useState<PetStats | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [toastKey, setToastKey] = useState(0)
   const [activeScript, setActiveScript] = useState<Script | null>(null)
 
   const animRef = useRef(anim)
   const sessionStart = useRef(Date.now())
+  const toastTimer = useRef<any>(0)
+
+  // 气泡显示时长 = 动画时间 + 阅读时间
+  const showToast = useCallback((text: string, minMs = 3000) => {
+    clearTimeout(toastTimer.current)
+    setToast(text)
+    setToastKey(k => k + 1)
+    const animMs = text.length * 70 + 500  // 逐字弹跳总时长
+    const stayMs = Math.max(minMs, animMs + 2500)  // 弹完后再留 2.5 秒
+    toastTimer.current = setTimeout(() => setToast(null), stayMs)
+  }, [])
   animRef.current = anim
   const readyRef = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -115,9 +127,8 @@ export default function FloatingPet() {
       setStats(s)
       if (s.checkin_earned && s.checkin_earned > 0) {
         setTimeout(() => {
-          setToast(`+ ${s.checkin_earned} token!`)
+          showToast(`+${s.checkin_earned} token!`)
           setAnim('happy')
-          setTimeout(() => setToast(null), 3000)
           setTimeout(() => { if (animRef.current === 'happy') setAnim('idle') }, 2500)
         }, 2000)
       }
@@ -265,17 +276,14 @@ export default function FloatingPet() {
   const handlePet = useCallback(async () => {
     // 如果有活跃剧本且有抚摸覆盖台词
     if (activeScript?.petOverride) {
-      setToast(activeScript.petOverride)
-      setTimeout(() => setToast(null), 3000)
-      // 不播放开心动画（比如凌晨装睡时摸了没反应）
+      showToast(activeScript.petOverride)
       const s = await doPet()
       if (s) setStats(s)
       return
     }
     setAnim('happy')
     const level = stats ? getLevel(stats.affinity) : 0
-    setToast(getPetWord(level))
-    setTimeout(() => setToast(null), 2800)
+    showToast(getPetWord(level))
     setTimeout(() => { if (animRef.current === 'happy') setAnim('idle') }, 2500)
     const s = await doPet()
     if (s) setStats(s)
@@ -284,8 +292,7 @@ export default function FloatingPet() {
   /* ── 投喂 ─────────────────────────────────────────── */
   const handleFeed = useCallback(async (quality: 'normal' | 'high') => {
     if (activeScript?.feedOverride) {
-      setToast(activeScript.feedOverride)
-      setTimeout(() => setToast(null), 3000)
+      showToast(activeScript.feedOverride)
       const s = await doFeed(quality)
       if (s) setStats(s)
       return
@@ -313,14 +320,14 @@ export default function FloatingPet() {
         markTriggered(script.id)
         setActiveScript(script)
         const line = script.lines[Math.floor(Math.random() * script.lines.length)]
-        setToast(line)
+        showToast(line)
         if (script.anim) setAnim(script.anim as PetAnim)
-        // 气泡停留久一点（剧本台词比普通 toast 长）
+        // 动画恢复比气泡早一点
+        const animMs = line.length * 70 + 3000
         setTimeout(() => {
-          setToast(null)
           setActiveScript(null)
           if (script.anim && animRef.current === script.anim) setAnim('idle')
-        }, 6000)
+        }, animMs)
       }
     }
     // 首次延迟 30 秒再检查（让入场动画先走完）
@@ -417,54 +424,69 @@ export default function FloatingPet() {
 
         {/* 像素风对话气泡 */}
         {toast && (
-          <div style={{
+          <div key={toastKey} style={{
             position: 'absolute',
-            bottom: PET_SIZE - 16,
+            bottom: PET_SIZE - 10,
             left: '50%',
             transform: 'translateX(-50%)',
-            fontFamily: 'monospace',
-            fontSize: 12,
-            lineHeight: 1.5,
-            color: '#3D2B1F',
-            background: '#FDF6EC',
-            border: '2px solid #5C4033',
-            boxShadow: '2px 2px 0px #5C4033',
-            padding: '6px 12px',
-            maxWidth: 200,
-            textAlign: 'center',
             pointerEvents: 'none',
-            animation: 'petToastIn 0.3s ease',
+            animation: 'petBubblePop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
           }}>
-            {toast}
-            {/* 小三角 */}
             <div style={{
-              position: 'absolute',
-              bottom: -8,
-              left: '50%',
-              marginLeft: -4,
-              width: 0, height: 0,
-              borderLeft: '6px solid transparent',
-              borderRight: '6px solid transparent',
-              borderTop: '8px solid #5C4033',
-            }} />
-            <div style={{
-              position: 'absolute',
-              bottom: -5,
-              left: '50%',
-              marginLeft: -3,
-              width: 0, height: 0,
-              borderLeft: '5px solid transparent',
-              borderRight: '5px solid transparent',
-              borderTop: '6px solid #FDF6EC',
-            }} />
+              background: '#FDF6EC',
+              border: '2px solid #5C4033',
+              borderRadius: 3,
+              boxShadow: '2px 2px 0 #5C4033',
+              padding: '6px 12px',
+              maxWidth: 220,
+              textAlign: 'center',
+              whiteSpace: 'nowrap',
+            }}>
+              <span style={{
+                fontFamily: '"Press Start 2P", monospace',
+                fontSize: 9,
+                lineHeight: 1.6,
+                color: '#3D2B1F',
+                letterSpacing: 1,
+              }}>
+                {toast.split('').map((char, i) => (
+                  <span
+                    key={i}
+                    style={{
+                      display: 'inline-block',
+                      animation: `petCharBounce 0.5s ease ${i * 0.07}s both`,
+                      whiteSpace: char === ' ' ? 'pre' : undefined,
+                    }}
+                  >
+                    {char}
+                  </span>
+                ))}
+              </span>
+            </div>
+            {/* 小尾巴 */}
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <div style={{
+                width: 8, height: 6,
+                borderLeft: '2px solid #5C4033',
+                borderBottom: '2px solid #5C4033',
+                background: '#FDF6EC',
+                transform: 'skewX(-20deg)',
+                marginTop: -1,
+              }} />
+            </div>
           </div>
         )}
       </div>
 
       <style>{`
-        @keyframes petToastIn {
-          from { opacity: 0; transform: translateX(-50%) translateY(8px); }
-          to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        @keyframes petBubblePop {
+          from { opacity: 0; transform: translateX(-50%) scale(0.6); }
+          to { opacity: 1; transform: translateX(-50%) scale(1); }
+        }
+        @keyframes petCharBounce {
+          0% { opacity: 0; transform: translateY(8px); }
+          50% { opacity: 1; transform: translateY(-3px); }
+          100% { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </>
