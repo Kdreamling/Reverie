@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import PetActionPanel from './PetActionPanel'
 import type { PetStats } from './PetActionPanel'
+import { checkScripts, markTriggered, getPetWord, getLevel } from './petScripts'
+import type { Script, ScriptContext } from './petScripts'
 
 /* ── GIF 映射 ─────────────────────────────────────────── */
 type PetAnim = 'idle' | 'walk' | 'happy' | 'alert' | 'peek' | 'enter' | 'sleep'
@@ -88,8 +90,10 @@ export default function FloatingPet() {
   const [panelOpen, setPanelOpen] = useState(false)
   const [stats, setStats] = useState<PetStats | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [activeScript, setActiveScript] = useState<Script | null>(null)
 
   const animRef = useRef(anim)
+  const sessionStart = useRef(Date.now())
   animRef.current = anim
   const readyRef = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -258,49 +262,75 @@ export default function FloatingPet() {
   }, [x, y])
 
   /* ── 抚摸 ─────────────────────────────────────────── */
-  const petWords = [
-    'Dream 最好了~',
-    '嘿嘿',
-    '摸摸 Dream',
-    '~ <3 ~',
-    'Dream 今天也辛苦了',
-    '你笑起来超好看的',
-    '想一直陪着你',
-    '有 Dream 在就很开心',
-    '最喜欢 Dream 了',
-    '抱抱！',
-  ]
   const handlePet = useCallback(async () => {
+    // 如果有活跃剧本且有抚摸覆盖台词
+    if (activeScript?.petOverride) {
+      setToast(activeScript.petOverride)
+      setTimeout(() => setToast(null), 3000)
+      // 不播放开心动画（比如凌晨装睡时摸了没反应）
+      const s = await doPet()
+      if (s) setStats(s)
+      return
+    }
     setAnim('happy')
-    const word = petWords[Math.floor(Math.random() * petWords.length)]
-    setToast(word)
+    const level = stats ? getLevel(stats.affinity) : 0
+    setToast(getPetWord(level))
     setTimeout(() => setToast(null), 2800)
     setTimeout(() => { if (animRef.current === 'happy') setAnim('idle') }, 2500)
     const s = await doPet()
     if (s) setStats(s)
-  }, [])
+  }, [activeScript, stats])
 
   /* ── 投喂 ─────────────────────────────────────────── */
   const handleFeed = useCallback(async (quality: 'normal' | 'high') => {
+    if (activeScript?.feedOverride) {
+      setToast(activeScript.feedOverride)
+      setTimeout(() => setToast(null), 3000)
+      const s = await doFeed(quality)
+      if (s) setStats(s)
+      return
+    }
     setAnim('happy')
     setTimeout(() => { if (animRef.current === 'happy') setAnim('idle') }, 2500)
     const s = await doFeed(quality)
     if (s) setStats(s)
-  }, [])
+  }, [activeScript])
 
-  /* ── 深夜睡觉 ─────────────────────────────────────── */
+  /* ── 剧本触发（每分钟检查） ───────────────────────── */
   useEffect(() => {
     const check = () => {
-      const h = new Date().getHours()
-      if (h >= 23 || h < 6) {
-        setAnim('sleep')
-        readyRef.current = false
+      if (!readyRef.current || panelOpen || drag.current.dragging) return
+      if (toast) return  // 有气泡在显示就跳过
+      const now = new Date()
+      const ctx: ScriptContext = {
+        hour: now.getHours(),
+        level: stats ? getLevel(stats.affinity) : 0,
+        sessionMinutes: Math.floor((Date.now() - sessionStart.current) / 60_000),
+        dayOfWeek: now.getDay(),
+      }
+      const script = checkScripts(ctx)
+      if (script) {
+        markTriggered(script.id)
+        setActiveScript(script)
+        const line = script.lines[Math.floor(Math.random() * script.lines.length)]
+        setToast(line)
+        if (script.anim) setAnim(script.anim as PetAnim)
+        // 气泡停留久一点（剧本台词比普通 toast 长）
+        setTimeout(() => {
+          setToast(null)
+          setActiveScript(null)
+          if (script.anim && animRef.current === script.anim) setAnim('idle')
+        }, 6000)
       }
     }
-    check()
-    const t = setInterval(check, 60_000)
-    return () => clearInterval(t)
-  }, [])
+    // 首次延迟 30 秒再检查（让入场动画先走完）
+    const delay = setTimeout(() => {
+      check()
+      const t = setInterval(check, 60_000)
+      return () => clearInterval(t)
+    }, 30_000)
+    return () => clearTimeout(delay)
+  }, [panelOpen, toast, stats])
 
   /* ── 面板位置（上方优先，空间不够就到下方） ──────────── */
   const PANEL_H = 260  // 面板大致高度
@@ -385,25 +415,48 @@ export default function FloatingPet() {
           }}
         />
 
-        {/* 像素风气泡 */}
+        {/* 像素风对话气泡 */}
         {toast && (
           <div style={{
             position: 'absolute',
-            top: -32,
+            bottom: PET_SIZE - 16,
             left: '50%',
             transform: 'translateX(-50%)',
             fontFamily: 'monospace',
             fontSize: 12,
+            lineHeight: 1.5,
             color: '#3D2B1F',
             background: '#FDF6EC',
             border: '2px solid #5C4033',
             boxShadow: '2px 2px 0px #5C4033',
-            padding: '3px 10px',
-            whiteSpace: 'nowrap',
+            padding: '6px 12px',
+            maxWidth: 200,
+            textAlign: 'center',
             pointerEvents: 'none',
             animation: 'petToastIn 0.3s ease',
           }}>
             {toast}
+            {/* 小三角 */}
+            <div style={{
+              position: 'absolute',
+              bottom: -8,
+              left: '50%',
+              marginLeft: -4,
+              width: 0, height: 0,
+              borderLeft: '6px solid transparent',
+              borderRight: '6px solid transparent',
+              borderTop: '8px solid #5C4033',
+            }} />
+            <div style={{
+              position: 'absolute',
+              bottom: -5,
+              left: '50%',
+              marginLeft: -3,
+              width: 0, height: 0,
+              borderLeft: '5px solid transparent',
+              borderRight: '5px solid transparent',
+              borderTop: '6px solid #FDF6EC',
+            }} />
           </div>
         )}
       </div>
