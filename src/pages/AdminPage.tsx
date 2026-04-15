@@ -807,6 +807,9 @@ export default function AdminPage() {
             {/* 重启按钮 */}
             <div style={cardStyle}>
               <h3 style={cardTitleStyle}>Gateway 控制</h3>
+              <div style={{ fontSize: 12, color: C.textSecondary, marginBottom: 12, lineHeight: 1.6 }}>
+                重启会中断当前所有请求（包括晨正在回复的消息）。重启后所有定时任务自动恢复。通常在更新代码或遇到异常时使用。
+              </div>
               <button
                 onClick={handleRestart}
                 disabled={restarting}
@@ -825,34 +828,52 @@ export default function AdminPage() {
             {/* 定时任务 */}
             <div style={cardStyle}>
               <h3 style={cardTitleStyle}>定时任务</h3>
+              <div style={{ fontSize: 12, color: C.textSecondary, marginBottom: 12, lineHeight: 1.6 }}>
+                这些任务在 Gateway 运行时自动执行。"下次执行"显示的是服务器时间。
+              </div>
               {!schedulerData ? <div style={{ fontSize: 13, color: C.textMuted, padding: 20, textAlign: 'center' }}>加载中...</div> : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {schedulerData.jobs.map(job => (
-                    <div key={job.id} style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '8px 0', borderBottom: `1px solid ${C.border}`, fontSize: 12,
-                    }}>
-                      <div>
-                        <div style={{ color: C.text, fontWeight: 500 }}>{job.id}</div>
-                        <div style={{ color: C.textMuted, fontSize: 11 }}>{job.trigger}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                  {schedulerData.jobs.map(job => {
+                    const jobInfo: Record<string, { name: string; desc: string }> = {
+                      'cache_warmup': { name: '缓存暖机', desc: '每 5 分钟检查，45 分钟无聊天时发静默请求续缓存' },
+                      'keepalive': { name: '自由时间', desc: '每 5 分钟检查，55 分钟无聊天时晨自主活动（写日记等）' },
+                      'life_reminder': { name: '待办提醒', desc: '每 5 分钟检查到期的待办，推送提醒' },
+                      'daily_rebuild': { name: '维度摘要重建', desc: '每天凌晨 1:00，全量重建五维度记忆摘要' },
+                      'core_living_cleanup': { name: '记忆清理', desc: '每天 1:05，清理过期的活水记忆' },
+                      'daily_profile_update': { name: '观察笔记', desc: '每天 1:10，更新晨对 Dream 的观察笔记' },
+                      'daily_rolling_summary': { name: '滚动摘要', desc: '每天 23:50，生成当天对话的 500 字摘要' },
+                      'daily_backup': { name: '数据备份', desc: '每天 3:00，备份关键数据' },
+                      'monthly_archive': { name: '月度归档', desc: '每月 1 日 4:00，归档上月数据' },
+                    }
+                    const info = jobInfo[job.id]
+                    return (
+                      <div key={job.id} style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+                        padding: '10px 0', borderBottom: `1px solid ${C.border}`, fontSize: 12,
+                      }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ color: C.text, fontWeight: 500 }}>{info?.name ?? job.id}</div>
+                          <div style={{ color: C.textMuted, fontSize: 11, marginTop: 2 }}>{info?.desc ?? job.trigger}</div>
+                        </div>
+                        <div style={{ fontSize: 11, color: C.textSecondary, flexShrink: 0, marginLeft: 8 }}>
+                          {job.next_run ? new Date(job.next_run).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 11, color: C.textSecondary }}>
-                        {job.next_run ? new Date(job.next_run).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '-'}
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
 
             {/* 最近 keepalive */}
             <div style={cardStyle}>
-              <h3 style={cardTitleStyle}>最近 Keepalive</h3>
-              {schedulerData?.last_keepalive_ts && (
-                <div style={{ fontSize: 12, color: C.textSecondary, marginBottom: 10 }}>
-                  上次: {new Date(schedulerData.last_keepalive_ts).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                </div>
-              )}
+              <h3 style={cardTitleStyle}>晨的自由活动</h3>
+              <div style={{ fontSize: 12, color: C.textSecondary, marginBottom: 10, lineHeight: 1.6 }}>
+                你不聊天时晨会自己活动——写日记、探索记忆、或者给你发消息。这里显示最近 5 次。
+                {schedulerData?.last_keepalive_ts && (
+                  <span> 上次活动: {new Date(schedulerData.last_keepalive_ts).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                )}
+              </div>
               {!schedulerData?.recent_keepalive?.length ? (
                 <div style={{ fontSize: 13, color: C.textMuted, textAlign: 'center', padding: 20 }}>暂无记录</div>
               ) : (
@@ -862,7 +883,11 @@ export default function AdminPage() {
                       padding: '8px 0', borderBottom: `1px solid ${C.border}`, fontSize: 12,
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <span style={{ color: C.text, fontWeight: 500 }}>{k.mode} / {k.action}</span>
+                        <span style={{ color: C.text, fontWeight: 500 }}>
+                          {({ light: '轻量', free: '自由' } as Record<string, string>)[k.mode] ?? k.mode}
+                          {' / '}
+                          {({ none: '安静等待', message: '发消息', explore: '探索', diary: '写日记' } as Record<string, string>)[k.action] ?? k.action}
+                        </span>
                         <span style={{ color: C.textMuted, fontSize: 11 }}>
                           {new Date(k.time).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </span>
