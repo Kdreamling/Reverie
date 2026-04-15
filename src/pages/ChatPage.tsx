@@ -1225,6 +1225,13 @@ export default function ChatPage() {
                 </button>
               </div>
 
+              {/* Streaming hint */}
+              {isStreaming && (
+                <p className="text-center mb-1" style={{ fontSize: 11, color: C.textMuted, letterSpacing: '0.02em' }}>
+                  回复生成中，可以随时离开
+                </p>
+              )}
+
               {/* Attachment preview — hidden when locked */}
               {!isLockedByChen && attachments.length > 0 && (
                 <div className="flex gap-2 mb-2 px-1 flex-wrap">
