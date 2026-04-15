@@ -1,4 +1,4 @@
-import { memo, useState, useSyncExternalStore } from 'react'
+import { memo, useState, useCallback, useRef as useReactRef, useSyncExternalStore } from 'react'
 import { ChevronDown, ChevronRight, Copy, Trash2, Check, RotateCcw, Brain, FileText, File as FileIcon } from 'lucide-react'
 import type { ChatMessage, MessageAttachment, MemoryOperation } from '../api/chat'
 // ContextDebugPanel import removed (unused)
@@ -139,10 +139,54 @@ const AttachmentsBlock = memo(function AttachmentsBlock({ attachments }: { attac
 })
 
 import ReactMarkdown from 'react-markdown'
+import type { Components } from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 import { parseArtifacts } from './artifact/parseArtifacts'
 import ArtifactCard from './artifact/ArtifactCard'
+
+function CodeBlock({ children, ...props }: React.HTMLAttributes<HTMLPreElement>) {
+  const [copied, setCopied] = useState(false)
+  const [hovered, setHovered] = useState(false)
+  const preRef = useReactRef<HTMLPreElement>(null)
+
+  const handleCopy = useCallback(() => {
+    const text = preRef.current?.textContent
+    if (!text) return
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }, [])
+
+  return (
+    <div
+      style={{ position: 'relative' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <pre ref={preRef} {...props}>
+        {children}
+      </pre>
+      <button
+        onClick={handleCopy}
+        className="flex items-center justify-center rounded-md transition-opacity cursor-pointer"
+        style={{
+          position: 'absolute', top: 8, right: 8,
+          width: 28, height: 28,
+          opacity: hovered || copied ? 1 : 0,
+          background: 'rgba(180,150,120,0.18)',
+          border: '1px solid rgba(180,150,120,0.2)',
+          color: copied ? '#6B8E5A' : '#8A7A6A',
+        }}
+        title="复制代码"
+      >
+        {copied ? <Check size={13} strokeWidth={2} /> : <Copy size={13} strokeWidth={1.8} />}
+      </button>
+    </div>
+  )
+}
+
+const mdComponents: Components = { pre: CodeBlock }
 
 const MarkdownContent = memo(function MarkdownContent({ content }: { content: string }) {
   // 将 HTML <br/> / <br> 替换为 Markdown 换行
@@ -152,7 +196,7 @@ const MarkdownContent = memo(function MarkdownContent({ content }: { content: st
   if (artifacts.length === 0) {
     return (
       <div className="md-content">
-        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{normalized}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={mdComponents}>{normalized}</ReactMarkdown>
       </div>
     )
   }
@@ -166,7 +210,7 @@ const MarkdownContent = memo(function MarkdownContent({ content }: { content: st
           // Text part
           return part.trim() ? (
             <div key={i} className="md-content">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{part}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={mdComponents}>{part}</ReactMarkdown>
             </div>
           ) : null
         }

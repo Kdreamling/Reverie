@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
-import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square, MapPin } from 'lucide-react'
+import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square, MapPin, Image } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
@@ -146,6 +146,8 @@ export default function ChatPage() {
   const swipeStartX = useRef<number | null>(null)
   const swipeStartY = useRef<number | null>(null)
   const [locating, setLocating] = useState(false)
+  const [showPlusMenu, setShowPlusMenu] = useState(false)
+  const plusMenuRef = useRef<HTMLDivElement>(null)
   const [lockInfo, setLockInfo] = useState<{ chen_locked_dream: any; dream_locked_chen: any } | null>(null)
   const [knockMsg, setKnockMsg] = useState('')
   const [knockSending, setKnockSending] = useState(false)
@@ -367,19 +369,26 @@ export default function ChatPage() {
     setSwipedId(null)
   }
 
-  // iOS keyboard
+  // iOS keyboard — resize #root to visual viewport so flex layout handles everything
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
+    const root = document.getElementById('root')
+    if (!root) return
     function onResize() {
-      const offset = window.innerHeight - vv!.height - vv!.offsetTop
-      setKeyboardOffset(Math.max(0, offset))
+      root!.style.height = vv!.height + 'px'
+      // Pin to visible area (iOS may scroll the layout viewport)
+      root!.style.top = vv!.offsetTop + 'px'
+      setKeyboardOffset(0) // no longer needed, flex handles it
     }
     vv.addEventListener('resize', onResize)
     vv.addEventListener('scroll', onResize)
     return () => {
       vv.removeEventListener('resize', onResize)
       vv.removeEventListener('scroll', onResize)
+      // Restore on unmount
+      root!.style.height = ''
+      root!.style.top = ''
     }
   }, [])
 
@@ -455,6 +464,18 @@ export default function ChatPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showModelDropdown])
 
+  // Click outside to close plus menu
+  useEffect(() => {
+    if (!showPlusMenu) return
+    function handleClickOutside(e: MouseEvent) {
+      if (plusMenuRef.current && !plusMenuRef.current.contains(e.target as Node)) {
+        setShowPlusMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showPlusMenu])
+
   // When active session changes: load its messages
   useEffect(() => {
     if (currentSession) {
@@ -467,10 +488,15 @@ export default function ChatPage() {
   }, [currentSession?.id, loadMessages, clearMessages])
 
   // Scroll to bottom on new messages (reset user scroll state)
+  // Use 'instant' to avoid smooth-scroll lag that causes white gap after streaming ends
+  const prevMsgCountRef = useRef(0)
   useEffect(() => {
     userScrolledUpRef.current = false
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length])
+    // If message count jumped (e.g. streaming message finalized), use instant scroll
+    const jumped = messages.length - prevMsgCountRef.current >= 1
+    prevMsgCountRef.current = messages.length
+    messagesEndRef.current?.scrollIntoView({ behavior: jumped && !isStreaming ? 'instant' : 'smooth' })
+  }, [messages.length, isStreaming])
 
   // During streaming, scroll periodically — but only if user hasn't scrolled up
   useEffect(() => {
@@ -1169,7 +1195,7 @@ export default function ChatPage() {
             background: C.glass,
             backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
             borderTop: `1px solid ${C.border}`,
-            paddingBottom: keyboardOffset > 0 ? `${keyboardOffset}px` : 'max(10px, env(safe-area-inset-bottom))',
+            paddingBottom: 'max(10px, env(safe-area-inset-bottom))',
           }}>
             <div className="mx-auto px-4 md:px-6 py-2 relative" style={{ maxWidth: 720 }}>
               {/* Hidden file input */}
@@ -1238,35 +1264,39 @@ export default function ChatPage() {
                 </div>
               )}
 
+              <div ref={plusMenuRef}>
               <div
                 className="flex items-end gap-2.5 px-3.5 py-2.5 transition-all duration-300"
                 style={{
-                  borderRadius: isFocused ? 22 : 26,
+                  borderRadius: showPlusMenu ? '22px 22px 0 0' : (isFocused ? 22 : 26),
                   background: C.inputBg,
-                  border: `1px solid ${isFocused ? C.borderStrong : C.border}`,
+                  border: `1px solid ${isFocused || showPlusMenu ? C.borderStrong : C.border}`,
+                  borderBottom: showPlusMenu ? 'none' : undefined,
                   boxShadow: isFocused ? '0 4px 24px rgba(160,120,90,0.08)' : 'none',
                   opacity: isLockedByChen ? 0.35 : undefined,
                   pointerEvents: isLockedByChen ? 'none' : undefined,
                 }}
               >
-                {/* Attach button */}
+                {/* Plus toggle */}
                 <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isStreaming || isUploading || !currentSession}
-                  className="flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                  style={{ width: 30, height: 30, color: C.textMuted }}
-                  onMouseEnter={e => { if (!isStreaming) e.currentTarget.style.color = C.accent }}
-                  onMouseLeave={e => (e.currentTarget.style.color = C.textMuted)}
-                  title="上传文件"
+                  onClick={() => setShowPlusMenu(v => !v)}
+                  disabled={isStreaming || !currentSession}
+                  className="flex-shrink-0 flex items-center justify-center cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                  style={{
+                    width: 30, height: 30,
+                    color: showPlusMenu ? C.accent : C.textMuted,
+                    transform: showPlusMenu ? 'rotate(45deg)' : 'none',
+                    transition: 'transform 0.2s ease, color 0.15s',
+                  }}
                 >
-                  <Paperclip size={16} strokeWidth={1.8} />
+                  <Plus size={18} strokeWidth={2} />
                 </button>
                 <textarea
                   ref={textareaRef}
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  onFocus={() => setIsFocused(true)}
+                  onFocus={() => { setIsFocused(true); setShowPlusMenu(false) }}
                   onBlur={() => setIsFocused(false)}
                   disabled={isStreaming || !currentSession || sessionEnded || isLockedByChen}
                   placeholder={isLockedByChen ? "Session locked by Claude" : sessionEnded ? "Session closed" : "说点什么..."}
@@ -1274,18 +1304,6 @@ export default function ChatPage() {
                   className="flex-1 resize-none bg-transparent text-sm outline-none leading-relaxed disabled:opacity-40"
                   style={{ color: C.text, minHeight: 24, maxHeight: 120, overflowY: 'auto', scrollbarWidth: 'none' }}
                 />
-                {/* Location button */}
-                <button
-                  onClick={handleShareLocation}
-                  disabled={isStreaming || locating || !currentSession}
-                  className="flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                  style={{ width: 30, height: 30, color: locating ? C.accent : C.textMuted }}
-                  onMouseEnter={e => { if (!isStreaming) e.currentTarget.style.color = C.accent }}
-                  onMouseLeave={e => { if (!locating) e.currentTarget.style.color = C.textMuted }}
-                  title="分享位置"
-                >
-                  {locating ? <Loader2 size={15} className="animate-spin" /> : <MapPin size={15} strokeWidth={1.8} />}
-                </button>
                 {isStreaming ? (
                   <button
                     onClick={stopStreaming}
@@ -1310,6 +1328,50 @@ export default function ChatPage() {
                     {isUploading ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={15} strokeWidth={2.5} />}
                   </button>
                 )}
+              </div>
+
+              {/* Tool tray — expands below input */}
+              <div
+                style={{
+                  maxHeight: showPlusMenu ? 120 : 0,
+                  opacity: showPlusMenu ? 1 : 0,
+                  overflow: 'hidden',
+                  transition: 'max-height 0.25s ease, opacity 0.2s ease',
+                  background: C.inputBg,
+                  borderRadius: '0 0 22px 22px',
+                  border: showPlusMenu ? `1px solid ${C.borderStrong}` : `1px solid transparent`,
+                  borderTop: 'none',
+                }}
+              >
+                <div
+                  className="flex items-center gap-1 px-3"
+                  style={{ padding: '10px 12px 14px', borderTop: `1px dashed ${C.border}` }}
+                >
+                  {[
+                    { icon: Image, title: '图片', action: () => {
+                      const inp = document.createElement('input')
+                      inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true
+                      inp.onchange = () => { handleFileSelect(inp.files); setShowPlusMenu(false) }
+                      inp.click()
+                    }},
+                    { icon: FileText, title: '文件', action: () => { fileInputRef.current?.click(); setShowPlusMenu(false) }},
+                    { icon: MapPin, title: '位置', action: () => { handleShareLocation(); setShowPlusMenu(false) }},
+                  ].map(item => (
+                    <button
+                      key={item.title}
+                      onClick={item.action}
+                      disabled={isUploading}
+                      title={item.title}
+                      className="flex items-center justify-center rounded-xl transition-colors cursor-pointer disabled:opacity-40"
+                      style={{ width: 44, height: 44, color: C.textSecondary }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(160,120,90,0.06)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <item.icon size={20} strokeWidth={1.5} />
+                    </button>
+                  ))}
+                </div>
+              </div>
               </div>
             </div>
           </div>
