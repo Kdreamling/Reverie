@@ -458,13 +458,13 @@ function formatTokens(n: number): string {
 
 // ─── Tabs ────────────────────────────────────────────────────────────────────
 
-type Tab = 'status' | 'channels' | 'logs' | 'memory'
+type Tab = 'status' | 'channels' | 'logs' | 'scheduler'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'status', label: '总览' },
   { key: 'channels', label: '供应商' },
   { key: 'logs', label: '日志' },
-  { key: 'memory', label: '记忆' },
+  { key: 'scheduler', label: '运维' },
 ]
 
 // ─── Main Component ──────────────────────────────────────────────────────────
@@ -481,6 +481,8 @@ export default function AdminPage() {
   const [editingChannel, setEditingChannel] = useState<ChannelInfo | null>(null)
   const [lockStatus, setLockStatus] = useState<{ chen_locked_dream: any; dream_locked_chen: any } | null>(null)
   const [lockMinutes, setLockMinutes] = useState(120)
+  const [schedulerData, setSchedulerData] = useState<{ jobs: any[]; last_keepalive_ts: string | null; recent_keepalive: any[] } | null>(null)
+  const [restarting, setRestarting] = useState(false)
 
   const loadLockStatus = useCallback(async () => {
     try {
@@ -540,11 +542,31 @@ export default function AdminPage() {
     } catch { setUsage(null) }
   }, [])
 
+  const loadScheduler = useCallback(async () => {
+    try {
+      const data = await adminFetch<{ jobs: any[]; last_keepalive_ts: string | null; recent_keepalive: any[] }>('/admin/scheduler/status')
+      setSchedulerData(data)
+    } catch { setSchedulerData(null) }
+  }, [])
+
+  const handleRestart = async () => {
+    if (!confirm('确定重启 Gateway？会中断当前所有请求。')) return
+    setRestarting(true)
+    try {
+      const data = await adminFetch<{ success: boolean; message: string }>('/admin/restart', { method: 'POST' })
+      toast.info(data.message)
+    } catch (e) {
+      toast.error(`重启失败: ${e instanceof Error ? e.message : '未知错误'}`)
+    }
+    setTimeout(() => setRestarting(false), 10000)
+  }
+
   useEffect(() => {
     if (tab === 'status') { loadStatus(); loadUsage(); loadLockStatus() }
     if (tab === 'channels') loadChannels()
     if (tab === 'logs') loadLogs()
-  }, [tab, loadStatus, loadChannels, loadLogs, loadUsage, loadLockStatus])
+    if (tab === 'scheduler') loadScheduler()
+  }, [tab, loadStatus, loadChannels, loadLogs, loadUsage, loadLockStatus, loadScheduler])
 
   const handleTestChannel = async (ch: ChannelInfo) => {
     try {
@@ -780,13 +802,82 @@ export default function AdminPage() {
 
         {tab === 'logs' && <LogsSection logs={logs} />}
 
-        {tab === 'memory' && (
-          <div style={cardStyle}>
-            <h3 style={cardTitleStyle}>记忆系统管理</h3>
-            <div style={{ fontSize: 13, color: C.textMuted, textAlign: 'center', padding: 30 }}>
-              🚧 开发中，敬请期待
+        {tab === 'scheduler' && (
+          <>
+            {/* 重启按钮 */}
+            <div style={cardStyle}>
+              <h3 style={cardTitleStyle}>Gateway 控制</h3>
+              <button
+                onClick={handleRestart}
+                disabled={restarting}
+                style={{
+                  ...btnStyle, width: '100%',
+                  background: restarting ? C.surface : '#fff',
+                  border: `1px solid ${restarting ? C.border : '#e53935'}`,
+                  color: restarting ? C.textMuted : '#e53935',
+                  cursor: restarting ? 'default' : 'pointer',
+                }}
+              >
+                {restarting ? '重启中...请稍等后刷新' : '重启 Gateway'}
+              </button>
             </div>
-          </div>
+
+            {/* 定时任务 */}
+            <div style={cardStyle}>
+              <h3 style={cardTitleStyle}>定时任务</h3>
+              {!schedulerData ? <div style={{ fontSize: 13, color: C.textMuted, padding: 20, textAlign: 'center' }}>加载中...</div> : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {schedulerData.jobs.map(job => (
+                    <div key={job.id} style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '8px 0', borderBottom: `1px solid ${C.border}`, fontSize: 12,
+                    }}>
+                      <div>
+                        <div style={{ color: C.text, fontWeight: 500 }}>{job.id}</div>
+                        <div style={{ color: C.textMuted, fontSize: 11 }}>{job.trigger}</div>
+                      </div>
+                      <div style={{ fontSize: 11, color: C.textSecondary }}>
+                        {job.next_run ? new Date(job.next_run).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 最近 keepalive */}
+            <div style={cardStyle}>
+              <h3 style={cardTitleStyle}>最近 Keepalive</h3>
+              {schedulerData?.last_keepalive_ts && (
+                <div style={{ fontSize: 12, color: C.textSecondary, marginBottom: 10 }}>
+                  上次: {new Date(schedulerData.last_keepalive_ts).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </div>
+              )}
+              {!schedulerData?.recent_keepalive?.length ? (
+                <div style={{ fontSize: 13, color: C.textMuted, textAlign: 'center', padding: 20 }}>暂无记录</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {schedulerData.recent_keepalive.map((k, i) => (
+                    <div key={i} style={{
+                      padding: '8px 0', borderBottom: `1px solid ${C.border}`, fontSize: 12,
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ color: C.text, fontWeight: 500 }}>{k.mode} / {k.action}</span>
+                        <span style={{ color: C.textMuted, fontSize: 11 }}>
+                          {new Date(k.time).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      {k.content && (
+                        <div style={{ color: C.textSecondary, fontSize: 11, lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const }}>
+                          {k.content}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
     </div>
