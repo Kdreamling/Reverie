@@ -838,6 +838,7 @@ export default function AdminPage() {
                       'cache_warmup': { name: '缓存暖机', desc: '每 5 分钟检查，45 分钟无聊天时发静默请求续缓存' },
                       'keepalive': { name: '自由时间', desc: '每 5 分钟检查，55 分钟无聊天时晨自主活动（写日记等）' },
                       'life_reminder': { name: '待办提醒', desc: '每 5 分钟检查到期的待办，推送提醒' },
+                      'care_engine': { name: '关心引擎', desc: '每 5 分钟检查 Dream 状态，Sonnet 判断是否需要推送关怀（冷却 90 分钟）' },
                       'daily_rebuild': { name: '维度摘要重建', desc: '每天凌晨 1:00，全量重建五维度记忆摘要' },
                       'core_living_cleanup': { name: '记忆清理', desc: '每天 1:05，清理过期的活水记忆' },
                       'daily_profile_update': { name: '观察笔记', desc: '每天 1:10，更新晨对 Dream 的观察笔记' },
