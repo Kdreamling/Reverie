@@ -100,7 +100,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
   async loadMessages(sessionId) {
     try {
       const raw: unknown = await fetchMessagesAPI(sessionId)
-      console.log('[chatStore] loadMessages raw response:', raw)
 
       const records: unknown[] =
         Array.isArray(raw) ? raw
@@ -194,7 +193,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
       }
 
-      console.log('[chatStore] loadMessages transformed:', messages.length, 'messages from', records.length, 'records')
       set({ messages, sessionEnded: false })
     } catch {
       // silently fail

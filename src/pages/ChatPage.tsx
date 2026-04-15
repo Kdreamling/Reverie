@@ -295,7 +295,7 @@ export default function ChatPage() {
   }, [deleteConversation])
 
   const handleRetry = useCallback((_msgId: string) => {
-    console.log('retry', _msgId)
+    // TODO: implement retry
   }, [])
 
   // Window-level swipe gesture
