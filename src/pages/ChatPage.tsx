@@ -39,7 +39,7 @@ const GROUPS: { key: Group; label: string }[] = [
 const MODELS: { value: string; label: string }[] = [
   { value: 'deepseek-chat', label: 'DeepSeek Chat' },
   { value: 'deepseek-reasoner', label: 'DeepSeek Reasoner' },
-  { value: '[0.1]claude-opus-4-6-thinking', label: 'Claude Opus 4.6' },
+  { value: '[按量]claude-opus-4-6-thinking', label: 'Claude Opus 4.6' },
   { value: '[按量]claude-opus-4-6-thinking', label: 'Claude Opus 4.6 (按量)' },
   { value: 'claude-opus-4-6', label: 'Claude Opus (闲鱼)' },
   { value: 'anthropic/claude-opus-4.6', label: 'Claude Opus (OR)' },

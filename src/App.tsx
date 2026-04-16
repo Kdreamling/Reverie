@@ -12,6 +12,7 @@ import ProjectDetailPage from './pages/ProjectDetailPage'
 import DashboardPage from './pages/DashboardPage'
 import DiaryPage from './pages/DiaryPage'
 import AdminPage from './pages/AdminPage'
+import DevPage from './pages/DevPage'
 import XiaokeDiaryPage from './pages/XiaokeDiaryPage'
 import AuthGuard from './components/AuthGuard'
 import ToastContainer from './components/ToastContainer'
@@ -47,6 +48,7 @@ export default function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/diary/:date" element={<DiaryPage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/dev" element={<DevPage />} />
           <Route path="/xiaoke-diary" element={<XiaokeDiaryPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
