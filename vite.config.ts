@@ -21,6 +21,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: true,
       },
+      '/dev': {
+        target: 'https://kdreamling.work',
+        changeOrigin: true,
+        secure: true,
+      },
     },
   },
 })

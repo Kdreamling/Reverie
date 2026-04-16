@@ -9,6 +9,13 @@ import rehypeHighlight from 'rehype-highlight'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+interface DelegateStep {
+  round: number
+  tool: string
+  status: 'running' | 'done'
+  preview?: string
+}
+
 interface ToolCall {
   id: string
   name: string
@@ -16,6 +23,7 @@ interface ToolCall {
   result: string
   status: 'running' | 'done' | 'error'
   ts: number
+  subSteps?: DelegateStep[]
 }
 
 interface DevMessage {
@@ -57,6 +65,7 @@ function ToolCallBlock({ tc }: { tc: ToolCall }) {
   }
   const icon = icons[tc.name] || '🔧'
   const statusColor = tc.status === 'running' ? D.accent : tc.status === 'error' ? D.red : D.green
+  const hasSubSteps = tc.subSteps && tc.subSteps.length > 0
 
   return (
     <div style={{ margin: '4px 0', borderLeft: `2px solid ${statusColor}`, paddingLeft: 10 }}>
@@ -66,11 +75,27 @@ function ToolCallBlock({ tc }: { tc: ToolCall }) {
       >
         {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         <span>{icon} {tc.name}</span>
-        {tc.args && <span style={{ color: D.textMuted, fontSize: 11, maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tc.args}</span>}
+        {tc.args && !hasSubSteps && <span style={{ color: D.textMuted, fontSize: 11, maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tc.args}</span>}
+        {hasSubSteps && <span style={{ color: D.textMuted, fontSize: 11 }}>({tc.subSteps!.length} steps)</span>}
         {tc.status === 'running' && <span style={{ color: D.accent, fontSize: 11 }}>running...</span>}
       </button>
       {open && (
         <div style={{ fontSize: 12, fontFamily: 'monospace', padding: '4px 0 4px 18px' }}>
+          {/* Delegate 子步骤可视化 */}
+          {hasSubSteps && (
+            <div style={{ marginBottom: 6 }}>
+              {tc.subSteps!.map((s, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '1px 0', fontSize: 11 }}>
+                  <span style={{ color: s.status === 'done' ? D.green : D.accent, width: 12, textAlign: 'center' }}>
+                    {s.status === 'done' ? '✓' : '›'}
+                  </span>
+                  <span style={{ color: D.textMuted }}>R{s.round}</span>
+                  <span style={{ color: D.text }}>{icons[s.tool] || '🔧'} {s.tool}</span>
+                  {s.preview && <span style={{ color: D.textMuted, maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.preview}</span>}
+                </div>
+              ))}
+            </div>
+          )}
           {tc.args && (
             <div style={{ color: D.textMuted, marginBottom: 4, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
               <span style={{ color: D.accent }}>args: </span>{tc.args}
@@ -507,6 +532,38 @@ export default function DevPage() {
                 ))
                 continue
               }
+              case 'delegate_progress': {
+                const step: DelegateStep = {
+                  round: evt.round || 0,
+                  tool: evt.tool || '?',
+                  status: evt.status === 'done' ? 'done' : 'running',
+                  preview: evt.preview || undefined,
+                }
+                setMessages(prev => prev.map(m => {
+                  if (m.id !== assistantId) return m
+                  // 找到最后一个 delegate_to_sonnet 工具调用，追加子步骤
+                  const tcs = [...(m.toolCalls || [])]
+                  for (let i = tcs.length - 1; i >= 0; i--) {
+                    if (tcs[i].name === 'delegate_to_sonnet') {
+                      const existing = tcs[i].subSteps || []
+                      if (step.status === 'done') {
+                        // 更新已有的 running 步骤为 done
+                        const updated = existing.map(s =>
+                          s.round === step.round && s.tool === step.tool && s.status === 'running'
+                            ? { ...s, status: 'done' as const, preview: step.preview }
+                            : s
+                        )
+                        tcs[i] = { ...tcs[i], subSteps: updated }
+                      } else {
+                        tcs[i] = { ...tcs[i], subSteps: [...existing, step] }
+                      }
+                      break
+                    }
+                  }
+                  return { ...m, toolCalls: tcs }
+                }))
+                continue
+              }
               case 'session_ended':
               case 'silent_read':
               case 'clear_thinking':
@@ -554,14 +611,55 @@ export default function DevPage() {
     }
   }, [input, sessionId, token, isStreaming, model])
 
-  const stopStream = useCallback(() => { abortCtrl?.abort() }, [abortCtrl])
+  const stopStream = useCallback(() => {
+    // 通知后端中断工具循环
+    if (sessionId) {
+      fetch('/api/dev/abort', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId }),
+      }).catch(() => {})
+    }
+    // 同时断 SSE 流（兜底：如果晨在 thinking/text 阶段，abort 标志检查不到）
+    abortCtrl?.abort()
+  }, [sessionId, abortCtrl])
+
+  // 流式进行中：注入指令
+  const injectInstruction = useCallback(async () => {
+    if (!input.trim() || !sessionId) return
+    const text = input.trim()
+    setInput('')
+    // 前端显示注入的指令
+    setMessages(prev => [...prev, {
+      id: `inject-${Date.now()}`,
+      role: 'user',
+      content: `📌 ${text}`,
+      ts: Date.now(),
+    }])
+    try {
+      await fetch('/api/dev/inject', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId, content: text }),
+      })
+    } catch {
+      setMessages(prev => [...prev, {
+        id: `sys-${Date.now()}`, role: 'system',
+        content: 'Failed to inject instruction', ts: Date.now(),
+      }])
+    }
+  }, [input, sessionId])
 
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      sendMessage()
+      if (isStreaming) {
+        injectInstruction()
+      } else {
+        sendMessage()
+      }
     }
-  }, [sendMessage])
+  }, [sendMessage, injectInstruction, isStreaming])
 
   // ─── Render ──────────────────────────────────────────────────────────────
 
@@ -735,12 +833,11 @@ export default function DevPage() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isStreaming ? 'Claude is working...' : 'Describe what to change...'}
-              disabled={isStreaming}
+              placeholder={isStreaming ? 'Insert instruction...' : 'Describe what to change...'}
               rows={1}
               style={{
                 flex: 1, background: 'transparent', border: 'none', outline: 'none',
-                color: D.text, fontSize: 13, fontFamily: 'inherit', resize: 'none',
+                color: isStreaming ? D.accent : D.text, fontSize: 13, fontFamily: 'inherit', resize: 'none',
                 lineHeight: 1.5, maxHeight: 120, overflowY: 'auto',
               }}
               onInput={e => {
@@ -750,9 +847,20 @@ export default function DevPage() {
               }}
             />
             {isStreaming ? (
-              <button onClick={stopStream} style={{ background: D.red, border: 'none', borderRadius: 6, padding: '6px 8px', cursor: 'pointer', display: 'flex' }}>
-                <Square size={14} fill="white" color="white" />
-              </button>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {input.trim() && (
+                  <button
+                    onClick={injectInstruction}
+                    title="Inject instruction"
+                    style={{ background: D.accent, border: 'none', borderRadius: 6, padding: '6px 8px', cursor: 'pointer', display: 'flex' }}
+                  >
+                    <ArrowUp size={14} color={D.bg} />
+                  </button>
+                )}
+                <button onClick={stopStream} title="Stop" style={{ background: D.red, border: 'none', borderRadius: 6, padding: '6px 8px', cursor: 'pointer', display: 'flex' }}>
+                  <Square size={14} fill="white" color="white" />
+                </button>
+              </div>
             ) : (
               <button
                 onClick={sendMessage}
@@ -768,7 +876,9 @@ export default function DevPage() {
             )}
           </div>
           <div style={{ fontSize: 10, color: D.textMuted, marginTop: 4, textAlign: 'center' }}>
-            Shift+Enter for new line · read/write · git · build · restart · rollback
+            {isStreaming
+              ? 'Enter to inject instruction · Stop to abort'
+              : 'Shift+Enter for new line · read/write · git · build · restart · rollback'}
           </div>
         </div>
       </div>
