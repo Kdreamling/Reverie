@@ -37,15 +37,14 @@ const GROUPS: { key: Group; label: string }[] = [
 ]
 
 const MODELS: { value: string; label: string }[] = [
-  { value: 'deepseek-chat', label: 'DeepSeek Chat' },
-  { value: 'deepseek-reasoner', label: 'DeepSeek Reasoner' },
   { value: '[按量]claude-opus-4-6-thinking', label: 'Claude Opus 4.6' },
+  { value: 'guagua/claude-opus-4-7', label: 'Claude Opus 4.7 (呱呱)' },
+  { value: 'guagua-gcp/claude-opus-4-6', label: 'Claude Opus 4.6 (GCP)' },
   { value: '[按量]claude-opus-4-6-thinking', label: 'Claude Opus 4.6 (按量)' },
   { value: 'claude-opus-4-6', label: 'Claude Opus (闲鱼)' },
   { value: 'anthropic/claude-opus-4.6', label: 'Claude Opus (OR)' },
   { value: 'claude-opus-4.6-zenmux', label: 'Claude Opus (ZM)' },
   { value: 'claude-opus-4.6-guagua', label: 'Claude Opus 4.6 (呱呱)' },
-  { value: 'guagua/claude-opus-4-7', label: 'Claude Opus 4.7 (呱呱)' },
 ]
 
 // Sidebar navigation icons (SVG paths)
