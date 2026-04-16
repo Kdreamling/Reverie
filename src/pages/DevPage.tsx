@@ -159,9 +159,11 @@ function formatTime(iso: string) {
 // ─── Main DevPage ────────────────────────────────────────────────────────────
 
 const DEV_MODELS: { value: string; label: string }[] = [
+  { value: 'guagua-gcp/claude-sonnet-4-6', label: 'Sonnet 4.6 (呱呱GCP)' },
+  { value: 'guagua-gcp/claude-opus-4-6', label: 'Opus 4.6 (呱呱GCP)' },
   { value: '[按量]claude-sonnet-4-6', label: 'Sonnet 4.6 (按量)' },
   { value: '[按量]claude-opus-4-6-thinking', label: 'Opus 4.6 (按量)' },
-  { value: 'claude-opus-4.6-guagua', label: 'Opus 4.6 (呱呱)' },
+  { value: 'claude-opus-4.6-guagua', label: 'Opus 4.6 (呱呱thinking)' },
   { value: 'claude-opus-4.6-zenmux', label: 'Opus 4.6 (ZM)' },
   { value: 'deepseek-chat', label: 'DeepSeek Chat' },
   { value: 'deepseek-reasoner', label: 'DeepSeek R1' },
