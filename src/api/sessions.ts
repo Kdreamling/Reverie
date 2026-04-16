@@ -28,6 +28,10 @@ export async function fetchTodaySessionAPI(): Promise<Session> {
   return client.get<Session>('/sessions/today')
 }
 
+export async function fetchSessionByIdAPI(id: string): Promise<Session> {
+  return client.get<Session>(`/sessions/${id}`)
+}
+
 export async function updateSessionAPI(
   id: string,
   data: Partial<Pick<Session, 'title' | 'model' | 'scene_type'>>,

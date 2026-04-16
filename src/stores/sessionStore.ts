@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import {
   fetchSessionsAPI,
+  fetchSessionByIdAPI,
   createSessionAPI,
   deleteSessionAPI,
   updateSessionAPI,
@@ -41,7 +42,7 @@ interface SessionState {
   fetchSessions: () => Promise<void>
   ensureTodaySession: () => Promise<void>
   createSession: (scene_type: string, model: string) => Promise<Session>
-  selectSession: (id: string) => void
+  selectSession: (id: string) => Promise<void>
   deleteSession: (id: string) => Promise<void>
   updateSessionModel: (model: string) => Promise<void>
 }
@@ -87,9 +88,22 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     return session
   },
 
-  selectSession(id) {
+  async selectSession(id) {
     const session = get().sessions.find(s => s.id === id) ?? null
-    set({ currentSession: session })
+    if (session) {
+      set({ currentSession: session })
+    } else {
+      // Session not in local list (e.g. RP session outside top 20) — fetch from backend
+      try {
+        const fetched = await fetchSessionByIdAPI(id)
+        set(s => ({
+          currentSession: fetched,
+          sessions: [fetched, ...s.sessions],
+        }))
+      } catch {
+        set({ currentSession: null })
+      }
+    }
   },
 
   async deleteSession(id) {
