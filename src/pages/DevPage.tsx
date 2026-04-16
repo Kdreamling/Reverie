@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
 import { ArrowUp, Terminal, RotateCcw, Square, ChevronDown, ChevronRight, Clock, Plus } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { createSessionAPI, fetchSessionsAPI, type Session } from '../api/sessions'
-import { streamChat, fetchMessagesAPI, type ChatMessage } from '../api/chat'
+import { streamChat, fetchMessagesAPI } from '../api/chat'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -181,6 +181,7 @@ export default function DevPage() {
   const [devSessions, setDevSessions] = useState<Session[]>([])
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [totalTokens, setTotalTokens] = useState({ input: 0, output: 0, cached: 0 })
+  const [gwStatus, setGwStatus] = useState<'ok' | 'disconnected' | 'reconnecting'>('ok')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -222,16 +223,55 @@ export default function DevPage() {
     }
   }, [token])  // eslint-disable-line
 
-  // Convert DB messages to DevMessages
-  function dbToDevMessages(msgs: ChatMessage[]): DevMessage[] {
-    return msgs.map(m => ({
-      id: m.id || `db-${Math.random().toString(36).slice(2)}`,
-      role: m.role === 'event' ? 'system' as const : m.role,
-      content: m.content,
-      thinking: m.thinking || m.thinking_summary || undefined,
-      tokens: m.tokens || undefined,
-      ts: new Date(m.created_at).getTime(),
-    }))
+  // Convert raw DB records (user_msg/assistant_msg pairs) to DevMessages
+  function dbToDevMessages(raw: unknown): DevMessage[] {
+    // API returns { messages: [...] } or array
+    const records: unknown[] =
+      Array.isArray(raw) ? raw
+        : Array.isArray((raw as { messages?: unknown }).messages)
+          ? (raw as { messages: unknown[] }).messages
+          : []
+
+    // DB returns newest first, reverse to chronological
+    records.reverse()
+
+    const result: DevMessage[] = []
+    for (const rec of records) {
+      const r = rec as {
+        id: string
+        user_msg?: string
+        assistant_msg?: string
+        thinking_summary?: string | null
+        thinking_time?: number | null
+        input_tokens?: number | null
+        output_tokens?: number | null
+        cached_tokens?: number | null
+        created_at: string
+      }
+      if (r.user_msg) {
+        result.push({
+          id: `${r.id}-user`,
+          role: 'user',
+          content: r.user_msg,
+          ts: new Date(r.created_at).getTime(),
+        })
+      }
+      if (r.assistant_msg) {
+        result.push({
+          id: `${r.id}-assistant`,
+          role: 'assistant',
+          content: r.assistant_msg,
+          thinking: r.thinking_summary || undefined,
+          tokens: (r.input_tokens || r.output_tokens) ? {
+            input: r.input_tokens ?? 0,
+            output: r.output_tokens ?? 0,
+            cached: r.cached_tokens ?? 0,
+          } : undefined,
+          ts: new Date(r.created_at).getTime(),
+        })
+      }
+    }
+    return result
   }
 
   // Load existing session (cache first, then DB fallback)
@@ -250,13 +290,13 @@ export default function DevPage() {
 
     // Fallback: load from DB
     try {
-      const msgs = await fetchMessagesAPI(sid)
-      if (msgs.length > 0) {
-        const devMsgs = [
-          { id: 'sys-restore', role: 'system' as const, content: `Session restored: ${sid.slice(0, 8)} (${msgs.length} messages)`, ts: Date.now() },
-          ...dbToDevMessages(msgs),
-        ]
-        setMessages(devMsgs)
+      const raw = await fetchMessagesAPI(sid)
+      const devMsgs = dbToDevMessages(raw)
+      if (devMsgs.length > 0) {
+        setMessages([
+          { id: 'sys-restore', role: 'system' as const, content: `Session restored: ${sid.slice(0, 8)} (${devMsgs.length} messages)`, ts: Date.now() },
+          ...devMsgs,
+        ])
       } else {
         setMessages([
           { id: 'sys-0', role: 'system', content: `Dev session: ${sid.slice(0, 8)} (empty)`, ts: Date.now() },
@@ -289,6 +329,41 @@ export default function DevPage() {
       setMessages([{ id: 'err-0', role: 'system', content: `Failed: ${e.message}`, ts: Date.now() }])
     }
   }, [token, model, loadDevSessions])
+
+  // Gateway health polling (after disconnect)
+  const pollGatewayHealth = useCallback(() => {
+    setGwStatus('disconnected')
+    setMessages(prev => [...prev, {
+      id: `sys-gw-${Date.now()}`, role: 'system',
+      content: 'Gateway disconnected — waiting for restart...', ts: Date.now(),
+    }])
+    let attempts = 0
+    const maxAttempts = 30
+    const iv = setInterval(async () => {
+      attempts++
+      setGwStatus('reconnecting')
+      try {
+        const res = await fetch('/api/health', { signal: AbortSignal.timeout(3000) })
+        if (res.ok) {
+          clearInterval(iv)
+          setGwStatus('ok')
+          setMessages(prev => [...prev, {
+            id: `sys-gw-ok-${Date.now()}`, role: 'system',
+            content: `Gateway reconnected (${attempts * 3}s)`, ts: Date.now(),
+          }])
+        }
+      } catch {
+        if (attempts >= maxAttempts) {
+          clearInterval(iv)
+          setGwStatus('disconnected')
+          setMessages(prev => [...prev, {
+            id: `sys-gw-fail-${Date.now()}`, role: 'system',
+            content: 'Gateway did not come back after 90s. Check server manually.', ts: Date.now(),
+          }])
+        }
+      }
+    }, 3000)
+  }, [])
 
   // Send message
   const sendMessage = useCallback(async () => {
@@ -461,9 +536,14 @@ export default function DevPage() {
       }
     } catch (e: any) {
       if (e.name !== 'AbortError') {
+        // Check if this looks like a gateway disconnect (network error during stream)
+        const isDisconnect = e.message?.includes('network') || e.message?.includes('Failed to fetch') || e.name === 'TypeError'
         setMessages(prev => prev.map(m =>
           m.id === assistantId ? { ...m, content: m.content + `\n\n[Error: ${e.message}]` } : m
         ))
+        if (isDisconnect) {
+          pollGatewayHealth()
+        }
       }
     } finally {
       setIsStreaming(false)
@@ -551,6 +631,16 @@ export default function DevPage() {
               <Terminal size={16} />
             </button>
             <span style={{ fontSize: 13, fontWeight: 600, color: D.accent }}>Reverie Dev</span>
+            {gwStatus !== 'ok' && (
+              <span style={{
+                fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                background: gwStatus === 'disconnected' ? 'rgba(212,115,90,0.15)' : 'rgba(196,154,120,0.15)',
+                color: gwStatus === 'disconnected' ? D.red : D.accent,
+                animation: gwStatus === 'reconnecting' ? 'pulse 1.5s ease-in-out infinite' : 'none',
+              }}>
+                {gwStatus === 'disconnected' ? 'disconnected' : 'reconnecting...'}
+              </span>
+            )}
             {sessionId && (
               <span style={{ fontSize: 10, color: D.textMuted }}>{sessionId.slice(0, 8)}</span>
             )}
