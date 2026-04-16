@@ -53,6 +53,7 @@ function ToolCallBlock({ tc }: { tc: ToolCall }) {
     git_commit: '💾', git_push: '🚀', git_rollback: '⏪', build_frontend: '🏗️',
     restart_gateway: '🔄', run_shell: '💻', read_system_log: '📋',
     search_memory: '🔍', save_memory: '💭', run_code: '▶️',
+    delegate_to_sonnet: '🤖',
   }
   const icon = icons[tc.name] || '🔧'
   const statusColor = tc.status === 'running' ? D.accent : tc.status === 'error' ? D.red : D.green
