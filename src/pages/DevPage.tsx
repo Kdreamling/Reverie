@@ -75,7 +75,7 @@ function ToolCallBlock({ tc }: { tc: ToolCall }) {
       >
         {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         <span>{icon} {tc.name}</span>
-        {tc.args && !hasSubSteps && <span style={{ color: D.textMuted, fontSize: 11, maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tc.args}</span>}
+        {tc.args && !hasSubSteps && <span style={{ color: D.textMuted, fontSize: 11, maxWidth: 'min(400px, 50vw)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tc.args}</span>}
         {hasSubSteps && <span style={{ color: D.textMuted, fontSize: 11 }}>({tc.subSteps!.length} steps)</span>}
         {tc.status === 'running' && <span style={{ color: D.accent, fontSize: 11 }}>running...</span>}
       </button>
@@ -91,7 +91,7 @@ function ToolCallBlock({ tc }: { tc: ToolCall }) {
                   </span>
                   <span style={{ color: D.textMuted }}>R{s.round}</span>
                   <span style={{ color: D.text }}>{icons[s.tool] || '🔧'} {s.tool}</span>
-                  {s.preview && <span style={{ color: D.textMuted, maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.preview}</span>}
+                  {s.preview && <span style={{ color: D.textMuted, maxWidth: 'min(300px, 40vw)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.preview}</span>}
                 </div>
               ))}
             </div>
@@ -185,6 +185,7 @@ function formatTime(iso: string) {
 
 const DEV_MODELS: { value: string; label: string }[] = [
   { value: 'guagua-gcp/claude-sonnet-4-6', label: 'Sonnet 4.6 (呱呱GCP)' },
+  { value: 'guagua/claude-opus-4-7', label: 'Opus 4.7 (呱呱)' },
   { value: 'guagua-gcp/claude-opus-4-6', label: 'Opus 4.6 (呱呱GCP)' },
   { value: '[按量]claude-sonnet-4-6', label: 'Sonnet 4.6 (按量)' },
   { value: '[按量]claude-opus-4-6-thinking', label: 'Opus 4.6 (按量)' },
@@ -198,6 +199,18 @@ const DEV_MODELS: { value: string; label: string }[] = [
 const messageCache = new Map<string, DevMessage[]>()
 const tokenCache = new Map<string, { input: number; output: number; cached: number }>()
 
+// ─── Responsive breakpoint ──────────────────────────────────────────────────
+
+function useIsMobile(breakpoint = 640) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < breakpoint)
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < breakpoint)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [breakpoint])
+  return isMobile
+}
+
 export default function DevPage() {
   const token = useAuthStore(s => s.token)
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -207,11 +220,15 @@ export default function DevPage() {
   const [model, setModel] = useState(DEV_MODELS[0].value)
   const [abortCtrl, setAbortCtrl] = useState<AbortController | null>(null)
   const [devSessions, setDevSessions] = useState<Session[]>([])
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [totalTokens, setTotalTokens] = useState({ input: 0, output: 0, cached: 0 })
   const [gwStatus, setGwStatus] = useState<'ok' | 'disconnected' | 'reconnecting'>('ok')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const isMobile = useIsMobile()
+
+  // PC 默认展开侧边栏
+  useEffect(() => { if (!isMobile) setSidebarOpen(true) }, [isMobile])
 
   // Save messages to cache whenever they change
   useEffect(() => {
@@ -307,6 +324,7 @@ export default function DevPage() {
     if (!token || sid === sessionId) return
     setSessionId(sid)
     localStorage.setItem('reverie_dev_session', sid)
+    if (window.innerWidth < 640) setSidebarOpen(false)
 
     // Check in-memory cache first
     const cached = messageCache.get(sid)
@@ -666,11 +684,17 @@ export default function DevPage() {
   return (
     <div style={{ display: 'flex', height: '100vh', background: D.bg, color: D.text, fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace" }}>
 
-      {/* Sidebar */}
+      {/* Sidebar — overlay on mobile, inline on desktop */}
+      {sidebarOpen && isMobile && (
+        <div onClick={() => setSidebarOpen(false)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 90,
+        }} />
+      )}
       {sidebarOpen && (
         <div style={{
           width: 220, flexShrink: 0, borderRight: `1px solid ${D.border}`,
           background: D.surface, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          ...(isMobile ? { position: 'fixed', left: 0, top: 0, bottom: 0, zIndex: 100 } : {}),
         }}>
           <div style={{ padding: '12px 14px', borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 12, color: D.textMuted, fontWeight: 600 }}>Sessions</span>
@@ -721,20 +745,20 @@ export default function DevPage() {
         {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '8px 16px', borderBottom: `1px solid ${D.border}`,
-          background: D.surface, flexShrink: 0,
+          padding: isMobile ? '6px 10px' : '8px 16px', borderBottom: `1px solid ${D.border}`,
+          background: D.surface, flexShrink: 0, gap: 6, flexWrap: isMobile ? 'wrap' : 'nowrap',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 10, minWidth: 0 }}>
             <button
               onClick={() => setSidebarOpen(o => !o)}
-              style={{ background: 'none', border: 'none', color: D.textMuted, cursor: 'pointer', padding: 2 }}
+              style={{ background: 'none', border: 'none', color: D.textMuted, cursor: 'pointer', padding: 2, flexShrink: 0 }}
             >
               <Terminal size={16} />
             </button>
-            <span style={{ fontSize: 13, fontWeight: 600, color: D.accent }}>Reverie Dev</span>
+            {!isMobile && <span style={{ fontSize: 13, fontWeight: 600, color: D.accent }}>Reverie Dev</span>}
             {gwStatus !== 'ok' && (
               <span style={{
-                fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                fontSize: 10, padding: '2px 6px', borderRadius: 4,
                 background: gwStatus === 'disconnected' ? 'rgba(212,115,90,0.15)' : 'rgba(196,154,120,0.15)',
                 color: gwStatus === 'disconnected' ? D.red : D.accent,
                 animation: gwStatus === 'reconnecting' ? 'pulse 1.5s ease-in-out infinite' : 'none',
@@ -742,18 +766,14 @@ export default function DevPage() {
                 {gwStatus === 'disconnected' ? 'disconnected' : 'reconnecting...'}
               </span>
             )}
-            {sessionId && (
-              <span style={{ fontSize: 10, color: D.textMuted }}>{sessionId.slice(0, 8)}</span>
-            )}
-            {/* Token counter */}
             {totalTokens.input > 0 && (
-              <span style={{ fontSize: 10, color: D.textMuted, padding: '2px 6px', background: D.accentDim, borderRadius: 4 }}>
-                {((totalTokens.input + totalTokens.output) / 1000).toFixed(0)}k tokens
-                {totalTokens.cached > 0 && <span style={{ color: D.accent }}> ({((totalTokens.cached / totalTokens.input) * 100).toFixed(0)}% cached)</span>}
+              <span style={{ fontSize: 10, color: D.textMuted, padding: '2px 6px', background: D.accentDim, borderRadius: 4, whiteSpace: 'nowrap' }}>
+                {((totalTokens.input + totalTokens.output) / 1000).toFixed(0)}k
+                {totalTokens.cached > 0 && !isMobile && <span style={{ color: D.accent }}> ({((totalTokens.cached / totalTokens.input) * 100).toFixed(0)}% cached)</span>}
               </span>
             )}
           </div>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
             <select
               value={model}
               onChange={e => setModel(e.target.value)}
@@ -761,7 +781,7 @@ export default function DevPage() {
               style={{
                 background: D.inputBg, border: `1px solid ${D.border}`, borderRadius: 6,
                 padding: '4px 8px', color: D.accent, fontSize: 11, fontFamily: 'inherit',
-                cursor: 'pointer', outline: 'none',
+                cursor: 'pointer', outline: 'none', maxWidth: isMobile ? 130 : 'none',
               }}
             >
               {DEV_MODELS.map(m => (
@@ -770,7 +790,7 @@ export default function DevPage() {
             </select>
             <a
               href="/chat/"
-              style={{ border: `1px solid ${D.border}`, borderRadius: 6, padding: '4px 10px', color: D.textMuted, fontSize: 11, textDecoration: 'none' }}
+              style={{ border: `1px solid ${D.border}`, borderRadius: 6, padding: '4px 10px', color: D.textMuted, fontSize: 11, textDecoration: 'none', whiteSpace: 'nowrap' }}
             >
               Chat
             </a>
@@ -778,7 +798,7 @@ export default function DevPage() {
         </div>
 
         {/* Messages */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '8px 10px' : '12px 20px' }}>
           {messages.map(msg => (
             <div key={msg.id} style={{ marginBottom: 14 }}>
               {msg.role === 'system' && (
@@ -821,7 +841,7 @@ export default function DevPage() {
         </div>
 
         {/* Input */}
-        <div style={{ padding: '10px 16px', borderTop: `1px solid ${D.border}`, background: D.surface, flexShrink: 0 }}>
+        <div style={{ padding: isMobile ? '8px 10px' : '10px 16px', borderTop: `1px solid ${D.border}`, background: D.surface, flexShrink: 0 }}>
           <div style={{
             display: 'flex', alignItems: 'flex-end', gap: 8,
             background: D.inputBg, borderRadius: 10, border: `1px solid ${D.border}`,
