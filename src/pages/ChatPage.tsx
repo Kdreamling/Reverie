@@ -44,7 +44,8 @@ const MODELS: { value: string; label: string }[] = [
   { value: 'claude-opus-4-6', label: 'Claude Opus (闲鱼)' },
   { value: 'anthropic/claude-opus-4.6', label: 'Claude Opus (OR)' },
   { value: 'claude-opus-4.6-zenmux', label: 'Claude Opus (ZM)' },
-  { value: 'claude-opus-4.6-guagua', label: 'Claude Opus (呱呱)' },
+  { value: 'claude-opus-4.6-guagua', label: 'Claude Opus 4.6 (呱呱)' },
+  { value: 'guagua/claude-opus-4-7', label: 'Claude Opus 4.7 (呱呱)' },
 ]
 
 // Sidebar navigation icons (SVG paths)
