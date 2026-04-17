@@ -12,10 +12,11 @@ interface ChannelInfo {
   base_url: string
   api_key_masked: string
   models: string[]
+  model_overrides?: Record<string, { model_name?: string; supports_thinking?: boolean }>
   supports_thinking: boolean
   thinking_format: string
   enabled: boolean
-  source: 'hardcoded' | 'db'
+  source: 'hardcoded' | 'hardcoded_override' | 'db'
 }
 
 interface ServerStatus {
@@ -108,6 +109,8 @@ function ChannelCard({ ch, onTest, onEdit, onDelete, onToggle }: {
 }) {
   const [testing, setTesting] = useState(false)
   const isDb = ch.source === 'db'
+  const isHardcoded = ch.source === 'hardcoded' || ch.source === 'hardcoded_override'
+  const hasOverride = ch.source === 'hardcoded_override'
 
   const handleTest = async () => {
     setTesting(true)
@@ -134,9 +137,9 @@ function ChannelCard({ ch, onTest, onEdit, onDelete, onToggle }: {
           }}>{ch.provider}</span>
           <span style={{
             fontSize: 9, padding: '2px 6px', borderRadius: 8,
-            background: isDb ? '#e8f5e9' : C.surface,
-            color: isDb ? '#4caf50' : C.textMuted,
-          }}>{isDb ? 'DB' : '内置'}</span>
+            background: isDb ? '#e8f5e9' : (hasOverride ? '#fff3e0' : C.surface),
+            color: isDb ? '#4caf50' : (hasOverride ? '#e65100' : C.textMuted),
+          }}>{isDb ? 'DB' : (hasOverride ? '内置·已改' : '内置')}</span>
         </div>
       </div>
 
@@ -170,16 +173,19 @@ function ChannelCard({ ch, onTest, onEdit, onDelete, onToggle }: {
         >
           {testing ? '测试中...' : '测试'}
         </button>
+        <button onClick={() => onEdit(ch)} style={smallBtnStyle}>编辑</button>
+        <button onClick={() => onToggle(ch)} style={smallBtnStyle}>
+          {ch.enabled ? '停用' : '启用'}
+        </button>
         {isDb && (
-          <>
-            <button onClick={() => onEdit(ch)} style={smallBtnStyle}>编辑</button>
-            <button onClick={() => onToggle(ch)} style={smallBtnStyle}>
-              {ch.enabled ? '停用' : '启用'}
-            </button>
-            <button onClick={() => onDelete(ch)} style={{ ...smallBtnStyle, color: '#e53935' }}>
-              删除
-            </button>
-          </>
+          <button onClick={() => onDelete(ch)} style={{ ...smallBtnStyle, color: '#e53935' }}>
+            删除
+          </button>
+        )}
+        {isHardcoded && hasOverride && (
+          <button onClick={() => onDelete(ch)} style={{ ...smallBtnStyle, color: '#e65100' }}>
+            恢复默认
+          </button>
         )}
       </div>
     </div>
@@ -247,17 +253,57 @@ function AddChannelForm({ onSubmit, onCancel }: {
   )
 }
 
-function EditChannelForm({ ch, onSubmit, onCancel }: {
+// 把 "显示名 => 上游id" 的文本解析为 {models, model_overrides}
+function parseModelsText(text: string): { models: string[]; model_overrides: Record<string, { model_name: string }> } {
+  const list: string[] = []
+  const overrides: Record<string, { model_name: string }> = {}
+  text.split(/[\n,]/).map(s => s.trim()).filter(Boolean).forEach(line => {
+    const m = line.match(/^(.+?)\s*=>\s*(.+)$/)
+    if (m) {
+      const disp = m[1].trim()
+      const real = m[2].trim()
+      list.push(disp)
+      if (real && real !== disp) overrides[disp] = { model_name: real }
+    } else {
+      list.push(line)
+    }
+  })
+  return { models: list, model_overrides: overrides }
+}
+
+function encodeModelsText(models: string[], overrides?: Record<string, { model_name?: string }>): string {
+  return models.map(m => {
+    const real = overrides?.[m]?.model_name
+    return real ? `${m} => ${real}` : m
+  }).join('\n')
+}
+
+function EditChannelForm({ ch, onSubmit, onSubmitAndTest, onCancel }: {
   ch: ChannelInfo
   onSubmit: (name: string, data: Record<string, unknown>) => void
+  onSubmitAndTest: (name: string, data: Record<string, unknown>) => void
   onCancel: () => void
 }) {
   const [provider, setProvider] = useState(ch.provider)
   const [baseUrl, setBaseUrl] = useState(ch.base_url)
   const [apiKey, setApiKey] = useState('')
-  const [models, setModels] = useState(ch.models.join(', '))
+  const [models, setModels] = useState(encodeModelsText(ch.models, ch.model_overrides))
   const [thinking, setThinking] = useState(ch.supports_thinking)
   const [thinkingFmt, setThinkingFmt] = useState(ch.thinking_format)
+
+  const buildData = (): Record<string, unknown> => {
+    const parsed = parseModelsText(models)
+    const data: Record<string, unknown> = {
+      provider,
+      base_url: baseUrl,
+      models: parsed.models,
+      model_overrides: parsed.model_overrides,
+      supports_thinking: thinking,
+      thinking_format: thinkingFmt,
+    }
+    if (apiKey) data.api_key = apiKey
+    return data
+  }
 
   return (
     <div style={cardStyle}>
@@ -274,7 +320,19 @@ function EditChannelForm({ ch, onSubmit, onCancel }: {
         </div>
         <FormField label="Base URL" value={baseUrl} onChange={setBaseUrl} />
         <FormField label="API Key（留空不修改）" value={apiKey} onChange={setApiKey} placeholder="留空保持原 Key" type="password" />
-        <FormField label="模型名（逗号分隔）" value={models} onChange={setModels} />
+        <div>
+          <label style={labelStyle}>模型（每行一个，可用 <code>显示名 =&gt; 上游id</code> 自定义）</label>
+          <textarea
+            value={models}
+            onChange={e => setModels(e.target.value)}
+            rows={Math.max(3, models.split('\n').length)}
+            style={{ ...inputStyle, fontFamily: 'monospace', fontSize: 12, resize: 'vertical' } as React.CSSProperties}
+            placeholder={'opus-慢 => claude-opus-4-6\nopus-快 => claude-opus-4-7'}
+          />
+          <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4 }}>
+            左边是聊天页显示的名字（随意取），右边是上游 API 真实的 model id。没 =&gt; 就是两者相同。
+          </div>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <label style={{ ...labelStyle, marginBottom: 0, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
             <input type="checkbox" checked={thinking} onChange={e => setThinking(e.target.checked)} />
@@ -290,20 +348,16 @@ function EditChannelForm({ ch, onSubmit, onCancel }: {
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
           <button
-            onClick={() => {
-              const data: Record<string, unknown> = {
-                provider,
-                base_url: baseUrl,
-                models: models.split(',').map(s => s.trim()).filter(Boolean),
-                supports_thinking: thinking,
-                thinking_format: thinkingFmt,
-              }
-              if (apiKey) data.api_key = apiKey
-              onSubmit(ch.name, data)
-            }}
+            onClick={() => onSubmit(ch.name, buildData())}
             style={{ ...btnStyle, flex: 1, background: C.accentGradient, color: '#fff' }}
           >
             保存
+          </button>
+          <button
+            onClick={() => onSubmitAndTest(ch.name, buildData())}
+            style={{ ...btnStyle, flex: 1, background: 'none', border: `1px solid ${C.accent}`, color: C.accent }}
+          >
+            保存并测试
           </button>
           <button onClick={onCancel} style={{ ...btnStyle, flex: 1, background: 'none', border: `1px solid ${C.border}`, color: C.textSecondary }}>
             取消
@@ -619,8 +673,40 @@ export default function AdminPage() {
     }
   }
 
+  const handleEditAndTestChannel = async (name: string, data: Record<string, unknown>) => {
+    try {
+      const resp = await adminFetch<{ success: boolean; message: string }>(
+        `/admin/channels/${encodeURIComponent(name)}`,
+        { method: 'PUT', body: JSON.stringify(data) },
+      )
+      if (!resp.success) {
+        toast.error(resp.message)
+        return
+      }
+      toast.success(`${resp.message}，正在测试...`)
+      // 保存后立刻测试
+      const testResp = await adminFetch<{ success: boolean; status_code?: number; error?: string; latency_ms?: number }>(
+        '/admin/channels/test',
+        { method: 'POST', body: JSON.stringify({ name }) },
+      )
+      if (testResp.success) {
+        toast.success(`${name} 连通正常 (${testResp.latency_ms}ms)`)
+      } else {
+        toast.error(`${name} 连通失败: ${testResp.status_code ?? ''} ${testResp.error ?? ''}`)
+      }
+      setEditingChannel(null)
+      loadChannels()
+    } catch (e) {
+      toast.error(`编辑失败: ${e instanceof Error ? e.message : '未知错误'}`)
+    }
+  }
+
   const handleDeleteChannel = async (ch: ChannelInfo) => {
-    if (!confirm(`确定删除渠道「${ch.name}」？此操作不可撤销。`)) return
+    const isHardcoded = ch.source === 'hardcoded' || ch.source === 'hardcoded_override'
+    const promptText = isHardcoded
+      ? `确定恢复「${ch.name}」到默认配置？自定义的 key / base_url / 模型列表将被清除，回退到 .env + 硬编码。`
+      : `确定删除渠道「${ch.name}」？此操作不可撤销。`
+    if (!confirm(promptText)) return
     try {
       const resp = await adminFetch<{ success: boolean; message: string }>(
         `/admin/channels/${encodeURIComponent(ch.name)}`,
@@ -784,6 +870,7 @@ export default function AdminPage() {
               <EditChannelForm
                 ch={editingChannel}
                 onSubmit={handleEditChannel}
+                onSubmitAndTest={handleEditAndTestChannel}
                 onCancel={() => setEditingChannel(null)}
               />
             )}
