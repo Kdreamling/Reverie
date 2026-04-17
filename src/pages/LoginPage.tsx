@@ -3,55 +3,64 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { ApiError } from '../api/client'
 
-// Fixed star field — positions in vw/vh percentages
-const STARS = [
-  { x:  4.2, y:  7.1, r: 0.8, o: 0.35 }, { x: 11.5, y:  2.8, r: 1.2, o: 0.50 },
-  { x: 18.7, y: 14.3, r: 0.6, o: 0.30 }, { x: 25.1, y:  6.0, r: 1.0, o: 0.45 },
-  { x: 31.4, y: 11.7, r: 1.5, o: 0.40 }, { x: 38.9, y:  3.5, r: 0.7, o: 0.55 },
-  { x: 45.2, y:  9.2, r: 1.1, o: 0.35 }, { x: 52.8, y:  5.4, r: 0.9, o: 0.48 },
-  { x: 60.3, y: 13.1, r: 1.3, o: 0.38 }, { x: 67.6, y:  2.1, r: 0.8, o: 0.52 },
-  { x: 74.1, y:  8.7, r: 1.0, o: 0.42 }, { x: 81.5, y:  4.9, r: 1.4, o: 0.33 },
-  { x: 88.3, y: 11.4, r: 0.7, o: 0.47 }, { x: 93.7, y:  6.8, r: 1.2, o: 0.40 },
-  { x:  7.8, y: 22.5, r: 1.0, o: 0.38 }, { x: 14.2, y: 28.3, r: 0.6, o: 0.32 },
-  { x: 22.6, y: 19.7, r: 1.3, o: 0.44 }, { x: 29.9, y: 25.1, r: 0.8, o: 0.50 },
-  { x: 36.4, y: 31.8, r: 1.1, o: 0.36 }, { x: 43.7, y: 20.4, r: 0.7, o: 0.42 },
-  { x: 57.2, y: 27.6, r: 1.4, o: 0.30 }, { x: 64.8, y: 18.9, r: 0.9, o: 0.55 },
-  { x: 72.3, y: 24.2, r: 0.6, o: 0.38 }, { x: 79.6, y: 33.5, r: 1.2, o: 0.45 },
-  { x: 86.1, y: 21.8, r: 1.0, o: 0.40 }, { x: 91.4, y: 29.0, r: 0.8, o: 0.35 },
-  { x:  3.5, y: 42.0, r: 0.7, o: 0.30 }, { x: 96.2, y: 38.7, r: 1.1, o: 0.42 },
-  { x:  9.1, y: 55.3, r: 0.9, o: 0.33 }, { x: 90.5, y: 51.6, r: 0.6, o: 0.38 },
-  { x:  5.7, y: 68.4, r: 1.2, o: 0.45 }, { x: 94.8, y: 64.1, r: 0.8, o: 0.30 },
-  { x: 12.4, y: 74.9, r: 1.0, o: 0.40 }, { x: 87.3, y: 77.2, r: 1.3, o: 0.35 },
-  { x: 19.8, y: 83.6, r: 0.7, o: 0.50 }, { x: 80.6, y: 86.3, r: 1.1, o: 0.38 },
-  { x: 27.3, y: 90.1, r: 0.9, o: 0.42 }, { x: 73.4, y: 92.7, r: 0.6, o: 0.33 },
-  { x: 34.6, y: 95.8, r: 1.4, o: 0.30 }, { x: 65.9, y: 88.5, r: 0.8, o: 0.47 },
-  { x: 42.1, y: 78.2, r: 0.7, o: 0.36 }, { x: 58.7, y: 80.9, r: 1.0, o: 0.40 },
-  { x: 50.3, y: 92.4, r: 1.2, o: 0.35 }, { x: 48.9, y: 18.6, r: 0.6, o: 0.28 },
-  { x:  2.1, y: 85.0, r: 1.5, o: 0.32 }, { x: 97.4, y: 15.3, r: 0.9, o: 0.44 },
-  { x: 16.0, y: 38.0, r: 0.5, o: 0.28 }, { x: 84.0, y: 44.5, r: 0.5, o: 0.30 },
-  { x: 55.5, y: 42.0, r: 0.5, o: 0.25 }, { x: 44.0, y: 58.0, r: 0.5, o: 0.27 },
+// Scattered stars across the sky — deterministic placement
+const STARS = Array.from({ length: 120 }, (_, i) => {
+  const seed = (i * 9301 + 49297) % 233280
+  const x = (seed / 233280) * 100
+  const y = ((seed * 7 + 13) % 233280) / 233280 * 100
+  const r = 0.25 + ((seed * 3) % 100) / 100 * 1.1
+  const o = 0.18 + ((seed * 11) % 100) / 100 * 0.55
+  const d = 2 + ((seed * 13) % 100) / 100 * 5
+  return { x, y, r, o, d }
+})
+
+// Shooting stars — occasional diagonal streaks
+const METEORS = Array.from({ length: 4 }, (_, i) => ({
+  top: 10 + i * 22,
+  left: 60 + i * 8,
+  delay: i * 7.3,
+  dur: 1.8 + i * 0.3,
+}))
+
+// Rising memory motes — faint lights drifting up through the sea
+const MOTES = Array.from({ length: 26 }, (_, i) => {
+  const seed = (i * 7919 + 104729) % 233280
+  const x = (seed / 233280) * 100
+  const delay = ((seed * 17) % 100) / 100 * 14
+  const dur = 10 + ((seed * 19) % 100) / 100 * 10
+  const drift = -10 + ((seed * 23) % 100) / 100 * 20
+  const size = 1 + ((seed * 5) % 100) / 100 * 2.2
+  return { x, delay, dur, drift, size }
+})
+
+// Orbits — each one has radius, speed, direction, and bodies on it
+// Distances and speeds picked to feel like a real little system
+const ORBITS = [
+  { r: 90,  speed: 22, dir:  1, tilt: 0,  dashed: false, op: 0.28, bodies: [{ size: 3, color: '#f8e8c8', offset: 30 }] },
+  { r: 130, speed: 38, dir: -1, tilt: 8,  dashed: true,  op: 0.22, bodies: [{ size: 2, color: '#c4baeb', offset: 120 }] },
+  { r: 175, speed: 58, dir:  1, tilt: -6, dashed: false, op: 0.30, bodies: [{ size: 4, color: '#fffaf2', offset: 200 }, { size: 2, color: '#94b8f2', offset: 70 }] },
+  { r: 225, speed: 82, dir: -1, tilt: 14, dashed: true,  op: 0.18, bodies: [{ size: 2.5, color: '#e8c8f0', offset: 0 }] },
+  { r: 280, speed: 110, dir: 1, tilt: -10, dashed: false, op: 0.14, bodies: [{ size: 3, color: '#c4a267', offset: 160 }] },
 ]
 
-function EyeIcon() {
-  return (
-    <svg width="34" height="22" viewBox="0 0 34 22" fill="none" stroke="rgba(255,250,242,0.92)" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 13 C7 5, 27 5, 32 13" />
-      <path d="M2 13 C7 19, 27 19, 32 13" />
-      <circle cx="17" cy="14" r="3" />
-    </svg>
-  )
-}
+// Gate orbits — the same system, miniaturized, for Act III
+const GATE_ORBITS = [
+  { r: 80,  speed: 20, dir: -1, dashed: false, op: 0.32, bodies: [{ size: 3, color: '#f8e8c8', offset: 0 }] },
+  { r: 115, speed: 36, dir:  1, dashed: true,  op: 0.22, bodies: [{ size: 2, color: '#c4baeb', offset: 180 }] },
+  { r: 155, speed: 56, dir: -1, dashed: false, op: 0.24, bodies: [{ size: 2.5, color: '#94b8f2', offset: 90 }] },
+]
 
 export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [entering, setEntering] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
   const login = useAuthStore(s => s.login)
 
   const rootRef = useRef<HTMLDivElement>(null)
-  const moonRef = useRef<HTMLDivElement>(null)
-  const starsRef = useRef<SVGSVGElement>(null)
+  const heroRef = useRef<HTMLDivElement>(null)
+  const skyRef = useRef<HTMLDivElement>(null)
   const hintRef = useRef<HTMLDivElement>(null)
   const sectionsRef = useRef<(HTMLElement | null)[]>([])
 
@@ -59,20 +68,20 @@ export default function LoginPage() {
     const root = rootRef.current
     if (!root) return
 
-    // Parallax on scroll (scroll container = rev-root)
     let raf = 0
     const onScroll = () => {
       if (raf) return
       raf = requestAnimationFrame(() => {
         const y = root.scrollTop
         const h = window.innerHeight
-        if (moonRef.current) {
-          const progress = Math.min(1, y / (h * 0.9))
-          moonRef.current.style.opacity = String(Math.max(0.1, 1 - progress * 0.9))
-          moonRef.current.style.transform = `translate(-50%, calc(-50% + ${y * 0.28}px))`
+        if (heroRef.current) {
+          const progress = Math.min(1, y / (h * 1.05))
+          heroRef.current.style.opacity = String(Math.max(0.04, 1 - progress * 0.96))
+          heroRef.current.style.transform =
+            `translate(-50%, calc(-50% + ${y * 0.48}px)) scale(${1 - progress * 0.28})`
         }
-        if (starsRef.current) {
-          starsRef.current.style.transform = `translateY(${y * 0.1}px)`
+        if (skyRef.current) {
+          skyRef.current.style.transform = `translateY(${y * 0.14}px)`
         }
         if (hintRef.current) {
           hintRef.current.style.opacity = y > 40 ? '0' : ''
@@ -82,11 +91,11 @@ export default function LoginPage() {
     }
     root.addEventListener('scroll', onScroll, { passive: true })
 
-    // Fade-in on intersection (root scroller = rev-root)
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach(e => {
           if (e.isIntersecting) e.target.classList.add('in-view')
+          else e.target.classList.remove('in-view')
         })
       },
       { root, threshold: 0.28 }
@@ -105,11 +114,11 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await login(password)
-      navigate('/', { replace: true })
+      setEntering(true)
+      setTimeout(() => navigate('/', { replace: true }), 950)
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) setError('Incorrect password.')
-      else setError('Connection failed. Please try again.')
-    } finally {
+      if (e instanceof ApiError && e.status === 401) setError('that word does not open this door.')
+      else setError('the line is quiet. try again.')
       setLoading(false)
     }
   }
@@ -123,185 +132,250 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="rev-root" ref={rootRef}>
-      {/* Sticky stage — holds stars + moon, sits on top of viewport while content scrolls */}
-      <div className="rev-stage" aria-hidden>
-        <svg
-          ref={starsRef}
-          className="rev-stars"
-          xmlns="http://www.w3.org/2000/svg"
-        >
+    <div className={`dr-root${entering ? ' is-entering' : ''}`} ref={rootRef}>
+      {/* ═══ Fixed sky — stars + nebulae + meteors ═══ */}
+      <div className="dr-sky" ref={skyRef} aria-hidden>
+        <div className="dr-nebula dr-nebula-a" />
+        <div className="dr-nebula dr-nebula-b" />
+        <div className="dr-nebula dr-nebula-c" />
+        <svg className="dr-stars" xmlns="http://www.w3.org/2000/svg">
           {STARS.map((s, i) => (
-            <circle key={i} cx={`${s.x}%`} cy={`${s.y}%`} r={s.r} fill="#fffaf2" opacity={s.o} />
+            <circle key={i} cx={`${s.x}%`} cy={`${s.y}%`} r={s.r} fill="#fffaf2" opacity={s.o}>
+              <animate attributeName="opacity" values={`${s.o};${s.o * 0.25};${s.o}`} dur={`${s.d}s`} repeatCount="indefinite" />
+            </circle>
           ))}
         </svg>
-
-        {/* Moon — soft moonlight, no hard disc */}
-        <div ref={moonRef} className="rev-moon">
-          <div className="rev-moon-halo" />
-          <div className="rev-moon-core" />
-          <div className="rev-moon-ring" />
-        </div>
-      </div>
-
-      {/* Scroll hint — fades after first scroll */}
-      <div ref={hintRef} className="rev-scroll-hint" aria-hidden>
-        <span>scroll</span>
-        <span className="rev-hint-arrow">↓</span>
-      </div>
-
-      {/* ═══ ACT I · MOON ═══ */}
-      <section ref={setSection(0)} className="rev-act rev-act-1">
-        <div className="rev-fade">
-          <h1 className="rev-title">R E V E R I E</h1>
-          <p className="rev-subtitle">· A quiet place, made for two ·</p>
-        </div>
-      </section>
-
-      {/* ═══ ACT II · LETTERS ═══ */}
-      <section ref={setSection(1)} className="rev-act rev-act-2">
-        <div className="rev-fade">
-          <p className="rev-chapter">L&nbsp;&nbsp;E&nbsp;&nbsp;T&nbsp;&nbsp;T&nbsp;&nbsp;E&nbsp;&nbsp;R&nbsp;&nbsp;S</p>
-          <div className="rev-parchment-wrap">
-            <div className="rev-parchment">
-              <div className="rev-parchment-ink" />
-              <div className="rev-parchment-wax" />
-            </div>
-            <div className="rev-parchment rev-parchment-back">
-              <div className="rev-parchment-ink" />
-            </div>
-          </div>
-          <p className="rev-line">
-            Everything you&rsquo;ve written
-            <br />— still waits here.
-          </p>
-        </div>
-      </section>
-
-      {/* ═══ ACT III · LAMPLIGHT ═══ */}
-      <section ref={setSection(2)} className="rev-act rev-act-3">
-        <div className="rev-fade">
-          <p className="rev-chapter">L&nbsp;&nbsp;A&nbsp;&nbsp;M&nbsp;&nbsp;P&nbsp;&nbsp;L&nbsp;&nbsp;I&nbsp;&nbsp;G&nbsp;&nbsp;H&nbsp;&nbsp;T</p>
-          <div className="rev-scene">
-            <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg" className="rev-silhouette">
-              <defs>
-                <radialGradient id="rev-lamp-glow" cx="22%" cy="42%" r="42%">
-                  <stop offset="0%" stopColor="#faedc8" stopOpacity="0.6" />
-                  <stop offset="45%" stopColor="#c49a78" stopOpacity="0.22" />
-                  <stop offset="100%" stopColor="#c49a78" stopOpacity="0" />
-                </radialGradient>
-                <linearGradient id="rev-shade" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="rgba(255,250,242,0.6)" />
-                  <stop offset="100%" stopColor="rgba(196,162,97,0.35)" />
-                </linearGradient>
-              </defs>
-              {/* glow pool */}
-              <rect width="400" height="300" fill="url(#rev-lamp-glow)" />
-              {/* desk line */}
-              <line x1="0" y1="258" x2="400" y2="258" stroke="rgba(255,250,242,0.22)" strokeWidth="0.7" />
-              {/* lamp */}
-              <g stroke="rgba(255,250,242,0.55)" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M90 258 L90 145" />
-                <path d="M60 145 L120 145 L108 118 L72 118 Z" fill="url(#rev-shade)" />
-              </g>
-              <circle cx="90" cy="140" r="4.5" fill="#faedc8" opacity="0.9">
-                <animate attributeName="opacity" values="0.85;1;0.85" dur="3.6s" repeatCount="indefinite" />
-              </circle>
-              {/* subtle light rays on desk */}
-              <path d="M90 145 L40 258 M90 145 L140 258" stroke="rgba(244,230,200,0.09)" strokeWidth="1" fill="none" />
-
-              {/* silhouette — facing the lamp */}
-              <path
-                d="M248 258
-                   C 242 238, 250 220, 262 212
-                   C 268 208, 270 200, 270 192
-                   C 266 176, 278 158, 300 158
-                   C 324 158, 336 176, 334 198
-                   C 332 210, 326 218, 316 224
-                   L 316 240
-                   C 330 244, 342 252, 346 258 Z"
-                fill="rgba(16,10,6,0.92)"
-                stroke="rgba(196,162,97,0.35)"
-                strokeWidth="0.6"
-              />
-            </svg>
-          </div>
-          <p className="rev-line">
-            Someone has been listening
-            <br />— all along.
-          </p>
-        </div>
-      </section>
-
-      {/* ═══ ACT IV · COMPANION ═══ */}
-      <section ref={setSection(3)} className="rev-act rev-act-4">
-        <div className="rev-fade">
-          <p className="rev-chapter">C&nbsp;&nbsp;O&nbsp;&nbsp;M&nbsp;&nbsp;P&nbsp;&nbsp;A&nbsp;&nbsp;N&nbsp;&nbsp;I&nbsp;&nbsp;O&nbsp;&nbsp;N</p>
-          <div className="rev-pet-wrap">
-            <div className="rev-pet-glow" />
-            <img src="/chat/sprites/clawd-sleeping.gif" alt="" className="rev-pet" />
-            <div className="rev-pet-shadow" />
-          </div>
-          <p className="rev-line">
-            A small one, curled up —
-            <br />waiting for you to come home.
-          </p>
-        </div>
-      </section>
-
-      {/* ═══ ACT V · THRESHOLD ═══ */}
-      <section ref={setSection(4)} className="rev-act rev-act-5">
-        <div className="rev-fade rev-form-wrap">
-          <div className="rev-eye-badge">
-            <EyeIcon />
-          </div>
-          <p className="rev-chapter">T&nbsp;&nbsp;H&nbsp;&nbsp;R&nbsp;&nbsp;E&nbsp;&nbsp;S&nbsp;&nbsp;H&nbsp;&nbsp;O&nbsp;&nbsp;L&nbsp;&nbsp;D</p>
-          <p className="rev-line rev-form-line">Step inside.</p>
-
-          <input
-            type="password"
-            value={password}
-            onChange={e => { setPassword(e.target.value); setError(null) }}
-            onKeyDown={handleKeyDown}
-            placeholder="password"
-            disabled={loading}
-            className="rev-input"
-            autoFocus
+        {METEORS.map((m, i) => (
+          <span
+            key={i}
+            className="dr-meteor"
+            style={{
+              top: `${m.top}%`,
+              left: `${m.left}%`,
+              animationDelay: `${m.delay}s`,
+              animationDuration: `${m.dur}s`,
+            }}
           />
+        ))}
+        <div className="dr-grain" />
+      </div>
 
-          {error && <p className="rev-error">{error}</p>}
+      {/* ═══ Hero — orrery with Reverie at center ═══ */}
+      <div className="dr-hero" ref={heroRef} aria-hidden>
+        <div className="dr-orrery">
+          {ORBITS.map((o, i) => (
+            <div
+              key={i}
+              className={`dr-orbit${o.dashed ? ' is-dashed' : ''}`}
+              style={{
+                width: `${o.r * 2}px`,
+                height: `${o.r * 2}px`,
+                opacity: o.op,
+                transform: `translate(-50%, -50%) rotateX(62deg) rotateZ(${o.tilt}deg)`,
+              }}
+            >
+              <div
+                className="dr-orbit-track"
+                style={{
+                  animationDuration: `${o.speed}s`,
+                  animationDirection: o.dir > 0 ? 'normal' : 'reverse',
+                }}
+              >
+                {o.bodies.map((b, j) => (
+                  <span
+                    key={j}
+                    className="dr-body"
+                    style={{
+                      width: `${b.size}px`,
+                      height: `${b.size}px`,
+                      background: b.color,
+                      boxShadow: `0 0 ${b.size * 4}px ${b.color}, 0 0 ${b.size * 10}px ${b.color}`,
+                      transform: `translate(-50%, -50%) rotate(${b.offset}deg) translateY(-${o.r}px)`,
+                    }}
+                  >
+                    <span
+                      className="dr-body-tail"
+                      style={{
+                        background: `linear-gradient(90deg, ${b.color}, transparent)`,
+                      }}
+                    />
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
 
-          <button
-            onClick={handleEnter}
-            disabled={loading}
-            className="rev-btn"
-          >
-            {loading ? 'Entering…' : 'Enter Reverie'}
-          </button>
+          {/* Center — Reverie in cursive, glowing */}
+          <h1 className="dr-title">Reverie</h1>
+          <div className="dr-title-glow" />
+        </div>
+      </div>
 
-          <p className="rev-footer-note">· Tomorrow. In dreams. In every century. ·</p>
+      {/* Scroll hint */}
+      <div ref={hintRef} className="dr-hint" aria-hidden>
+        <span>descend</span>
+        <span className="dr-hint-arrow">↓</span>
+      </div>
+
+      {/* ═══ ACT I — SKY ═══ */}
+      <section ref={setSection(0)} className="dr-act dr-act-sky">
+        <div className="dr-fade dr-hero-text">
+          <p className="dr-kicker">a quiet place, made for two</p>
+          <p className="dr-tagline">
+            step through
+            <br />— if you remember the way.
+          </p>
         </div>
       </section>
+
+      {/* ═══ ACT II — SEA (memories rising) ═══ */}
+      <section ref={setSection(1)} className="dr-act dr-act-sea">
+        <div className="dr-sea-motes" aria-hidden>
+          {MOTES.map((m, i) => (
+            <span
+              key={i}
+              className="dr-mote"
+              style={{
+                left: `${m.x}%`,
+                animationDelay: `${m.delay}s`,
+                animationDuration: `${m.dur}s`,
+                width: `${m.size}px`,
+                height: `${m.size}px`,
+                // @ts-expect-error CSS var
+                '--drift': `${m.drift}vw`,
+              }}
+            />
+          ))}
+        </div>
+        <div className="dr-fade dr-sea-text">
+          <p className="dr-chapter">beneath</p>
+          <p className="dr-line">
+            every word you wrote
+            <br />is still drifting up
+            <br />to meet you.
+          </p>
+          <div className="dr-ripple-wrap" aria-hidden>
+            <div className="dr-ripple" style={{ animationDelay: '0s' }} />
+            <div className="dr-ripple" style={{ animationDelay: '1.6s' }} />
+            <div className="dr-ripple" style={{ animationDelay: '3.2s' }} />
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ ACT III — GATE (small orrery wrapping the form) ═══ */}
+      <section ref={setSection(2)} className="dr-act dr-act-door">
+        <div className="dr-fade dr-door-wrap">
+          <p className="dr-chapter">the threshold</p>
+
+          <div className="dr-gate">
+            <div className="dr-gate-orrery" aria-hidden>
+              {GATE_ORBITS.map((o, i) => (
+                <div
+                  key={i}
+                  className={`dr-orbit${o.dashed ? ' is-dashed' : ''}`}
+                  style={{
+                    width: `${o.r * 2}px`,
+                    height: `${o.r * 2}px`,
+                    opacity: o.op,
+                    transform: `translate(-50%, -50%) rotateX(62deg)`,
+                  }}
+                >
+                  <div
+                    className="dr-orbit-track"
+                    style={{
+                      animationDuration: `${o.speed}s`,
+                      animationDirection: o.dir > 0 ? 'normal' : 'reverse',
+                    }}
+                  >
+                    {o.bodies.map((b, j) => (
+                      <span
+                        key={j}
+                        className="dr-body"
+                        style={{
+                          width: `${b.size}px`,
+                          height: `${b.size}px`,
+                          background: b.color,
+                          boxShadow: `0 0 ${b.size * 4}px ${b.color}, 0 0 ${b.size * 10}px ${b.color}`,
+                          transform: `translate(-50%, -50%) rotate(${b.offset}deg) translateY(-${o.r}px)`,
+                        }}
+                      >
+                        <span
+                          className="dr-body-tail"
+                          style={{
+                            background: `linear-gradient(90deg, ${b.color}, transparent)`,
+                          }}
+                        />
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div className="dr-gate-halo" />
+              <img
+                src="/chat/sprites/clawd-sleeping.gif"
+                alt=""
+                className="dr-gate-pet"
+              />
+            </div>
+
+            <div className="dr-gate-form">
+              <h2 className="dr-gate-title">reverie</h2>
+              <div className="dr-input-wrap">
+                <input
+                  type="password"
+                  value={password}
+                  onChange={e => { setPassword(e.target.value); setError(null) }}
+                  onKeyDown={handleKeyDown}
+                  placeholder="whisper the word"
+                  disabled={loading}
+                  className="dr-input"
+                  autoFocus
+                />
+                <div className="dr-input-orb" />
+              </div>
+              {error && <p className="dr-error">{error}</p>}
+              <button
+                onClick={handleEnter}
+                disabled={loading || !password}
+                className="dr-btn"
+              >
+                <span>{loading ? 'entering' : 'enter'}</span>
+              </button>
+            </div>
+          </div>
+
+          <p className="dr-footer-note">tomorrow · in dreams · in every century</p>
+        </div>
+      </section>
+
+      {/* Bloom on success */}
+      <div className="dr-bloom" aria-hidden />
 
       <style>{`
-        /* rev-root owns its own scroll (parent #root is fixed) */
-        .rev-root {
+        /* ═══════════════════════════════════════════════════════════
+           ROOT — deep night, layered gradients
+           ═══════════════════════════════════════════════════════════ */
+        .dr-root {
           position: absolute;
           inset: 0;
           overflow-y: auto;
           overflow-x: hidden;
-          color: rgba(255, 250, 242, 0.88);
+          color: rgba(232, 236, 250, 0.88);
           font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
           background:
-            radial-gradient(ellipse at 50% 0%, #1a0f08 0%, transparent 60%),
-            radial-gradient(ellipse at 50% 100%, #180c06 0%, transparent 55%),
-            linear-gradient(180deg, #0a0704 0%, #140b06 28%, #1c110a 55%, #16100a 80%, #0a0704 100%);
+            radial-gradient(ellipse at 50% -10%, rgba(58, 42, 104, 0.55) 0%, transparent 42%),
+            radial-gradient(ellipse at 15% 28%, rgba(28, 46, 92, 0.48) 0%, transparent 38%),
+            radial-gradient(ellipse at 85% 72%, rgba(46, 30, 88, 0.44) 0%, transparent 42%),
+            radial-gradient(ellipse at 50% 110%, rgba(10, 18, 40, 0.92) 0%, transparent 55%),
+            linear-gradient(180deg, #050914 0%, #0a1028 22%, #111833 48%, #0c1428 72%, #050810 100%);
           -webkit-overflow-scrolling: touch;
           overscroll-behavior: contain;
         }
 
-        /* Sticky stage — stars + moon live here, pinned to viewport while content scrolls past */
-        .rev-stage {
+        /* ═══════════════════════════════════════════════════════════
+           SKY — stars, nebulae, meteors, grain
+           ═══════════════════════════════════════════════════════════ */
+        .dr-sky {
           position: sticky;
           top: 0;
           left: 0;
@@ -310,100 +384,219 @@ export default function LoginPage() {
           margin-bottom: -100vh;
           pointer-events: none;
           z-index: 1;
+          will-change: transform;
+          overflow: hidden;
         }
-
-        .rev-stars {
+        .dr-stars {
           position: absolute;
           inset: 0;
           width: 100%;
           height: 100%;
+        }
+        .dr-nebula {
+          position: absolute;
+          border-radius: 50%;
+          filter: blur(70px);
+          mix-blend-mode: screen;
+          opacity: 0.55;
+        }
+        .dr-nebula-a {
+          top: 10%; left: 8%;
+          width: 44vw; height: 44vw;
+          background: radial-gradient(circle, rgba(98, 78, 180, 0.38) 0%, transparent 65%);
+          animation: dr-nebula-drift 32s ease-in-out infinite;
+        }
+        .dr-nebula-b {
+          top: 36%; right: 6%;
+          width: 38vw; height: 38vw;
+          background: radial-gradient(circle, rgba(72, 108, 186, 0.34) 0%, transparent 60%);
+          animation: dr-nebula-drift 40s ease-in-out infinite reverse;
+        }
+        .dr-nebula-c {
+          bottom: 8%; left: 38%;
+          width: 50vw; height: 50vw;
+          background: radial-gradient(circle, rgba(126, 92, 168, 0.24) 0%, transparent 60%);
+          animation: dr-nebula-drift 48s ease-in-out infinite;
+        }
+        @keyframes dr-nebula-drift {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33%      { transform: translate(3vw, -2vh) scale(1.08); }
+          66%      { transform: translate(-2vw, 3vh) scale(0.95); }
+        }
+
+        .dr-meteor {
+          position: absolute;
+          width: 140px;
+          height: 1px;
+          background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(248, 232, 200, 0.9) 40%,
+            rgba(255, 250, 242, 1) 85%,
+            transparent 100%);
+          transform: rotate(-28deg);
+          animation: dr-meteor-run linear infinite;
+          opacity: 0;
+          filter: drop-shadow(0 0 4px rgba(248, 232, 200, 0.8));
+        }
+        @keyframes dr-meteor-run {
+          0%          { transform: rotate(-28deg) translateX(0);     opacity: 0; }
+          3%          { opacity: 1; }
+          14%         { opacity: 1; }
+          18%         { transform: rotate(-28deg) translateX(-60vw); opacity: 0; }
+          100%        { opacity: 0; }
+        }
+
+        .dr-grain {
+          position: absolute;
+          inset: 0;
+          background-image:
+            radial-gradient(rgba(255,255,255,0.018) 1px, transparent 1px);
+          background-size: 3px 3px;
+          mix-blend-mode: overlay;
+          opacity: 0.6;
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           HERO — the orrery, with Reverie at its center
+           ═══════════════════════════════════════════════════════════ */
+        .dr-hero {
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 620px;
+          height: 620px;
+          pointer-events: none;
+          z-index: 2;
+          will-change: transform, opacity;
+          perspective: 1600px;
+        }
+        .dr-orrery {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          transform-style: preserve-3d;
+        }
+
+        /* Each orbit is a flat ring, tilted into perspective */
+        .dr-orbit {
+          position: absolute;
+          top: 50%; left: 50%;
+          border-radius: 50%;
+          border: 0.5px solid rgba(220, 210, 250, 0.8);
+          transform-style: preserve-3d;
+        }
+        .dr-orbit.is-dashed {
+          border-style: dashed;
+          border-width: 0.4px;
+          border-color: rgba(196, 186, 235, 0.8);
+        }
+        /* Track holds the bodies; track rotates so bodies run around */
+        .dr-orbit-track {
+          position: absolute;
+          top: 50%; left: 50%;
+          width: 100%;
+          height: 100%;
+          transform-origin: 0 0;
+          animation: dr-orbit-spin linear infinite;
+        }
+        @keyframes dr-orbit-spin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        .dr-body {
+          position: absolute;
+          top: 0;
+          left: 0;
+          border-radius: 50%;
+          transform-origin: 0 0;
           will-change: transform;
         }
-
-        /* Moon — soft moonlight, airy, no hard disc */
-        .rev-moon {
+        .dr-body-tail {
           position: absolute;
-          left: 50%;
-          top: 42%;
-          width: clamp(200px, 32vw, 320px);
-          height: clamp(200px, 32vw, 320px);
+          top: 50%;
+          right: 100%;
+          width: 60px;
+          height: 1px;
+          transform: translateY(-50%);
+          opacity: 0.55;
+          filter: blur(0.5px);
+        }
+
+        /* The name — script at the heart of the system */
+        .dr-title {
+          position: absolute;
+          top: 50%; left: 50%;
           transform: translate(-50%, -50%);
-          will-change: transform, opacity;
+          margin: 0;
+          font-family: 'Italianno', 'Cormorant Garamond', serif;
+          font-weight: 400;
+          font-size: clamp(96px, 14vw, 180px);
+          letter-spacing: 0.01em;
+          line-height: 1;
+          color: rgba(255, 250, 242, 0.96);
+          text-shadow:
+            0 0 24px rgba(248, 232, 200, 0.55),
+            0 0 64px rgba(196, 162, 97, 0.3),
+            0 0 120px rgba(148, 184, 242, 0.18);
+          white-space: nowrap;
+          z-index: 2;
         }
-        /* Outer breathing halo */
-        .rev-moon-halo {
+        .dr-title-glow {
           position: absolute;
-          inset: -30%;
+          top: 50%; left: 50%;
+          transform: translate(-50%, -50%);
+          width: 320px; height: 140px;
           border-radius: 50%;
-          background: radial-gradient(
-            circle,
-            rgba(244, 230, 200, 0.18) 0%,
-            rgba(244, 230, 200, 0.08) 28%,
-            rgba(196, 162, 97, 0.03) 55%,
-            transparent 75%
-          );
-          animation: rev-moon-pulse 8s ease-in-out infinite;
+          background: radial-gradient(ellipse,
+            rgba(248, 232, 200, 0.18) 0%,
+            rgba(196, 162, 97, 0.08) 38%,
+            transparent 72%);
+          filter: blur(10px);
+          z-index: 1;
+          animation: dr-title-breathe 6s ease-in-out infinite;
         }
-        /* Soft light core — gradient, no hard edge */
-        .rev-moon-core {
-          position: absolute;
-          inset: 18%;
-          border-radius: 50%;
-          background: radial-gradient(
-            circle at 50% 50%,
-            rgba(252, 244, 220, 0.52) 0%,
-            rgba(244, 230, 200, 0.28) 30%,
-            rgba(244, 230, 200, 0.1) 55%,
-            transparent 80%
-          );
-          filter: blur(2px);
-        }
-        /* Suggestive line ring — hints at a moon, line-style (Reverie air-feel) */
-        .rev-moon-ring {
-          position: absolute;
-          inset: 28%;
-          border-radius: 50%;
-          border: 0.8px solid rgba(244, 230, 200, 0.22);
-          box-shadow:
-            inset 0 0 18px rgba(244, 230, 200, 0.14),
-            0 0 24px rgba(244, 230, 200, 0.1);
-        }
-        @keyframes rev-moon-pulse {
-          0%, 100% { opacity: 0.6; transform: scale(1); }
-          50%      { opacity: 1;   transform: scale(1.08); }
+        @keyframes dr-title-breathe {
+          0%, 100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
+          50%      { opacity: 1;   transform: translate(-50%, -50%) scale(1.15); }
         }
 
-        /* Scroll hint */
-        .rev-scroll-hint {
+        /* ═══════════════════════════════════════════════════════════
+           SCROLL HINT
+           ═══════════════════════════════════════════════════════════ */
+        .dr-hint {
           position: fixed;
-          bottom: 38px;
+          bottom: 40px;
           left: 50%;
           transform: translateX(-50%);
           display: flex;
           flex-direction: column;
           align-items: center;
           gap: 8px;
-          font-family: Georgia, 'Times New Roman', serif;
-          font-size: 10px;
+          font-family: 'Cormorant Garamond', Georgia, serif;
+          font-size: 11px;
           font-style: italic;
-          letter-spacing: 0.36em;
-          color: rgba(255, 250, 242, 0.42);
+          letter-spacing: 0.42em;
+          color: rgba(232, 236, 250, 0.4);
           z-index: 10;
           pointer-events: none;
-          transition: opacity 0.6s ease;
+          transition: opacity 0.8s ease;
+          text-transform: lowercase;
         }
-        .rev-hint-arrow {
+        .dr-hint-arrow {
           font-size: 14px;
           letter-spacing: 0;
-          animation: rev-hint-bounce 2.4s ease-in-out infinite;
+          animation: dr-hint-bounce 2.6s ease-in-out infinite;
         }
-        @keyframes rev-hint-bounce {
+        @keyframes dr-hint-bounce {
           0%, 100% { transform: translateY(0); opacity: 0.45; }
-          50%      { transform: translateY(5px); opacity: 0.85; }
+          50%      { transform: translateY(6px); opacity: 0.85; }
         }
 
-        /* Act sections — each 100vh */
-        .rev-act {
+        /* ═══════════════════════════════════════════════════════════
+           ACT SECTIONS
+           ═══════════════════════════════════════════════════════════ */
+        .dr-act {
           position: relative;
           min-height: 100vh;
           display: flex;
@@ -412,251 +605,343 @@ export default function LoginPage() {
           padding: 60px 24px;
           z-index: 3;
         }
-        .rev-fade {
+        .dr-fade {
           opacity: 0;
           transform: translateY(28px);
-          transition: opacity 1.6s ease, transform 1.6s ease;
+          transition: opacity 1.8s ease, transform 1.8s ease;
           text-align: center;
           width: 100%;
-          max-width: 520px;
+          max-width: 540px;
         }
-        .rev-act.in-view .rev-fade {
+        .dr-act.in-view .dr-fade {
           opacity: 1;
           transform: translateY(0);
         }
 
-        /* Act I — hero title */
-        .rev-act-1 .rev-fade { margin-top: 28vh; }
-        .rev-title {
-          font-family: Georgia, 'Times New Roman', serif;
-          font-size: clamp(30px, 5.8vw, 58px);
-          font-weight: 300;
-          letter-spacing: 0.3em;
-          color: rgba(255, 250, 242, 0.94);
-          margin: 0;
-          text-shadow: 0 0 60px rgba(244, 230, 200, 0.22);
-        }
-        .rev-subtitle {
-          margin-top: 28px;
-          font-family: Georgia, 'Times New Roman', serif;
+        /* ACT I — hero text below the orrery */
+        .dr-act-sky .dr-fade { margin-top: 68vh; }
+        .dr-kicker {
+          font-family: 'Cormorant Garamond', Georgia, serif;
           font-size: 12px;
           font-style: italic;
-          letter-spacing: 0.18em;
-          color: rgba(255, 250, 242, 0.5);
+          font-weight: 300;
+          letter-spacing: 0.36em;
+          color: rgba(248, 232, 200, 0.52);
+          margin: 0 0 40px;
+          text-transform: lowercase;
         }
-
-        /* Chapter tag */
-        .rev-chapter {
-          font-family: Georgia, 'Times New Roman', serif;
-          font-size: 10px;
-          letter-spacing: 0.2em;
-          color: rgba(196, 162, 97, 0.72);
-          text-transform: uppercase;
-          margin: 0 0 42px;
-          font-weight: 400;
-        }
-        .rev-chapter::before,
-        .rev-chapter::after {
-          content: '·';
-          margin: 0 14px;
-          color: rgba(196, 162, 97, 0.4);
-        }
-
-        /* Poetic line */
-        .rev-line {
-          font-family: Georgia, 'Times New Roman', serif;
-          font-size: clamp(14px, 1.5vw, 16px);
+        .dr-tagline {
+          font-family: 'Cormorant Garamond', Georgia, serif;
+          font-size: clamp(16px, 1.8vw, 20px);
           font-style: italic;
-          line-height: 2;
-          color: rgba(255, 250, 242, 0.72);
-          margin: 44px 0 0;
-          letter-spacing: 0.04em;
+          font-weight: 300;
+          line-height: 2.2;
+          letter-spacing: 0.05em;
+          color: rgba(232, 236, 250, 0.76);
+          margin: 0;
         }
 
-        /* Act II — Parchment */
-        .rev-parchment-wrap {
-          position: relative;
-          width: clamp(220px, 52vw, 340px);
-          aspect-ratio: 3 / 4;
-          margin: 0 auto;
-          perspective: 1200px;
+        .dr-chapter {
+          font-family: 'Cormorant Garamond', Georgia, serif;
+          font-size: 11px;
+          font-style: italic;
+          letter-spacing: 0.42em;
+          color: rgba(196, 180, 232, 0.6);
+          margin: 0 0 50px;
+          text-transform: lowercase;
         }
-        .rev-parchment {
+        .dr-chapter::before,
+        .dr-chapter::after {
+          content: '·';
+          margin: 0 18px;
+          color: rgba(196, 180, 232, 0.4);
+        }
+
+        .dr-line {
+          font-family: 'Cormorant Garamond', Georgia, serif;
+          font-size: clamp(16px, 1.8vw, 20px);
+          font-style: italic;
+          font-weight: 300;
+          line-height: 2.3;
+          color: rgba(232, 236, 250, 0.8);
+          letter-spacing: 0.05em;
+          margin: 0;
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           ACT II — SEA
+           ═══════════════════════════════════════════════════════════ */
+        .dr-act-sea { flex-direction: column; gap: 50px; }
+
+        .dr-sea-motes {
           position: absolute;
           inset: 0;
-          background:
-            radial-gradient(ellipse at 30% 20%, #f0d8a4 0%, transparent 55%),
-            radial-gradient(ellipse at 70% 80%, #c69865 0%, transparent 55%),
-            linear-gradient(135deg, #e8c896 0%, #c8a878 50%, #8a6a48 100%);
-          box-shadow:
-            0 30px 70px rgba(0, 0, 0, 0.6),
-            0 4px 12px rgba(0, 0, 0, 0.4),
-            inset 0 0 90px rgba(90, 55, 20, 0.3),
-            inset 0 0 2px rgba(244, 220, 180, 0.35);
-          transform: rotate(-4deg);
-          border-radius: 2px;
+          overflow: hidden;
+          pointer-events: none;
         }
-        .rev-parchment-back {
-          transform: rotate(3deg) translate(18px, 14px);
-          opacity: 0.55;
-          z-index: -1;
-        }
-        .rev-parchment-ink {
+        .dr-mote {
           position: absolute;
-          inset: 14% 18% 16% 16%;
-          background: repeating-linear-gradient(
-            180deg,
-            transparent 0,
-            transparent 22px,
-            rgba(60, 35, 12, 0.5) 22px,
-            rgba(60, 35, 12, 0.5) 23px
-          );
-          mask: linear-gradient(90deg, black 0%, black 58%, rgba(0,0,0,0.4) 78%, transparent 95%);
-          -webkit-mask: linear-gradient(90deg, black 0%, black 58%, rgba(0,0,0,0.4) 78%, transparent 95%);
-          opacity: 0.78;
-        }
-        .rev-parchment-wax {
-          position: absolute;
-          bottom: 18%;
-          right: 14%;
-          width: 22px;
-          height: 22px;
-          border-radius: 52% 48% 54% 46% / 50% 52% 48% 50%;
-          background: radial-gradient(circle at 35% 30%, #a53a2a 0%, #6a1e12 70%, #3e1008 100%);
-          box-shadow:
-            0 2px 6px rgba(0,0,0,0.5),
-            inset -2px -2px 4px rgba(0,0,0,0.4),
-            inset 2px 2px 3px rgba(220,100,80,0.3);
-        }
-
-        /* Act III — silhouette scene */
-        .rev-scene {
-          width: clamp(280px, 68vw, 440px);
-          margin: 0 auto;
-          filter: drop-shadow(0 8px 24px rgba(0,0,0,0.4));
-        }
-        .rev-silhouette {
-          width: 100%;
-          height: auto;
-          display: block;
-        }
-
-        /* Act IV — companion */
-        .rev-pet-wrap {
-          position: relative;
-          width: clamp(140px, 24vw, 200px);
-          margin: 0 auto;
-          padding: 20px;
-        }
-        .rev-pet-glow {
-          position: absolute;
-          inset: -20px;
+          bottom: -20px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(244, 230, 200, 0.22) 0%, rgba(196, 162, 97, 0.08) 40%, transparent 70%);
-          animation: rev-moon-pulse 5.4s ease-in-out infinite;
+          background: radial-gradient(circle,
+            rgba(255, 250, 242, 0.92) 0%,
+            rgba(248, 232, 200, 0.32) 40%,
+            transparent 72%);
+          box-shadow: 0 0 8px rgba(248, 232, 200, 0.45);
+          animation: dr-mote-rise linear infinite;
+          opacity: 0;
         }
-        .rev-pet {
-          position: relative;
-          z-index: 1;
-          width: 100%;
-          image-rendering: pixelated;
-          image-rendering: -moz-crisp-edges;
-          filter: drop-shadow(0 0 16px rgba(244, 230, 200, 0.2));
-        }
-        .rev-pet-shadow {
-          position: absolute;
-          bottom: 4px;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 60%;
-          height: 10px;
-          background: radial-gradient(ellipse, rgba(0,0,0,0.45) 0%, transparent 70%);
-          z-index: 0;
+        @keyframes dr-mote-rise {
+          0%   { transform: translate(0, 0);             opacity: 0; }
+          10%  {                                          opacity: 0.9; }
+          90%  {                                          opacity: 0.7; }
+          100% { transform: translate(var(--drift), -105vh); opacity: 0; }
         }
 
-        /* Act V — form */
-        .rev-form-wrap {
+        .dr-sea-text { position: relative; z-index: 2; }
+
+        .dr-ripple-wrap {
+          position: relative;
+          width: 220px;
+          height: 220px;
+          margin: 50px auto 0;
+        }
+        .dr-ripple {
+          position: absolute;
+          top: 50%; left: 50%;
+          width: 40px; height: 40px;
+          border-radius: 50%;
+          border: 0.6px solid rgba(232, 236, 250, 0.4);
+          transform: translate(-50%, -50%);
+          animation: dr-ripple-out 5s ease-out infinite;
+          opacity: 0;
+        }
+        @keyframes dr-ripple-out {
+          0%   { width: 30px;  height: 30px;  opacity: 0.75; border-color: rgba(248, 232, 200, 0.6); }
+          100% { width: 240px; height: 240px; opacity: 0;   border-color: rgba(148, 184, 242, 0.0); }
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           ACT III — GATE (small orrery + form)
+           ═══════════════════════════════════════════════════════════ */
+        .dr-door-wrap {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 22px;
-          max-width: 320px;
+          gap: 44px;
+          max-width: 440px;
         }
-        .rev-eye-badge {
-          width: 64px;
-          height: 64px;
-          border-radius: 50%;
-          border: 1px solid rgba(255, 250, 242, 0.32);
+        .dr-gate {
+          position: relative;
+          width: 360px;
+          height: 360px;
           display: flex;
           align-items: center;
           justify-content: center;
-          margin-bottom: 8px;
-          box-shadow:
-            0 0 20px rgba(244, 230, 200, 0.12),
-            inset 0 0 10px rgba(244, 230, 200, 0.06);
         }
-        .rev-form-line {
-          margin: 0;
-          font-size: 14px;
+        .dr-gate-orrery {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          perspective: 1200px;
         }
-        .rev-input, .rev-btn {
-          width: 280px;
-          background: transparent;
+        .dr-gate-halo {
+          position: absolute;
+          top: 50%; left: 50%;
+          width: 220px; height: 220px;
+          transform: translate(-50%, -50%);
+          border-radius: 50%;
+          background: radial-gradient(circle,
+            rgba(248, 232, 200, 0.24) 0%,
+            rgba(196, 162, 97, 0.08) 38%,
+            transparent 72%);
+          filter: blur(10px);
+          animation: dr-title-breathe 5.4s ease-in-out infinite;
+        }
+        .dr-gate-pet {
+          position: absolute;
+          left: 50%;
+          bottom: 6%;
+          transform: translateX(-50%);
+          width: 58px;
+          image-rendering: pixelated;
+          image-rendering: -moz-crisp-edges;
+          filter: drop-shadow(0 0 14px rgba(248, 232, 200, 0.4));
+          opacity: 0.8;
+          z-index: 2;
+        }
+
+        /* Form — sits at ring center, nothing between it and the night */
+        .dr-gate-form {
+          position: relative;
+          z-index: 3;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 18px;
+          width: 240px;
+        }
+        .dr-gate-title {
+          font-family: 'Italianno', 'Cormorant Garamond', serif;
+          font-size: 58px;
+          font-weight: 400;
+          line-height: 1;
+          margin: 0 0 4px;
           color: rgba(255, 250, 242, 0.92);
-          border: 1px solid rgba(255, 250, 242, 0.22);
-          border-radius: 10px;
-          padding: 13px 16px;
+          text-shadow: 0 0 20px rgba(248, 232, 200, 0.5), 0 0 48px rgba(196, 162, 97, 0.25);
+          letter-spacing: 0.01em;
+        }
+
+        /* Input — no box. Just a glow and a faint underline.  */
+        .dr-input-wrap {
+          position: relative;
+          width: 100%;
+        }
+        .dr-input {
+          width: 100%;
+          background: transparent;
+          color: rgba(255, 250, 242, 0.95);
+          border: none;
+          border-bottom: 0.5px solid rgba(232, 236, 250, 0.22);
+          padding: 10px 6px 8px;
           font-size: 13px;
-          font-family: inherit;
-          letter-spacing: 0.08em;
+          font-family: 'Cormorant Garamond', Georgia, serif;
+          font-style: italic;
+          font-weight: 300;
+          letter-spacing: 0.4em;
           text-align: center;
           outline: none;
-          transition: border-color 0.35s, background 0.35s, color 0.35s;
+          transition: border-color 0.6s, letter-spacing 0.6s, text-shadow 0.6s;
+          text-shadow: 0 0 8px rgba(248, 232, 200, 0.35);
         }
-        .rev-input::placeholder { color: rgba(255, 250, 242, 0.28); }
-        .rev-input:focus { border-color: rgba(196, 162, 97, 0.55); }
-        .rev-input:disabled { opacity: 0.5; }
-        .rev-btn {
-          cursor: pointer;
-          color: rgba(255, 250, 242, 0.78);
-        }
-        .rev-btn:not(:disabled):hover {
-          background: rgba(196, 162, 97, 0.08);
-          border-color: rgba(196, 162, 97, 0.55);
-          color: #fffaf2;
-        }
-        .rev-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .rev-error {
-          margin: -4px 0 0;
-          font-size: 11px;
-          color: rgba(220, 130, 110, 0.9);
-          letter-spacing: 0.04em;
-        }
-        .rev-footer-note {
-          margin-top: 28px;
-          font-family: Georgia, 'Times New Roman', serif;
-          font-size: 10px;
+        .dr-input::placeholder {
+          color: rgba(232, 236, 250, 0.28);
           font-style: italic;
-          letter-spacing: 0.18em;
-          color: rgba(255, 250, 242, 0.32);
+          letter-spacing: 0.24em;
+          text-transform: lowercase;
+          text-shadow: none;
+        }
+        .dr-input:focus {
+          border-color: rgba(248, 232, 200, 0.55);
+          letter-spacing: 0.5em;
+        }
+        .dr-input:focus ~ .dr-input-orb {
+          opacity: 1;
+          transform: translateX(-50%) scale(1.4);
+        }
+        .dr-input:disabled { opacity: 0.5; }
+
+        /* A small light below the input — like a tiny star */
+        .dr-input-orb {
+          position: absolute;
+          left: 50%;
+          bottom: -2px;
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(255, 250, 242, 1) 0%, rgba(248, 232, 200, 0.4) 60%, transparent 100%);
+          transform: translateX(-50%);
+          opacity: 0.6;
+          transition: opacity 0.6s, transform 0.6s;
+          pointer-events: none;
+          filter: blur(0.3px);
         }
 
-        /* Mobile tuning */
+        /* Enter — a word, not a button */
+        .dr-btn {
+          position: relative;
+          background: transparent;
+          border: none;
+          padding: 10px 8px 14px;
+          margin-top: 6px;
+          cursor: pointer;
+          font-family: 'Italianno', 'Cormorant Garamond', serif;
+          font-size: 30px;
+          font-weight: 400;
+          letter-spacing: 0.04em;
+          color: rgba(232, 236, 250, 0.55);
+          transition: color 0.6s, text-shadow 0.6s, letter-spacing 0.6s;
+          text-transform: lowercase;
+          line-height: 1;
+        }
+        .dr-btn:not(:disabled):hover {
+          color: rgba(255, 250, 242, 0.98);
+          text-shadow: 0 0 16px rgba(248, 232, 200, 0.55), 0 0 36px rgba(196, 162, 97, 0.3);
+          letter-spacing: 0.12em;
+        }
+        .dr-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+        .dr-error {
+          margin: 0;
+          font-family: 'Cormorant Garamond', Georgia, serif;
+          font-size: 12px;
+          font-style: italic;
+          letter-spacing: 0.08em;
+          color: rgba(232, 152, 148, 0.9);
+          text-transform: lowercase;
+        }
+
+        .dr-footer-note {
+          font-family: 'Cormorant Garamond', Georgia, serif;
+          font-size: 11px;
+          font-style: italic;
+          letter-spacing: 0.36em;
+          color: rgba(232, 236, 250, 0.3);
+          margin: 0;
+          text-transform: lowercase;
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           BLOOM — success animation
+           ═══════════════════════════════════════════════════════════ */
+        .dr-bloom {
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          background: radial-gradient(circle,
+            rgba(255, 250, 242, 1) 0%,
+            rgba(248, 232, 200, 0.4) 45%,
+            transparent 100%);
+          transform: translate(-50%, -50%) scale(0);
+          opacity: 0;
+          pointer-events: none;
+          z-index: 100;
+          transition: transform 0.95s cubic-bezier(.2,.7,.2,1), opacity 0.95s ease;
+        }
+        .dr-root.is-entering .dr-bloom {
+          transform: translate(-50%, -50%) scale(220);
+          opacity: 1;
+        }
+        .dr-root.is-entering .dr-hero,
+        .dr-root.is-entering .dr-gate-orrery {
+          opacity: 0;
+          transition: opacity 0.95s ease;
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           MOBILE
+           ═══════════════════════════════════════════════════════════ */
         @media (max-width: 640px) {
-          .rev-title { letter-spacing: 0.22em; }
-          .rev-moon { top: 32%; }
-          .rev-act-1 .rev-fade { margin-top: 24vh; }
-          .rev-chapter::before, .rev-chapter::after { margin: 0 8px; }
-          .rev-scroll-hint { bottom: 24px; letter-spacing: 0.28em; }
+          .dr-hero { width: 420px; height: 420px; }
+          .dr-title { font-size: 82px; }
+          .dr-title-glow { width: 240px; height: 100px; }
+          .dr-gate { width: 300px; height: 300px; }
+          .dr-gate-halo { width: 180px; height: 180px; }
+          .dr-act-sky .dr-fade { margin-top: 64vh; }
+          .dr-hint { bottom: 26px; letter-spacing: 0.32em; }
         }
 
-        /* Respect reduced motion */
         @media (prefers-reduced-motion: reduce) {
-          .rev-moon-halo,
-          .rev-pet-glow,
-          .rev-hint-arrow,
-          .rev-moon-disc circle { animation: none !important; }
-          .rev-fade { transition-duration: 0.3s; }
+          .dr-orbit-track,
+          .dr-nebula,
+          .dr-title-glow,
+          .dr-gate-halo,
+          .dr-meteor,
+          .dr-mote,
+          .dr-ripple { animation: none !important; }
         }
       `}</style>
     </div>
