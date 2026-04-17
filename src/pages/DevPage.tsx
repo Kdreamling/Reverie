@@ -1088,7 +1088,9 @@ export default function DevPage() {
           <div className="rv-topbar-r">
             <div className={`rv-status-chip ${gwStatus !== 'ok' ? 'warn' : ''}`}>
               <span className="rv-pulse-dot" />
-              <span>{gwStatus === 'ok' ? 'awake' : gwStatus === 'reconnecting' ? 'reconn...' : 'offline'}</span>
+              {!vp.mobile && (
+                <span>{gwStatus === 'ok' ? 'awake' : gwStatus === 'reconnecting' ? 'reconn...' : 'offline'}</span>
+              )}
             </div>
             {!vp.mobile && (
               <>
@@ -1100,18 +1102,18 @@ export default function DevPage() {
                   <span className="rv-meta-key">ch</span>
                   <span className="rv-meta-val">{channel}</span>
                 </div>
+                <select
+                  className="rv-model-select"
+                  value={model}
+                  onChange={e => setModel(e.target.value)}
+                  disabled={isStreaming}
+                >
+                  {DEV_MODELS.map(m => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
               </>
             )}
-            <select
-              className="rv-model-select"
-              value={model}
-              onChange={e => setModel(e.target.value)}
-              disabled={isStreaming}
-            >
-              {DEV_MODELS.map(m => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
-            </select>
             <a href="/chat/" className="rv-chat-link">chat</a>
           </div>
         </header>
@@ -1132,6 +1134,21 @@ export default function DevPage() {
                 <Plus size={11} />
               </button>
             </div>
+            {vp.mobile && (
+              <div className="rv-mobile-model-row">
+                <span className="rv-mmr-key">model</span>
+                <select
+                  className="rv-mobile-model-select"
+                  value={model}
+                  onChange={e => setModel(e.target.value)}
+                  disabled={isStreaming}
+                >
+                  {DEV_MODELS.map(m => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="rv-session-list">
               {groupedSessions.map(group => (
                 <div key={group.label}>
@@ -1541,6 +1558,60 @@ function DevStyles() {
         letter-spacing: 0.1em; text-transform: uppercase;
       }
       .rv-chat-link:hover { color: ${W.amber}; border-color: ${W.amberDeep}; }
+
+      /* Mobile topbar tightening */
+      @media (max-width: 600px) {
+        .rv-topbar {
+          padding: 8px 10px;
+          min-height: 44px;
+          gap: 6px;
+        }
+        .rv-topbar-l { gap: 6px; }
+        .rv-topbar-r { gap: 6px; }
+        .rv-menu-btn { padding: 3px 5px; margin-right: 2px; }
+        .rv-brand-prompt { font-size: 14px; }
+        .rv-brand-name {
+          font-size: 13px;
+          letter-spacing: 0.12em;
+        }
+        .rv-status-chip {
+          padding: 4px 6px;
+          border-radius: 50%;
+          width: 22px; height: 22px;
+          justify-content: center;
+          box-sizing: border-box;
+        }
+        .rv-status-chip .rv-pulse-dot { margin: 0; }
+        .rv-chat-link {
+          padding: 3px 8px;
+          font-size: 10px;
+          letter-spacing: 0.08em;
+        }
+      }
+
+      /* Mobile model selector in left drawer */
+      .rv-mobile-model-row {
+        display: flex; align-items: center; gap: 8px;
+        padding: 8px 12px;
+        border-bottom: 1px dashed ${W.border0};
+        font-size: 10px;
+      }
+      .rv-mmr-key {
+        color: ${W.inkFaint};
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        font-size: 9px;
+      }
+      .rv-mobile-model-select {
+        flex: 1; min-width: 0;
+        background: ${W.bg2}; border: 1px solid ${W.border1};
+        border-radius: 3px;
+        padding: 4px 8px;
+        color: ${W.amber};
+        font-size: 11px;
+        font-family: inherit;
+        cursor: pointer; outline: none;
+      }
 
       /* GRID */
       .rv-grid {
