@@ -798,12 +798,15 @@ export default function ChatPage() {
             if (!items.length) return null
             return (
               <div key={key} className="mb-2">
-                <p
-                  className="px-3 pt-3 pb-1.5 select-none"
-                  style={{ color: C.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: '0.03em' }}
+                <div
+                  className="flex items-center gap-2 px-3 pt-3 pb-1.5 select-none"
+                  style={{ color: C.textMuted }}
                 >
-                  {label}
-                </p>
+                  <span style={{ width: 14, height: 1, background: 'currentColor', opacity: 0.35, flexShrink: 0 }} />
+                  <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                    {label}
+                  </span>
+                </div>
                 {items.map(session => {
                   const isActive = session.id === currentSession?.id
                   const isHovered = session.id === hoveredId
@@ -864,7 +867,7 @@ export default function ChatPage() {
                         }}
                       >
                         {isActive && (
-                          <div style={{ position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)', width: 3, height: 20, borderRadius: 2, background: C.accent }} />
+                          <div style={{ position: 'absolute', left: 4, top: 10, bottom: 10, width: 2, borderRadius: 2, background: C.accent }} />
                         )}
                         <div className="flex items-start justify-between gap-3">
                           <p
