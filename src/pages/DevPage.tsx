@@ -1,5 +1,10 @@
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
-import { ArrowUp, Terminal, RotateCcw, Square, ChevronDown, ChevronRight, Clock, Plus } from 'lucide-react'
+import {
+  ArrowUp, Terminal, RotateCcw, Square, ChevronDown, ChevronRight, Clock, Plus,
+  FileText, FilePenLine, Folder, GitBranch, GitCommit, CloudUpload,
+  Hammer, RefreshCw, FileSearch, Search, Brain, Play, Bot, Wrench,
+  type LucideIcon,
+} from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { createSessionAPI, fetchSessionsAPI, type Session } from '../api/sessions'
 import { streamChat, fetchMessagesAPI } from '../api/chat'
@@ -52,35 +57,76 @@ const D = {
   inputBg: '#1A1614',
 }
 
+// ─── Tool icon & label mapping (Claude Code style) ───────────────────────────
+
+const TOOL_ICONS: Record<string, LucideIcon> = {
+  read_file: FileText,
+  write_file: FilePenLine,
+  list_dir: Folder,
+  git_diff: GitBranch,
+  git_commit: GitCommit,
+  git_push: CloudUpload,
+  git_rollback: RotateCcw,
+  build_frontend: Hammer,
+  restart_gateway: RefreshCw,
+  run_shell: Terminal,
+  read_system_log: FileSearch,
+  search_memory: Search,
+  save_memory: Brain,
+  run_code: Play,
+  delegate_to_sonnet: Bot,
+}
+
+const TOOL_LABELS: Record<string, string> = {
+  read_file: 'Read',
+  write_file: 'Write',
+  list_dir: 'LS',
+  git_diff: 'GitDiff',
+  git_commit: 'GitCommit',
+  git_push: 'GitPush',
+  git_rollback: 'GitRollback',
+  build_frontend: 'Build',
+  restart_gateway: 'Restart',
+  run_shell: 'Bash',
+  read_system_log: 'Log',
+  search_memory: 'SearchMemory',
+  save_memory: 'SaveMemory',
+  run_code: 'Run',
+  delegate_to_sonnet: 'Delegate',
+}
+
+function ToolIcon({ name, size = 12, color }: { name: string; size?: number; color?: string }) {
+  const Icon = TOOL_ICONS[name] || Wrench
+  return <Icon size={size} strokeWidth={1.6} style={{ color: color || D.textMuted, flexShrink: 0 }} />
+}
+
 // ─── Tool call display ───────────────────────────────────────────────────────
 
-function ToolCallBlock({ tc }: { tc: ToolCall }) {
+function ToolCallBlock({ tc, isMobile }: { tc: ToolCall; isMobile: boolean }) {
   const [open, setOpen] = useState(tc.status === 'running')
-  const icons: Record<string, string> = {
-    read_file: '📄', write_file: '✏️', list_dir: '📁', git_diff: '📊',
-    git_commit: '💾', git_push: '🚀', git_rollback: '⏪', build_frontend: '🏗️',
-    restart_gateway: '🔄', run_shell: '💻', read_system_log: '📋',
-    search_memory: '🔍', save_memory: '💭', run_code: '▶️',
-    delegate_to_sonnet: '🤖',
-  }
-  const icon = icons[tc.name] || '🔧'
   const statusColor = tc.status === 'running' ? D.accent : tc.status === 'error' ? D.red : D.green
   const hasSubSteps = tc.subSteps && tc.subSteps.length > 0
+  const label = TOOL_LABELS[tc.name] || tc.name
 
   return (
-    <div style={{ margin: '4px 0', borderLeft: `2px solid ${statusColor}`, paddingLeft: 10 }}>
+    <div style={{ margin: '4px 0', borderLeft: `2px solid ${statusColor}`, paddingLeft: isMobile ? 8 : 10 }}>
       <button
         onClick={() => setOpen(o => !o)}
-        style={{ background: 'none', border: 'none', color: D.text, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', fontSize: 13, fontFamily: 'monospace' }}
+        style={{ background: 'none', border: 'none', color: D.text, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', fontSize: isMobile ? 12 : 13, fontFamily: 'monospace', width: '100%', minWidth: 0 }}
       >
-        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        <span>{icon} {tc.name}</span>
-        {tc.args && !hasSubSteps && <span style={{ color: D.textMuted, fontSize: 11, maxWidth: 'min(400px, 50vw)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tc.args}</span>}
-        {hasSubSteps && <span style={{ color: D.textMuted, fontSize: 11 }}>({tc.subSteps!.length} steps)</span>}
-        {tc.status === 'running' && <span style={{ color: D.accent, fontSize: 11 }}>running...</span>}
+        {open ? <ChevronDown size={12} style={{ flexShrink: 0 }} /> : <ChevronRight size={12} style={{ flexShrink: 0 }} />}
+        <ToolIcon name={tc.name} size={isMobile ? 11 : 12} color={statusColor} />
+        <span style={{ fontWeight: 600, letterSpacing: '0.02em' }}>{label}</span>
+        {tc.args && !hasSubSteps && (
+          <span style={{ color: D.textMuted, fontSize: isMobile ? 10 : 11, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
+            ({tc.args})
+          </span>
+        )}
+        {hasSubSteps && <span style={{ color: D.textMuted, fontSize: 11 }}>· {tc.subSteps!.length} steps</span>}
+        {tc.status === 'running' && <span style={{ color: D.accent, fontSize: 10, marginLeft: 'auto', letterSpacing: '0.08em', textTransform: 'uppercase', flexShrink: 0 }}>running</span>}
       </button>
       {open && (
-        <div style={{ fontSize: 12, fontFamily: 'monospace', padding: '4px 0 4px 18px' }}>
+        <div style={{ fontSize: isMobile ? 11 : 12, fontFamily: 'monospace', padding: isMobile ? '4px 0 4px 12px' : '4px 0 4px 18px' }}>
           {/* Delegate 子步骤可视化 */}
           {hasSubSteps && (
             <div style={{ marginBottom: 6 }}>
@@ -90,20 +136,21 @@ function ToolCallBlock({ tc }: { tc: ToolCall }) {
                     {s.status === 'done' ? '✓' : '›'}
                   </span>
                   <span style={{ color: D.textMuted }}>R{s.round}</span>
-                  <span style={{ color: D.text }}>{icons[s.tool] || '🔧'} {s.tool}</span>
-                  {s.preview && <span style={{ color: D.textMuted, maxWidth: 'min(300px, 40vw)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.preview}</span>}
+                  <ToolIcon name={s.tool} size={11} color={D.textMuted} />
+                  <span style={{ color: D.text }}>{TOOL_LABELS[s.tool] || s.tool}</span>
+                  {s.preview && <span style={{ color: D.textMuted, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.preview}</span>}
                 </div>
               ))}
             </div>
           )}
           {tc.args && (
             <div style={{ color: D.textMuted, marginBottom: 4, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-              <span style={{ color: D.accent }}>args: </span>{tc.args}
+              <span style={{ color: D.accent }}>args </span>{tc.args}
             </div>
           )}
           {tc.result && (
-            <div style={{ color: D.text, whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 300, overflowY: 'auto' }}>
-              <span style={{ color: D.green }}>result: </span>{tc.result}
+            <div style={{ color: D.text, whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: isMobile ? 220 : 300, overflowY: 'auto' }}>
+              <span style={{ color: D.green }}>result </span>{tc.result}
             </div>
           )}
         </div>
@@ -651,7 +698,7 @@ export default function DevPage() {
     setMessages(prev => [...prev, {
       id: `inject-${Date.now()}`,
       role: 'user',
-      content: `📌 ${text}`,
+      content: `→ ${text}`,
       ts: Date.now(),
     }])
     try {
@@ -682,7 +729,7 @@ export default function DevPage() {
   // ─── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: D.bg, color: D.text, fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace" }}>
+    <div style={{ display: 'flex', height: '100dvh', background: D.bg, color: D.text, fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace" }}>
 
       {/* Sidebar — overlay on mobile, inline on desktop */}
       {sidebarOpen && isMobile && (
@@ -692,9 +739,14 @@ export default function DevPage() {
       )}
       {sidebarOpen && (
         <div style={{
-          width: 220, flexShrink: 0, borderRight: `1px solid ${D.border}`,
+          width: isMobile ? 'min(82vw, 260px)' : 220,
+          flexShrink: 0, borderRight: `1px solid ${D.border}`,
           background: D.surface, display: 'flex', flexDirection: 'column', overflow: 'hidden',
-          ...(isMobile ? { position: 'fixed', left: 0, top: 0, bottom: 0, zIndex: 100 } : {}),
+          ...(isMobile ? {
+            position: 'fixed', left: 0, top: 0, bottom: 0, zIndex: 100,
+            paddingTop: 'env(safe-area-inset-top)',
+            paddingBottom: 'env(safe-area-inset-bottom)',
+          } : {}),
         }}>
           <div style={{ padding: '12px 14px', borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 12, color: D.textMuted, fontWeight: 600 }}>Sessions</span>
@@ -745,7 +797,9 @@ export default function DevPage() {
         {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: isMobile ? '6px 10px' : '8px 16px', borderBottom: `1px solid ${D.border}`,
+          padding: isMobile ? '6px 10px' : '8px 16px',
+          paddingTop: isMobile ? 'calc(6px + env(safe-area-inset-top))' : '8px',
+          borderBottom: `1px solid ${D.border}`,
           background: D.surface, flexShrink: 0, gap: 6, flexWrap: isMobile ? 'wrap' : 'nowrap',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 10, minWidth: 0 }}>
@@ -822,7 +876,7 @@ export default function DevPage() {
                   {msg.thinking && <ThinkingBlock text={msg.thinking} />}
                   {msg.toolCalls && msg.toolCalls.length > 0 && (
                     <div style={{ margin: '4px 0' }}>
-                      {msg.toolCalls.map(tc => <ToolCallBlock key={tc.id} tc={tc} />)}
+                      {msg.toolCalls.map(tc => <ToolCallBlock key={tc.id} tc={tc} isMobile={isMobile} />)}
                     </div>
                   )}
                   {msg.content && (
@@ -841,7 +895,11 @@ export default function DevPage() {
         </div>
 
         {/* Input */}
-        <div style={{ padding: isMobile ? '8px 10px' : '10px 16px', borderTop: `1px solid ${D.border}`, background: D.surface, flexShrink: 0 }}>
+        <div style={{
+          padding: isMobile ? '8px 10px' : '10px 16px',
+          paddingBottom: isMobile ? 'calc(8px + env(safe-area-inset-bottom))' : '10px',
+          borderTop: `1px solid ${D.border}`, background: D.surface, flexShrink: 0,
+        }}>
           <div style={{
             display: 'flex', alignItems: 'flex-end', gap: 8,
             background: D.inputBg, borderRadius: 10, border: `1px solid ${D.border}`,
