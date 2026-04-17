@@ -211,8 +211,6 @@ function DiaryPage({ entry, full }: { entry: DiaryEntry; full: DiaryFull | null 
 
 // ─── Table of contents (left rail) ─────────────────────────────────────────
 
-type TocStyle = 'list' | 'spine' | 'timeline'
-
 function TOC({
   groups,
   activeKey,
@@ -220,8 +218,6 @@ function TOC({
   onClose,
   onJump,
   isMobile,
-  style,
-  onStyleChange,
 }: {
   groups: ReturnType<typeof groupByMonth<DiaryEntry>>
   activeKey: string
@@ -229,8 +225,6 @@ function TOC({
   onClose: () => void
   onJump: (year: number, month: number) => void
   isMobile: boolean
-  style: TocStyle
-  onStyleChange: (s: TocStyle) => void
 }) {
   const handleJump = (year: number, month: number) => {
     onJump(year, month)
@@ -241,7 +235,7 @@ function TOC({
     <>
       {isMobile && open && <div className="xd-toc-backdrop" onClick={onClose} />}
       <aside
-        className={`xd-toc ${open ? 'open' : ''} ${isMobile ? 'mobile' : ''} ${!isMobile && style === 'timeline' ? 'rail-mode' : ''}`}
+        className={`xd-toc ${open ? 'open' : ''} ${isMobile ? 'mobile' : ''} ${!isMobile ? 'rail-mode' : ''}`}
       >
         <div className="xd-toc-head">
           <span className="xd-toc-title">目录 · TOC</span>
@@ -250,91 +244,29 @@ function TOC({
           )}
         </div>
 
-        <div className="xd-style-switch" role="group" aria-label="sidebar style">
-          {([
-            { k: 'list', label: 'Ⅰ', hint: '列表' },
-            { k: 'spine', label: 'Ⅱ', hint: '书脊' },
-            { k: 'timeline', label: 'Ⅲ', hint: '时间线' },
-          ] as { k: TocStyle; label: string; hint: string }[]).map(o => (
-            <button
-              key={o.k}
-              onClick={() => onStyleChange(o.k)}
-              className={`xd-style-btn ${style === o.k ? 'on' : ''}`}
-              title={o.hint}
-              aria-label={o.hint}
-            >
-              {o.label}
-            </button>
-          ))}
+        <div className="xd-timeline">
+          <span className="xd-timeline-rail" />
+          {groups.map(g => {
+            const active = g.key === activeKey
+            return (
+              <button
+                key={g.key}
+                onClick={() => handleJump(g.year, g.month)}
+                className={`xd-tl-row ${active ? 'active' : ''}`}
+              >
+                <span className="xd-tl-dot" />
+                <span className="xd-tl-body">
+                  <span className="xd-tl-mo">
+                    {EN_MONTHS[g.month - 1]} <span className="xd-tl-yr">{g.year}</span>
+                  </span>
+                  <span className="xd-tl-cn">
+                    {CN_MONTHS[g.month - 1]} · <em>{g.items.length}</em>
+                  </span>
+                </span>
+              </button>
+            )
+          })}
         </div>
-
-        {style === 'list' && (
-          <div className="xd-toc-list">
-            {groups.map(g => {
-              const active = g.key === activeKey
-              return (
-                <button
-                  key={g.key}
-                  onClick={() => handleJump(g.year, g.month)}
-                  className={`xd-toc-row ${active ? 'active' : ''}`}
-                >
-                  <span className="xd-toc-month-num">
-                    <span className="xd-toc-year">{g.year}</span>
-                    <span className="xd-toc-mo">{EN_MONTHS[g.month - 1]}</span>
-                  </span>
-                  <span className="xd-toc-cn">{CN_MONTHS[g.month - 1]}</span>
-                  <span className="xd-toc-count">{g.items.length}</span>
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        {style === 'spine' && (
-          <div className="xd-spines">
-            {groups.map(g => {
-              const active = g.key === activeKey
-              return (
-                <button
-                  key={g.key}
-                  onClick={() => handleJump(g.year, g.month)}
-                  className={`xd-spine ${active ? 'active' : ''}`}
-                  title={`${g.year} ${CN_MONTHS[g.month - 1]} · ${g.items.length} 篇`}
-                >
-                  <span className="xd-spine-year">{g.year}</span>
-                  <span className="xd-spine-mo">{EN_MONTHS[g.month - 1]}</span>
-                  <span className="xd-spine-count">{g.items.length}</span>
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        {style === 'timeline' && (
-          <div className="xd-timeline">
-            <span className="xd-timeline-rail" />
-            {groups.map(g => {
-              const active = g.key === activeKey
-              return (
-                <button
-                  key={g.key}
-                  onClick={() => handleJump(g.year, g.month)}
-                  className={`xd-tl-row ${active ? 'active' : ''}`}
-                >
-                  <span className="xd-tl-dot" />
-                  <span className="xd-tl-body">
-                    <span className="xd-tl-mo">
-                      {EN_MONTHS[g.month - 1]} <span className="xd-tl-yr">{g.year}</span>
-                    </span>
-                    <span className="xd-tl-cn">
-                      {CN_MONTHS[g.month - 1]} · <em>{g.items.length}</em>
-                    </span>
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        )}
 
         <div className="xd-toc-foot">
           <div className="xd-toc-sig">
@@ -357,14 +289,6 @@ export default function XiaokeDiaryPage() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 900)
   const [tocOpen, setTocOpen] = useState(false)
   const [activeKey, setActiveKey] = useState('')
-  const [tocStyle, setTocStyle] = useState<TocStyle>(() => {
-    const saved = localStorage.getItem('xiaoke-diary-toc-style')
-    return (saved === 'spine' || saved === 'timeline' || saved === 'list') ? saved : 'list'
-  })
-  const handleTocStyleChange = useCallback((s: TocStyle) => {
-    setTocStyle(s)
-    try { localStorage.setItem('xiaoke-diary-toc-style', s) } catch {}
-  }, [])
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const entryRefs = useRef<Record<string, HTMLElement | null>>({})
@@ -487,8 +411,6 @@ export default function XiaokeDiaryPage() {
             onClose={() => setTocOpen(false)}
             onJump={jumpToMonth}
             isMobile={isMobile}
-            style={tocStyle}
-            onStyleChange={handleTocStyleChange}
           />
 
           {/* The book page */}
@@ -708,56 +630,6 @@ function DiaryStyles() {
         cursor: pointer; padding: 0 4px; line-height: 1;
       }
 
-      .xd-toc-list {
-        flex: 1; overflow-y: auto;
-        display: flex; flex-direction: column; gap: 2px;
-      }
-      .xd-toc-list::-webkit-scrollbar { width: 4px; }
-      .xd-toc-list::-webkit-scrollbar-thumb { background: rgba(212, 197, 160, 0.15); border-radius: 2px; }
-
-      .xd-toc-row {
-        background: transparent; border: none;
-        cursor: pointer;
-        display: grid;
-        grid-template-columns: auto 1fr auto;
-        gap: 10px;
-        align-items: baseline;
-        padding: 8px 10px;
-        border-radius: 4px;
-        color: ${K.paperShade};
-        text-align: left;
-        transition: background 0.18s, color 0.18s;
-        font-family: 'Noto Serif SC', serif;
-      }
-      .xd-toc-row:hover {
-        background: rgba(196, 162, 97, 0.08);
-        color: ${K.gold};
-      }
-      .xd-toc-row.active {
-        background: linear-gradient(to right, rgba(196, 162, 97, 0.14), transparent);
-        color: ${K.gold};
-      }
-      .xd-toc-month-num {
-        display: flex; flex-direction: column; line-height: 1.1;
-        font-family: 'EB Garamond', serif;
-      }
-      .xd-toc-year {
-        font-size: 9px; letter-spacing: 0.14em;
-        opacity: 0.55;
-      }
-      .xd-toc-mo {
-        font-size: 13px; font-weight: 600;
-        letter-spacing: 0.1em;
-      }
-      .xd-toc-cn { font-size: 13px; }
-      .xd-toc-count {
-        font-family: 'EB Garamond', serif;
-        font-size: 11px; font-style: italic;
-        color: ${K.copperDeep};
-        opacity: 0.75;
-      }
-      .xd-toc-row.active .xd-toc-count { color: ${K.gold}; opacity: 1; }
-
       .xd-toc-foot {
         padding-top: 14px;
         border-top: 1px dashed rgba(212, 197, 160, 0.15);
@@ -770,117 +642,6 @@ function DiaryStyles() {
         font-size: 11px; font-style: italic;
         letter-spacing: 0.1em;
       }
-
-      /* Style switch (I / II / III) */
-      .xd-style-switch {
-        display: flex; gap: 6px;
-        padding: 6px 4px 12px;
-        margin-bottom: 6px;
-        border-bottom: 1px dashed rgba(212, 197, 160, 0.12);
-      }
-      .xd-style-btn {
-        flex: 1;
-        background: transparent;
-        border: 1px solid rgba(212, 197, 160, 0.14);
-        color: ${K.paperShade};
-        font-family: 'EB Garamond', 'Playfair Display', serif;
-        font-size: 13px;
-        font-style: italic;
-        letter-spacing: 0.08em;
-        padding: 4px 0;
-        border-radius: 3px;
-        cursor: pointer;
-        opacity: 0.55;
-        transition: all 0.2s;
-      }
-      .xd-style-btn:hover {
-        color: ${K.gold};
-        border-color: rgba(196, 162, 97, 0.4);
-        opacity: 0.9;
-      }
-      .xd-style-btn.on {
-        color: ${K.gold};
-        border-color: ${K.gold};
-        background: rgba(196, 162, 97, 0.1);
-        opacity: 1;
-      }
-
-      /* ── Style II: Spines ────────────────────────────────────── */
-      .xd-spines {
-        flex: 1; overflow-y: auto;
-        display: flex; flex-direction: column; gap: 6px;
-        padding: 4px 2px 8px;
-      }
-      .xd-spines::-webkit-scrollbar { width: 4px; }
-      .xd-spines::-webkit-scrollbar-thumb { background: rgba(212, 197, 160, 0.15); border-radius: 2px; }
-      .xd-spine {
-        position: relative;
-        display: flex; align-items: center; justify-content: space-between;
-        height: 46px;
-        padding: 0 14px 0 12px;
-        background: linear-gradient(
-          to bottom,
-          rgba(160, 121, 90, 0.12) 0%,
-          rgba(125, 90, 63, 0.18) 50%,
-          rgba(160, 121, 90, 0.10) 100%
-        );
-        border: 1px solid rgba(196, 162, 97, 0.22);
-        border-left: 3px solid ${K.copper};
-        border-radius: 2px;
-        color: ${K.paperShade};
-        cursor: pointer;
-        font-family: 'EB Garamond', serif;
-        box-shadow:
-          inset 0 1px 0 rgba(244,230,200,0.06),
-          inset 0 -1px 0 rgba(0,0,0,0.25),
-          0 1px 2px rgba(0,0,0,0.3);
-        transition: all 0.22s;
-        overflow: hidden;
-      }
-      .xd-spine::before {
-        content: '';
-        position: absolute; top: 4px; bottom: 4px; left: 6px;
-        width: 1px;
-        background: rgba(196, 162, 97, 0.25);
-      }
-      .xd-spine:hover {
-        border-left-color: ${K.gold};
-        color: ${K.gold};
-        transform: translateX(2px);
-      }
-      .xd-spine.active {
-        border-left-color: ${K.gold};
-        border-color: ${K.gold};
-        color: ${K.gold};
-        background: linear-gradient(
-          to bottom,
-          rgba(196, 162, 97, 0.22) 0%,
-          rgba(196, 162, 97, 0.14) 50%,
-          rgba(196, 162, 97, 0.20) 100%
-        );
-        box-shadow:
-          inset 0 1px 0 rgba(244,230,200,0.12),
-          inset 0 -1px 0 rgba(0,0,0,0.2),
-          0 2px 6px rgba(196, 162, 97, 0.18);
-      }
-      .xd-spine-year {
-        font-size: 10px;
-        letter-spacing: 0.14em;
-        opacity: 0.6;
-        font-style: italic;
-      }
-      .xd-spine-mo {
-        font-size: 15px;
-        font-weight: 600;
-        letter-spacing: 0.22em;
-      }
-      .xd-spine-count {
-        font-size: 11px;
-        font-style: italic;
-        color: ${K.copperDeep};
-        opacity: 0.85;
-      }
-      .xd-spine.active .xd-spine-count { color: ${K.gold}; opacity: 1; }
 
       /* ── Rail mode (collapsed timeline as guide) ─────────────── */
       .xd-toc.rail-mode {
@@ -897,7 +658,6 @@ function DiaryStyles() {
           border-color 0.28s;
       }
       .xd-toc.rail-mode .xd-toc-head,
-      .xd-toc.rail-mode .xd-style-switch,
       .xd-toc.rail-mode .xd-toc-foot {
         opacity: 0;
         visibility: hidden;
@@ -918,7 +678,6 @@ function DiaryStyles() {
         z-index: 20;
       }
       .xd-toc.rail-mode:hover .xd-toc-head,
-      .xd-toc.rail-mode:hover .xd-style-switch,
       .xd-toc.rail-mode:hover .xd-toc-foot {
         opacity: 1;
         visibility: visible;
