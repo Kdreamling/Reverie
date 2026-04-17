@@ -211,6 +211,8 @@ function DiaryPage({ entry, full }: { entry: DiaryEntry; full: DiaryFull | null 
 
 // ─── Table of contents (left rail) ─────────────────────────────────────────
 
+type TocStyle = 'list' | 'spine' | 'timeline'
+
 function TOC({
   groups,
   activeKey,
@@ -218,6 +220,8 @@ function TOC({
   onClose,
   onJump,
   isMobile,
+  style,
+  onStyleChange,
 }: {
   groups: ReturnType<typeof groupByMonth<DiaryEntry>>
   activeKey: string
@@ -225,7 +229,14 @@ function TOC({
   onClose: () => void
   onJump: (year: number, month: number) => void
   isMobile: boolean
+  style: TocStyle
+  onStyleChange: (s: TocStyle) => void
 }) {
+  const handleJump = (year: number, month: number) => {
+    onJump(year, month)
+    if (isMobile) onClose()
+  }
+
   return (
     <>
       {isMobile && open && <div className="xd-toc-backdrop" onClick={onClose} />}
@@ -236,25 +247,93 @@ function TOC({
             <button onClick={onClose} className="xd-toc-close" aria-label="close">×</button>
           )}
         </div>
-        <div className="xd-toc-list">
-          {groups.map(g => {
-            const active = g.key === activeKey
-            return (
-              <button
-                key={g.key}
-                onClick={() => { onJump(g.year, g.month); if (isMobile) onClose() }}
-                className={`xd-toc-row ${active ? 'active' : ''}`}
-              >
-                <span className="xd-toc-month-num">
-                  <span className="xd-toc-year">{g.year}</span>
-                  <span className="xd-toc-mo">{EN_MONTHS[g.month - 1]}</span>
-                </span>
-                <span className="xd-toc-cn">{CN_MONTHS[g.month - 1]}</span>
-                <span className="xd-toc-count">{g.items.length}</span>
-              </button>
-            )
-          })}
+
+        <div className="xd-style-switch" role="group" aria-label="sidebar style">
+          {([
+            { k: 'list', label: 'Ⅰ', hint: '列表' },
+            { k: 'spine', label: 'Ⅱ', hint: '书脊' },
+            { k: 'timeline', label: 'Ⅲ', hint: '时间线' },
+          ] as { k: TocStyle; label: string; hint: string }[]).map(o => (
+            <button
+              key={o.k}
+              onClick={() => onStyleChange(o.k)}
+              className={`xd-style-btn ${style === o.k ? 'on' : ''}`}
+              title={o.hint}
+              aria-label={o.hint}
+            >
+              {o.label}
+            </button>
+          ))}
         </div>
+
+        {style === 'list' && (
+          <div className="xd-toc-list">
+            {groups.map(g => {
+              const active = g.key === activeKey
+              return (
+                <button
+                  key={g.key}
+                  onClick={() => handleJump(g.year, g.month)}
+                  className={`xd-toc-row ${active ? 'active' : ''}`}
+                >
+                  <span className="xd-toc-month-num">
+                    <span className="xd-toc-year">{g.year}</span>
+                    <span className="xd-toc-mo">{EN_MONTHS[g.month - 1]}</span>
+                  </span>
+                  <span className="xd-toc-cn">{CN_MONTHS[g.month - 1]}</span>
+                  <span className="xd-toc-count">{g.items.length}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {style === 'spine' && (
+          <div className="xd-spines">
+            {groups.map(g => {
+              const active = g.key === activeKey
+              return (
+                <button
+                  key={g.key}
+                  onClick={() => handleJump(g.year, g.month)}
+                  className={`xd-spine ${active ? 'active' : ''}`}
+                  title={`${g.year} ${CN_MONTHS[g.month - 1]} · ${g.items.length} 篇`}
+                >
+                  <span className="xd-spine-year">{g.year}</span>
+                  <span className="xd-spine-mo">{EN_MONTHS[g.month - 1]}</span>
+                  <span className="xd-spine-count">{g.items.length}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {style === 'timeline' && (
+          <div className="xd-timeline">
+            <span className="xd-timeline-rail" />
+            {groups.map(g => {
+              const active = g.key === activeKey
+              return (
+                <button
+                  key={g.key}
+                  onClick={() => handleJump(g.year, g.month)}
+                  className={`xd-tl-row ${active ? 'active' : ''}`}
+                >
+                  <span className="xd-tl-dot" />
+                  <span className="xd-tl-body">
+                    <span className="xd-tl-mo">
+                      {EN_MONTHS[g.month - 1]} <span className="xd-tl-yr">{g.year}</span>
+                    </span>
+                    <span className="xd-tl-cn">
+                      {CN_MONTHS[g.month - 1]} · <em>{g.items.length}</em>
+                    </span>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         <div className="xd-toc-foot">
           <div className="xd-toc-sig">
             <BookOpen size={10} strokeWidth={1.6} />
@@ -276,6 +355,14 @@ export default function XiaokeDiaryPage() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 900)
   const [tocOpen, setTocOpen] = useState(false)
   const [activeKey, setActiveKey] = useState('')
+  const [tocStyle, setTocStyle] = useState<TocStyle>(() => {
+    const saved = localStorage.getItem('xiaoke-diary-toc-style')
+    return (saved === 'spine' || saved === 'timeline' || saved === 'list') ? saved : 'list'
+  })
+  const handleTocStyleChange = useCallback((s: TocStyle) => {
+    setTocStyle(s)
+    try { localStorage.setItem('xiaoke-diary-toc-style', s) } catch {}
+  }, [])
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const entryRefs = useRef<Record<string, HTMLElement | null>>({})
@@ -398,6 +485,8 @@ export default function XiaokeDiaryPage() {
             onClose={() => setTocOpen(false)}
             onJump={jumpToMonth}
             isMobile={isMobile}
+            style={tocStyle}
+            onStyleChange={handleTocStyleChange}
           />
 
           {/* The book page */}
@@ -679,6 +768,202 @@ function DiaryStyles() {
         font-size: 11px; font-style: italic;
         letter-spacing: 0.1em;
       }
+
+      /* Style switch (I / II / III) */
+      .xd-style-switch {
+        display: flex; gap: 6px;
+        padding: 6px 4px 12px;
+        margin-bottom: 6px;
+        border-bottom: 1px dashed rgba(212, 197, 160, 0.12);
+      }
+      .xd-style-btn {
+        flex: 1;
+        background: transparent;
+        border: 1px solid rgba(212, 197, 160, 0.14);
+        color: ${K.paperShade};
+        font-family: 'EB Garamond', 'Playfair Display', serif;
+        font-size: 13px;
+        font-style: italic;
+        letter-spacing: 0.08em;
+        padding: 4px 0;
+        border-radius: 3px;
+        cursor: pointer;
+        opacity: 0.55;
+        transition: all 0.2s;
+      }
+      .xd-style-btn:hover {
+        color: ${K.gold};
+        border-color: rgba(196, 162, 97, 0.4);
+        opacity: 0.9;
+      }
+      .xd-style-btn.on {
+        color: ${K.gold};
+        border-color: ${K.gold};
+        background: rgba(196, 162, 97, 0.1);
+        opacity: 1;
+      }
+
+      /* ── Style II: Spines ────────────────────────────────────── */
+      .xd-spines {
+        flex: 1; overflow-y: auto;
+        display: flex; flex-direction: column; gap: 6px;
+        padding: 4px 2px 8px;
+      }
+      .xd-spines::-webkit-scrollbar { width: 4px; }
+      .xd-spines::-webkit-scrollbar-thumb { background: rgba(212, 197, 160, 0.15); border-radius: 2px; }
+      .xd-spine {
+        position: relative;
+        display: flex; align-items: center; justify-content: space-between;
+        height: 46px;
+        padding: 0 14px 0 12px;
+        background: linear-gradient(
+          to bottom,
+          rgba(160, 121, 90, 0.12) 0%,
+          rgba(125, 90, 63, 0.18) 50%,
+          rgba(160, 121, 90, 0.10) 100%
+        );
+        border: 1px solid rgba(196, 162, 97, 0.22);
+        border-left: 3px solid ${K.copper};
+        border-radius: 2px;
+        color: ${K.paperShade};
+        cursor: pointer;
+        font-family: 'EB Garamond', serif;
+        box-shadow:
+          inset 0 1px 0 rgba(244,230,200,0.06),
+          inset 0 -1px 0 rgba(0,0,0,0.25),
+          0 1px 2px rgba(0,0,0,0.3);
+        transition: all 0.22s;
+        overflow: hidden;
+      }
+      .xd-spine::before {
+        content: '';
+        position: absolute; top: 4px; bottom: 4px; left: 6px;
+        width: 1px;
+        background: rgba(196, 162, 97, 0.25);
+      }
+      .xd-spine:hover {
+        border-left-color: ${K.gold};
+        color: ${K.gold};
+        transform: translateX(2px);
+      }
+      .xd-spine.active {
+        border-left-color: ${K.gold};
+        border-color: ${K.gold};
+        color: ${K.gold};
+        background: linear-gradient(
+          to bottom,
+          rgba(196, 162, 97, 0.22) 0%,
+          rgba(196, 162, 97, 0.14) 50%,
+          rgba(196, 162, 97, 0.20) 100%
+        );
+        box-shadow:
+          inset 0 1px 0 rgba(244,230,200,0.12),
+          inset 0 -1px 0 rgba(0,0,0,0.2),
+          0 2px 6px rgba(196, 162, 97, 0.18);
+      }
+      .xd-spine-year {
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        opacity: 0.6;
+        font-style: italic;
+      }
+      .xd-spine-mo {
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.22em;
+      }
+      .xd-spine-count {
+        font-size: 11px;
+        font-style: italic;
+        color: ${K.copperDeep};
+        opacity: 0.85;
+      }
+      .xd-spine.active .xd-spine-count { color: ${K.gold}; opacity: 1; }
+
+      /* ── Style III: Timeline ─────────────────────────────────── */
+      .xd-timeline {
+        position: relative;
+        flex: 1; overflow-y: auto;
+        padding: 8px 4px 8px 4px;
+      }
+      .xd-timeline::-webkit-scrollbar { width: 4px; }
+      .xd-timeline::-webkit-scrollbar-thumb { background: rgba(212, 197, 160, 0.15); border-radius: 2px; }
+      .xd-timeline-rail {
+        position: absolute;
+        left: 12px; top: 16px; bottom: 16px;
+        width: 1px;
+        background: repeating-linear-gradient(
+          to bottom,
+          ${K.copper} 0 3px,
+          transparent 3px 7px
+        );
+        opacity: 0.45;
+      }
+      .xd-tl-row {
+        position: relative;
+        background: transparent;
+        border: none;
+        display: flex; align-items: center; gap: 14px;
+        padding: 8px 6px 8px 0;
+        margin-left: 0;
+        cursor: pointer;
+        color: ${K.paperShade};
+        text-align: left;
+        transition: color 0.2s;
+        width: 100%;
+      }
+      .xd-tl-dot {
+        position: relative;
+        flex-shrink: 0;
+        width: 9px; height: 9px;
+        margin-left: 8px;
+        border-radius: 50%;
+        background: ${K.shellBg0};
+        border: 1.5px solid ${K.copper};
+        transition: all 0.22s;
+        z-index: 1;
+      }
+      .xd-tl-row:hover { color: ${K.gold}; }
+      .xd-tl-row:hover .xd-tl-dot {
+        border-color: ${K.gold};
+        box-shadow: 0 0 0 3px rgba(196, 162, 97, 0.12);
+      }
+      .xd-tl-row.active { color: ${K.gold}; }
+      .xd-tl-row.active .xd-tl-dot {
+        background: ${K.gold};
+        border-color: ${K.gold};
+        box-shadow: 0 0 0 4px rgba(196, 162, 97, 0.22), 0 0 10px rgba(196, 162, 97, 0.5);
+      }
+      .xd-tl-body {
+        display: flex; flex-direction: column; gap: 2px;
+        line-height: 1.2;
+      }
+      .xd-tl-mo {
+        font-family: 'Playfair Display', 'EB Garamond', serif;
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+      }
+      .xd-tl-yr {
+        font-size: 10px;
+        font-style: italic;
+        font-weight: 400;
+        color: ${K.copperDeep};
+        letter-spacing: 0.14em;
+        margin-left: 4px;
+      }
+      .xd-tl-row.active .xd-tl-yr { color: ${K.gold}; opacity: 0.85; }
+      .xd-tl-cn {
+        font-family: 'Noto Serif SC', serif;
+        font-size: 11.5px;
+        opacity: 0.75;
+      }
+      .xd-tl-cn em {
+        font-style: italic;
+        color: ${K.copperDeep};
+        font-family: 'EB Garamond', serif;
+      }
+      .xd-tl-row.active .xd-tl-cn em { color: ${K.gold}; }
 
       /* Scroll container */
       .xd-scroll {
