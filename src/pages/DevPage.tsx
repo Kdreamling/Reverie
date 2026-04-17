@@ -44,17 +44,19 @@ interface DevMessage {
 // ─── Dev color overrides (terminal feel, still warm) ─────────────────────────
 
 const D = {
-  bg: '#1E1A16',
-  surface: '#262220',
-  surfaceHover: '#302C28',
-  border: 'rgba(180,150,120,0.15)',
-  text: '#E8E0D8',
+  bg: '#181614',
+  surface: '#211E1A',
+  surfaceAlt: '#2A2622',
+  surfaceHover: '#322E28',
+  border: 'rgba(180,150,120,0.12)',
+  borderLight: 'rgba(180,150,120,0.08)',
+  text: '#EAE2DA',
   textMuted: '#8A7A6A',
   accent: '#C49A78',
-  accentDim: 'rgba(196,154,120,0.15)',
+  accentDim: 'rgba(196,154,120,0.12)',
   green: '#6EBF8B',
   red: '#D4735A',
-  inputBg: '#1A1614',
+  inputBg: '#161412',
 }
 
 // ─── Tool icon & label mapping (Claude Code style) ───────────────────────────
@@ -109,30 +111,51 @@ function ToolCallBlock({ tc, isMobile }: { tc: ToolCall; isMobile: boolean }) {
   const label = TOOL_LABELS[tc.name] || tc.name
 
   return (
-    <div style={{ margin: '4px 0', borderLeft: `2px solid ${statusColor}`, paddingLeft: isMobile ? 8 : 10 }}>
+    <div style={{
+      margin: '6px 0',
+      background: D.surfaceAlt,
+      borderRadius: 10,
+      border: `1px solid ${D.borderLight}`,
+      overflow: 'hidden',
+    }}>
       <button
         onClick={() => setOpen(o => !o)}
-        style={{ background: 'none', border: 'none', color: D.text, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', fontSize: isMobile ? 12 : 13, fontFamily: 'monospace', width: '100%', minWidth: 0 }}
+        style={{
+          background: 'none', border: 'none', color: D.text, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: isMobile ? '8px 10px' : '8px 14px',
+          fontSize: isMobile ? 12 : 13, fontFamily: 'monospace',
+          width: '100%', minWidth: 0,
+        }}
       >
-        {open ? <ChevronDown size={12} style={{ flexShrink: 0 }} /> : <ChevronRight size={12} style={{ flexShrink: 0 }} />}
-        <ToolIcon name={tc.name} size={isMobile ? 11 : 12} color={statusColor} />
+        <span style={{
+          width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+          background: statusColor,
+          boxShadow: tc.status === 'running' ? `0 0 6px ${statusColor}` : 'none',
+        }} />
+        <ToolIcon name={tc.name} size={isMobile ? 13 : 14} color={D.text} />
         <span style={{ fontWeight: 600, letterSpacing: '0.02em' }}>{label}</span>
         {tc.args && !hasSubSteps && (
           <span style={{ color: D.textMuted, fontSize: isMobile ? 10 : 11, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
-            ({tc.args})
+            {tc.args}
           </span>
         )}
         {hasSubSteps && <span style={{ color: D.textMuted, fontSize: 11 }}>· {tc.subSteps!.length} steps</span>}
-        {tc.status === 'running' && <span style={{ color: D.accent, fontSize: 10, marginLeft: 'auto', letterSpacing: '0.08em', textTransform: 'uppercase', flexShrink: 0 }}>running</span>}
+        <span style={{ marginLeft: 'auto', flexShrink: 0 }}>
+          {open ? <ChevronDown size={12} style={{ color: D.textMuted }} /> : <ChevronRight size={12} style={{ color: D.textMuted }} />}
+        </span>
       </button>
       {open && (
-        <div style={{ fontSize: isMobile ? 11 : 12, fontFamily: 'monospace', padding: isMobile ? '4px 0 4px 12px' : '4px 0 4px 18px' }}>
-          {/* Delegate 子步骤可视化 */}
+        <div style={{
+          fontSize: isMobile ? 11 : 12, fontFamily: 'monospace',
+          padding: isMobile ? '0 10px 10px 30px' : '0 14px 12px 36px',
+          borderTop: `1px solid ${D.borderLight}`,
+        }}>
           {hasSubSteps && (
-            <div style={{ marginBottom: 6 }}>
+            <div style={{ marginTop: 8, marginBottom: 6 }}>
               {tc.subSteps!.map((s, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '1px 0', fontSize: 11 }}>
-                  <span style={{ color: s.status === 'done' ? D.green : D.accent, width: 12, textAlign: 'center' }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', fontSize: 11 }}>
+                  <span style={{ color: s.status === 'done' ? D.green : D.accent, width: 12, textAlign: 'center', fontSize: 10 }}>
                     {s.status === 'done' ? '✓' : '›'}
                   </span>
                   <span style={{ color: D.textMuted }}>R{s.round}</span>
@@ -144,13 +167,13 @@ function ToolCallBlock({ tc, isMobile }: { tc: ToolCall; isMobile: boolean }) {
             </div>
           )}
           {tc.args && (
-            <div style={{ color: D.textMuted, marginBottom: 4, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-              <span style={{ color: D.accent }}>args </span>{tc.args}
+            <div style={{ color: D.textMuted, marginTop: 8, marginBottom: 4, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+              <span style={{ color: D.accent, fontWeight: 600, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase' }}>args </span>{tc.args}
             </div>
           )}
           {tc.result && (
-            <div style={{ color: D.text, whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: isMobile ? 220 : 300, overflowY: 'auto' }}>
-              <span style={{ color: D.green }}>result </span>{tc.result}
+            <div style={{ color: D.text, whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: isMobile ? 220 : 300, overflowY: 'auto', marginTop: 4 }}>
+              <span style={{ color: D.green, fontWeight: 600, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase' }}>result </span>{tc.result}
             </div>
           )}
         </div>
@@ -748,43 +771,58 @@ export default function DevPage() {
             paddingBottom: 'env(safe-area-inset-bottom)',
           } : {}),
         }}>
-          <div style={{ padding: '12px 14px', borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 12, color: D.textMuted, fontWeight: 600 }}>Sessions</span>
+          <div style={{
+            padding: '14px 14px 12px', borderBottom: `1px solid ${D.border}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <span style={{ fontSize: 10, color: D.textMuted, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase' }}>Sessions</span>
             <button
               onClick={createNewSession}
-              style={{ background: D.accentDim, border: 'none', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: D.accent }}
+              style={{
+                background: 'transparent', border: `1px solid ${D.borderLight}`,
+                borderRadius: 6, padding: '4px 6px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', color: D.textMuted,
+                transition: 'all 0.15s',
+              }}
               title="New session"
+              onMouseEnter={e => { e.currentTarget.style.color = D.accent; e.currentTarget.style.borderColor = D.accent + '40' }}
+              onMouseLeave={e => { e.currentTarget.style.color = D.textMuted; e.currentTarget.style.borderColor = D.borderLight }}
             >
               <Plus size={12} />
             </button>
           </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
-            {devSessions.map(s => (
-              <button
-                key={s.id}
-                onClick={() => loadSession(s.id)}
-                style={{
-                  display: 'block', width: '100%', textAlign: 'left',
-                  padding: '8px 14px', border: 'none', cursor: 'pointer',
-                  background: s.id === sessionId ? D.accentDim : 'transparent',
-                  color: s.id === sessionId ? D.accent : D.textMuted,
-                  fontSize: 11, lineHeight: 1.4,
-                  borderLeft: s.id === sessionId ? `2px solid ${D.accent}` : '2px solid transparent',
-                }}
-                onMouseEnter={e => { if (s.id !== sessionId) e.currentTarget.style.background = D.surfaceHover }}
-                onMouseLeave={e => { if (s.id !== sessionId) e.currentTarget.style.background = 'transparent' }}
-              >
-                <div style={{ fontWeight: 500, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {s.title || s.id.slice(0, 8)}
-                </div>
-                <div style={{ fontSize: 10, color: D.textMuted, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Clock size={9} />
-                  {formatTime(s.updated_at)}
-                </div>
-              </button>
-            ))}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '8px 6px' }}>
+            {devSessions.map(s => {
+              const active = s.id === sessionId
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => loadSession(s.id)}
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'left',
+                    padding: '10px 12px', border: 'none', cursor: 'pointer',
+                    background: active ? D.accentDim : 'transparent',
+                    color: active ? D.accent : D.textMuted,
+                    fontSize: 11, lineHeight: 1.4,
+                    borderRadius: 8,
+                    borderLeft: active ? `2px solid ${D.accent}` : '2px solid transparent',
+                    marginBottom: 2, transition: 'background 0.12s',
+                  }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = D.surfaceHover }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? D.accentDim : 'transparent' }}
+                >
+                  <div style={{ fontWeight: active ? 600 : 500, marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {s.title || s.id.slice(0, 8)}
+                  </div>
+                  <div style={{ fontSize: 10, color: D.textMuted, display: 'flex', alignItems: 'center', gap: 4, opacity: 0.8 }}>
+                    <Clock size={9} />
+                    {formatTime(s.updated_at)}
+                  </div>
+                </button>
+              )
+            })}
             {devSessions.length === 0 && (
-              <div style={{ padding: '20px 14px', color: D.textMuted, fontSize: 11, textAlign: 'center' }}>
+              <div style={{ padding: '24px 14px', color: D.textMuted, fontSize: 11, textAlign: 'center', letterSpacing: '0.04em' }}>
                 No dev sessions yet
               </div>
             )}
@@ -797,45 +835,59 @@ export default function DevPage() {
         {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: isMobile ? '6px 10px' : '8px 16px',
-          paddingTop: isMobile ? 'calc(6px + env(safe-area-inset-top))' : '8px',
+          padding: isMobile ? '10px 12px' : '12px 20px',
+          paddingTop: isMobile ? 'calc(10px + env(safe-area-inset-top))' : '12px',
           borderBottom: `1px solid ${D.border}`,
-          background: D.surface, flexShrink: 0, gap: 6, flexWrap: isMobile ? 'wrap' : 'nowrap',
+          background: D.surface, flexShrink: 0, gap: 8,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 10, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12, minWidth: 0 }}>
             <button
               onClick={() => setSidebarOpen(o => !o)}
-              style={{ background: 'none', border: 'none', color: D.textMuted, cursor: 'pointer', padding: 2, flexShrink: 0 }}
+              style={{
+                background: D.surfaceAlt, border: `1px solid ${D.borderLight}`,
+                borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex',
+                color: D.textMuted, transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = D.accent; e.currentTarget.style.borderColor = D.accent + '40' }}
+              onMouseLeave={e => { e.currentTarget.style.color = D.textMuted; e.currentTarget.style.borderColor = D.borderLight }}
             >
-              <Terminal size={16} />
+              <Terminal size={isMobile ? 14 : 15} />
             </button>
-            {!isMobile && <span style={{ fontSize: 13, fontWeight: 600, color: D.accent }}>Reverie Dev</span>}
-            {gwStatus !== 'ok' && (
-              <span style={{
-                fontSize: 10, padding: '2px 6px', borderRadius: 4,
-                background: gwStatus === 'disconnected' ? 'rgba(212,115,90,0.15)' : 'rgba(196,154,120,0.15)',
-                color: gwStatus === 'disconnected' ? D.red : D.accent,
-                animation: gwStatus === 'reconnecting' ? 'pulse 1.5s ease-in-out infinite' : 'none',
-              }}>
-                {gwStatus === 'disconnected' ? 'disconnected' : 'reconnecting...'}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
+              <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 700, color: D.accent, letterSpacing: '0.06em' }}>
+                {isMobile ? 'Dev' : 'Reverie Dev'}
               </span>
-            )}
-            {totalTokens.input > 0 && (
-              <span style={{ fontSize: 10, color: D.textMuted, padding: '2px 6px', background: D.accentDim, borderRadius: 4, whiteSpace: 'nowrap' }}>
-                {((totalTokens.input + totalTokens.output) / 1000).toFixed(0)}k
-                {totalTokens.cached > 0 && !isMobile && <span style={{ color: D.accent }}> ({((totalTokens.cached / totalTokens.input) * 100).toFixed(0)}% cached)</span>}
-              </span>
-            )}
+              {gwStatus !== 'ok' && (
+                <span style={{
+                  fontSize: 10, padding: '2px 8px', borderRadius: 6,
+                  background: gwStatus === 'disconnected' ? 'rgba(212,115,90,0.12)' : 'rgba(196,154,120,0.12)',
+                  color: gwStatus === 'disconnected' ? D.red : D.accent,
+                  animation: gwStatus === 'reconnecting' ? 'pulse 1.5s ease-in-out infinite' : 'none',
+                }}>
+                  {gwStatus === 'disconnected' ? 'disconnected' : 'reconnecting...'}
+                </span>
+              )}
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+            {totalTokens.input > 0 && (
+              <span style={{
+                fontSize: 10, color: D.textMuted, padding: '3px 8px',
+                background: D.surfaceAlt, border: `1px solid ${D.borderLight}`,
+                borderRadius: 6, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums',
+              }}>
+                {((totalTokens.input + totalTokens.output) / 1000).toFixed(0)}k
+                {totalTokens.cached > 0 && !isMobile && <span style={{ color: D.accent }}> · {((totalTokens.cached / totalTokens.input) * 100).toFixed(0)}%</span>}
+              </span>
+            )}
             <select
               value={model}
               onChange={e => setModel(e.target.value)}
               disabled={isStreaming}
               style={{
-                background: D.inputBg, border: `1px solid ${D.border}`, borderRadius: 6,
-                padding: '4px 8px', color: D.accent, fontSize: 11, fontFamily: 'inherit',
-                cursor: 'pointer', outline: 'none', maxWidth: isMobile ? 130 : 'none',
+                background: D.surfaceAlt, border: `1px solid ${D.borderLight}`, borderRadius: 8,
+                padding: '5px 10px', color: D.accent, fontSize: 11, fontFamily: 'inherit',
+                cursor: 'pointer', outline: 'none', maxWidth: isMobile ? 120 : 'none',
               }}
             >
               {DEV_MODELS.map(m => (
@@ -844,7 +896,13 @@ export default function DevPage() {
             </select>
             <a
               href="/chat/"
-              style={{ border: `1px solid ${D.border}`, borderRadius: 6, padding: '4px 10px', color: D.textMuted, fontSize: 11, textDecoration: 'none', whiteSpace: 'nowrap' }}
+              style={{
+                border: `1px solid ${D.borderLight}`, borderRadius: 8,
+                padding: '5px 12px', color: D.textMuted, fontSize: 11,
+                textDecoration: 'none', whiteSpace: 'nowrap', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = D.text; (e.currentTarget as HTMLElement).style.borderColor = D.accent + '40' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = D.textMuted; (e.currentTarget as HTMLElement).style.borderColor = D.borderLight }}
             >
               Chat
             </a>
@@ -852,35 +910,67 @@ export default function DevPage() {
         </div>
 
         {/* Messages */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '8px 10px' : '12px 20px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '12px 10px' : '16px 24px' }}>
+          {messages.length === 0 && !isStreaming && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 12, color: D.textMuted }}>
+              <Terminal size={28} strokeWidth={1.2} style={{ opacity: 0.4 }} />
+              <span style={{ fontSize: 13, letterSpacing: '0.06em' }}>Reverie Dev Console</span>
+              <span style={{ fontSize: 11, opacity: 0.6 }}>describe what to change</span>
+            </div>
+          )}
           {messages.map(msg => (
-            <div key={msg.id} style={{ marginBottom: 14 }}>
+            <div key={msg.id} style={{ marginBottom: isMobile ? 16 : 20 }}>
               {msg.role === 'system' && (
-                <div style={{ color: D.textMuted, fontSize: 11, padding: '4px 8px', background: D.accentDim, borderRadius: 4, display: 'inline-block', whiteSpace: 'pre-wrap' }}>
-                  {msg.content}
+                <div style={{
+                  textAlign: 'center', padding: '6px 0',
+                }}>
+                  <span style={{
+                    color: D.textMuted, fontSize: 10, padding: '3px 12px',
+                    background: D.surfaceAlt, borderRadius: 20,
+                    letterSpacing: '0.04em',
+                  }}>
+                    {msg.content}
+                  </span>
                 </div>
               )}
 
               {msg.role === 'user' && (
-                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                  <span style={{ color: D.green, fontSize: 13, fontWeight: 600, flexShrink: 0 }}>dream $</span>
-                  <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6 }}>
+                <div style={{
+                  padding: isMobile ? '10px 12px' : '12px 16px',
+                  background: D.surfaceAlt,
+                  borderRadius: 12,
+                  border: `1px solid ${D.borderLight}`,
+                }}>
+                  <div style={{
+                    fontSize: 10, fontWeight: 600, color: D.green,
+                    marginBottom: 6, letterSpacing: '0.1em', textTransform: 'uppercase',
+                  }}>dream</div>
+                  <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.7, color: D.text }}>
                     {msg.content}
                   </div>
                 </div>
               )}
 
               {msg.role === 'assistant' && (
-                <div style={{ marginLeft: 0, borderLeft: `2px solid ${D.accent}30`, paddingLeft: 12 }}>
-                  <span style={{ color: D.accent, fontSize: 11, fontWeight: 600 }}>claude</span>
+                <div style={{
+                  padding: isMobile ? '10px 12px' : '12px 16px',
+                  borderRadius: 12,
+                  background: 'transparent',
+                  borderLeft: `2px solid ${D.accent}20`,
+                  marginLeft: isMobile ? 4 : 8,
+                }}>
+                  <div style={{
+                    fontSize: 10, fontWeight: 600, color: D.accent,
+                    marginBottom: 6, letterSpacing: '0.1em', textTransform: 'uppercase',
+                  }}>claude</div>
                   {msg.thinking && <ThinkingBlock text={msg.thinking} />}
                   {msg.toolCalls && msg.toolCalls.length > 0 && (
-                    <div style={{ margin: '4px 0' }}>
+                    <div style={{ margin: '8px 0' }}>
                       {msg.toolCalls.map(tc => <ToolCallBlock key={tc.id} tc={tc} isMobile={isMobile} />)}
                     </div>
                   )}
                   {msg.content && (
-                    <div style={{ fontSize: 13, lineHeight: 1.7, color: D.text }}>
+                    <div style={{ fontSize: 13, lineHeight: 1.75, color: D.text }}>
                       <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={mdComponents}>
                         {msg.content}
                       </ReactMarkdown>
@@ -896,47 +986,61 @@ export default function DevPage() {
 
         {/* Input */}
         <div style={{
-          padding: isMobile ? '8px 10px' : '10px 16px',
-          paddingBottom: isMobile ? 'calc(8px + env(safe-area-inset-bottom))' : '10px',
+          padding: isMobile ? '10px 12px' : '14px 24px',
+          paddingBottom: isMobile ? 'calc(10px + env(safe-area-inset-bottom))' : '14px',
           borderTop: `1px solid ${D.border}`, background: D.surface, flexShrink: 0,
         }}>
           <div style={{
-            display: 'flex', alignItems: 'flex-end', gap: 8,
-            background: D.inputBg, borderRadius: 10, border: `1px solid ${D.border}`,
-            padding: '8px 12px',
+            display: 'flex', alignItems: 'flex-end', gap: 10,
+            background: D.inputBg, borderRadius: 14, border: `1px solid ${D.border}`,
+            padding: isMobile ? '10px 12px' : '12px 16px',
+            transition: 'border-color 0.15s',
           }}>
-            <span style={{ color: D.green, fontSize: 13, fontWeight: 600, paddingBottom: 2 }}>$</span>
             <textarea
               ref={inputRef}
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isStreaming ? 'Insert instruction...' : 'Describe what to change...'}
+              placeholder={isStreaming ? 'inject instruction...' : 'describe what to build...'}
               rows={1}
               style={{
                 flex: 1, background: 'transparent', border: 'none', outline: 'none',
                 color: isStreaming ? D.accent : D.text, fontSize: 13, fontFamily: 'inherit', resize: 'none',
-                lineHeight: 1.5, maxHeight: 120, overflowY: 'auto',
+                lineHeight: 1.6, maxHeight: 140, overflowY: 'auto',
               }}
               onInput={e => {
                 const el = e.currentTarget
                 el.style.height = 'auto'
-                el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+                el.style.height = Math.min(el.scrollHeight, 140) + 'px'
               }}
+              onFocus={e => (e.currentTarget.parentElement!.style.borderColor = D.accent + '50')}
+              onBlur={e => (e.currentTarget.parentElement!.style.borderColor = D.border)}
             />
             {isStreaming ? (
-              <div style={{ display: 'flex', gap: 4 }}>
+              <div style={{ display: 'flex', gap: 6 }}>
                 {input.trim() && (
                   <button
                     onClick={injectInstruction}
                     title="Inject instruction"
-                    style={{ background: D.accent, border: 'none', borderRadius: 6, padding: '6px 8px', cursor: 'pointer', display: 'flex' }}
+                    style={{
+                      background: D.accent, border: 'none', borderRadius: 8, padding: '7px 9px',
+                      cursor: 'pointer', display: 'flex', transition: 'opacity 0.15s',
+                    }}
                   >
                     <ArrowUp size={14} color={D.bg} />
                   </button>
                 )}
-                <button onClick={stopStream} title="Stop" style={{ background: D.red, border: 'none', borderRadius: 6, padding: '6px 8px', cursor: 'pointer', display: 'flex' }}>
-                  <Square size={14} fill="white" color="white" />
+                <button
+                  onClick={stopStream}
+                  title="Stop"
+                  style={{
+                    background: 'transparent', border: `1px solid ${D.red}60`, borderRadius: 8,
+                    padding: '6px 8px', cursor: 'pointer', display: 'flex', transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = D.red; (e.currentTarget.firstChild as HTMLElement).style.color = '#fff' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; (e.currentTarget.firstChild as HTMLElement).style.color = D.red }}
+                >
+                  <Square size={13} fill="currentColor" color={D.red} style={{ transition: 'color 0.15s' }} />
                 </button>
               </div>
             ) : (
@@ -944,19 +1048,20 @@ export default function DevPage() {
                 onClick={sendMessage}
                 disabled={!input.trim()}
                 style={{
-                  background: input.trim() ? D.accent : D.accentDim,
-                  border: 'none', borderRadius: 6, padding: '6px 8px', cursor: input.trim() ? 'pointer' : 'default',
-                  display: 'flex', opacity: input.trim() ? 1 : 0.5,
+                  background: input.trim() ? D.accent : 'transparent',
+                  border: input.trim() ? 'none' : `1px solid ${D.borderLight}`,
+                  borderRadius: 8, padding: '7px 9px', cursor: input.trim() ? 'pointer' : 'default',
+                  display: 'flex', opacity: input.trim() ? 1 : 0.35, transition: 'all 0.2s',
                 }}
               >
-                <ArrowUp size={14} color={D.bg} />
+                <ArrowUp size={14} color={input.trim() ? D.bg : D.textMuted} />
               </button>
             )}
           </div>
-          <div style={{ fontSize: 10, color: D.textMuted, marginTop: 4, textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: D.textMuted, marginTop: 6, textAlign: 'center', letterSpacing: '0.03em' }}>
             {isStreaming
-              ? 'Enter to inject instruction · Stop to abort'
-              : 'Shift+Enter for new line · read/write · git · build · restart · rollback'}
+              ? 'enter to inject · stop to abort'
+              : 'shift+enter new line · read · write · git · build · restart'}
           </div>
         </div>
       </div>
