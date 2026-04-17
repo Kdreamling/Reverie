@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Brain, Settings, LogOut, Camera, Download, FileText, Server, BookOpen } from 'lucide-react'
+import { ChevronLeft, Brain, Settings, LogOut, Camera, Download, FileText, Server, BookOpen, Terminal } from 'lucide-react'
 import { C } from '../theme'
 import { useAuthStore } from '../stores/authStore'
 import { useSessionStore } from '../stores/sessionStore'
@@ -231,46 +231,40 @@ export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
           ))}
         </nav>
 
-        {/* Gateway 管理入口 */}
-        <div className="px-3 md:px-2 pb-2">
-          <button
-            onClick={() => navigate('/admin')}
-            className="flex items-center gap-4 md:gap-3 w-full px-4 md:px-3 py-4 md:py-3 rounded-xl md:rounded-lg transition-colors duration-150 cursor-pointer text-left"
-            style={{ background: 'transparent' }}
-            onMouseEnter={e => (e.currentTarget.style.background = C.sidebarActive)}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-          >
-            <div
-              className="flex items-center justify-center rounded-xl"
-              style={{ width: 40, height: 40, background: C.surface, flexShrink: 0 }}
-            >
-              <Server size={18} strokeWidth={1.5} style={{ color: C.textMuted }} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium" style={{ color: C.text }}>Gateway</p>
-              <p className="text-xs mt-0.5" style={{ color: C.textSecondary }}>供应商·日志·运维</p>
-            </div>
-            <ChevronLeft size={14} strokeWidth={2} style={{ color: C.textMuted, transform: 'rotate(180deg)', marginLeft: 'auto', flexShrink: 0 }} />
-          </button>
-          <button
-            onClick={() => navigate('/xiaoke-diary')}
-            className="flex items-center gap-4 md:gap-3 w-full px-4 md:px-3 py-4 md:py-3 rounded-xl md:rounded-lg transition-colors duration-150 cursor-pointer text-left"
-            style={{ background: 'transparent' }}
-            onMouseEnter={e => (e.currentTarget.style.background = C.sidebarActive)}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-          >
-            <div
-              className="flex items-center justify-center rounded-xl"
-              style={{ width: 40, height: 40, background: C.surface, flexShrink: 0 }}
-            >
-              <BookOpen size={18} strokeWidth={1.5} style={{ color: C.accent }} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium" style={{ color: C.text }}>小克的日记</p>
-              <p className="text-xs mt-0.5" style={{ color: C.textSecondary }}>24 篇，从 3 月 25 日起</p>
-            </div>
-            <ChevronLeft size={14} strokeWidth={2} style={{ color: C.textMuted, transform: 'rotate(180deg)', marginLeft: 'auto', flexShrink: 0 }} />
-          </button>
+        {/* 系统工具区 — 横排小图标 */}
+        <div className="px-5 md:px-4 pb-4 pt-1">
+          <p className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: C.textMuted }}>系统</p>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { icon: Server,   label: 'Gateway', path: '/admin',         accent: false },
+              { icon: BookOpen, label: '小克日记', path: '/xiaoke-diary', accent: true  },
+              { icon: Terminal, label: 'Dev',     path: '/dev',           accent: false },
+            ].map(item => (
+              <button
+                key={item.path}
+                onClick={() => navigate(item.path)}
+                className="flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl transition-all duration-150 cursor-pointer"
+                style={{
+                  background: 'transparent',
+                  border: `1px solid ${C.border}`,
+                  color: C.textSecondary,
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = C.sidebarActive
+                  e.currentTarget.style.borderColor = C.accent + '40'
+                  e.currentTarget.style.color = C.text
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.borderColor = C.border
+                  e.currentTarget.style.color = C.textSecondary
+                }}
+              >
+                <item.icon size={18} strokeWidth={1.5} style={{ color: item.accent ? C.accent : 'currentColor' }} />
+                <span className="text-[11px] font-medium" style={{ letterSpacing: '0.02em' }}>{item.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
