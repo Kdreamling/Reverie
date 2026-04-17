@@ -52,6 +52,43 @@ interface UsageSummary {
   by_channel: Record<string, { requests: number; input_tokens: number; output_tokens: number; errors: number }>
 }
 
+interface CacheHealth {
+  period_hours: number
+  summary: {
+    total_conversations: number
+    avg_hit_rate: number
+    total_cached_tokens: number
+    total_cache_creation_tokens: number
+    total_input_tokens: number
+    total_output_tokens: number
+    total_cost_usd: number
+    total_saved_usd: number
+    anomalies: number
+  }
+  by_scene: Record<string, {
+    count: number
+    cached_tokens: number
+    cache_creation_tokens: number
+    total_input: number
+    hit_rate: number
+    anomalies: number
+  }>
+  recent: Array<{
+    id: number | string
+    created_at: string
+    scene: string
+    channel: string | null
+    input_tokens: number
+    output_tokens: number
+    cached_tokens: number
+    cache_creation_tokens: number
+    hit_rate: number
+    cost: number
+    saved: number
+    anomaly: boolean
+  }>
+}
+
 // ─── API helpers ─────────────────────────────────────────────────────────────
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api'
@@ -459,6 +496,180 @@ function UsageSection({ usage }: { usage: UsageSummary | null }) {
   )
 }
 
+function CacheSection({
+  data, hours, onHoursChange, onRefresh,
+}: {
+  data: CacheHealth | null
+  hours: number
+  onHoursChange: (h: number) => void
+  onRefresh: () => void
+}) {
+  const sceneLabel = (s: string): string => ({
+    daily: '日常', dev: '开发', roleplay: '剧本', reading: '共读', event: '桌宠',
+  } as Record<string, string>)[s] ?? s
+  const hitColor = (rate: number) =>
+    rate >= 70 ? C.success : rate >= 40 ? C.accentWarm : C.errorText
+
+  return (
+    <>
+      {/* 时间范围选择 */}
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, color: C.textMuted }}>时间范围</span>
+          {[6, 24, 72, 168].map(h => (
+            <button
+              key={h}
+              onClick={() => onHoursChange(h)}
+              style={{
+                ...smallBtnStyle,
+                color: hours === h ? C.accent : C.textSecondary,
+                borderColor: hours === h ? C.accent : C.border,
+              }}
+            >
+              {h < 24 ? `${h}h` : h < 168 ? `${h / 24}d` : '7d'}
+            </button>
+          ))}
+          <button
+            onClick={onRefresh}
+            style={{ ...smallBtnStyle, marginLeft: 'auto', color: C.accent }}
+          >
+            ↻ 刷新
+          </button>
+        </div>
+      </div>
+
+      {!data ? <CardSkeleton /> : (
+        <>
+          {/* 总览 */}
+          <div style={cardStyle}>
+            <h3 style={cardTitleStyle}>缓存总览（{data.period_hours}h）</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <StatItem label="对话数" value={String(data.summary.total_conversations)} />
+              <StatItem
+                label="平均命中率"
+                value={`${data.summary.avg_hit_rate}%`}
+              />
+              <StatItem
+                label="异常次数"
+                value={String(data.summary.anomalies)}
+              />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <StatItem
+                label="缓存命中 tok"
+                value={formatTokens(data.summary.total_cached_tokens)}
+              />
+              <StatItem
+                label="缓存写入 tok"
+                value={formatTokens(data.summary.total_cache_creation_tokens)}
+              />
+            </div>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between',
+              padding: '10px 12px', borderRadius: 10, background: C.surface,
+              fontSize: 12,
+            }}>
+              <span style={{ color: C.textMuted }}>总成本 / 节省</span>
+              <span>
+                <span style={{ color: C.text, fontWeight: 600 }}>${data.summary.total_cost_usd.toFixed(3)}</span>
+                <span style={{ color: C.textMuted }}> · 节省 </span>
+                <span style={{ color: C.success, fontWeight: 600 }}>${data.summary.total_saved_usd.toFixed(3)}</span>
+              </span>
+            </div>
+            <div style={{ marginTop: 10, fontSize: 11, color: C.textMuted, lineHeight: 1.6 }}>
+              异常 = 有缓存写入 但 cached=0 且输入&gt;4096，即"该命中却没命中"的冷启动/miss
+            </div>
+          </div>
+
+          {/* 按场景分组 */}
+          {Object.keys(data.by_scene).length > 0 && (
+            <div style={cardStyle}>
+              <h3 style={cardTitleStyle}>按场景</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                {Object.entries(data.by_scene)
+                  .sort(([, a], [, b]) => b.count - a.count)
+                  .map(([scene, s]) => (
+                    <div key={scene} style={{
+                      padding: '10px 0', borderBottom: `1px solid ${C.border}`, fontSize: 12,
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <span style={{ color: C.text, fontWeight: 500 }}>
+                          {sceneLabel(scene)}
+                          <span style={{ color: C.textMuted, fontWeight: 400, marginLeft: 6 }}>
+                            {s.count}条
+                          </span>
+                        </span>
+                        <span style={{ color: hitColor(s.hit_rate), fontWeight: 600 }}>
+                          {s.hit_rate}%
+                        </span>
+                      </div>
+                      <div style={{ color: C.textMuted, fontSize: 11 }}>
+                        命中 {formatTokens(s.cached_tokens)} / 写入 {formatTokens(s.cache_creation_tokens)} / 输入 {formatTokens(s.total_input)}
+                        {s.anomalies > 0 && (
+                          <span style={{ color: C.errorText }}> · 异常 {s.anomalies}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* 最近对话 */}
+          <div style={cardStyle}>
+            <h3 style={cardTitleStyle}>最近对话</h3>
+            {data.recent.length === 0 ? (
+              <div style={{ fontSize: 13, color: C.textMuted, textAlign: 'center', padding: 20 }}>暂无记录</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                {data.recent.map(r => (
+                  <div
+                    key={r.id}
+                    style={{
+                      padding: '8px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 12,
+                      background: r.anomaly ? 'rgba(229, 57, 53, 0.06)' : 'transparent',
+                      borderRadius: r.anomaly ? 6 : 0,
+                      marginBottom: r.anomaly ? 2 : 0,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                      <span style={{ color: C.text, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {r.anomaly && (
+                          <span style={{
+                            fontSize: 10, padding: '1px 5px', borderRadius: 4,
+                            background: C.errorText, color: '#fff', fontWeight: 600,
+                          }}>
+                            MISS
+                          </span>
+                        )}
+                        {sceneLabel(r.scene)}
+                        {r.channel && (
+                          <span style={{ color: C.textMuted, fontWeight: 400 }}>· {r.channel}</span>
+                        )}
+                      </span>
+                      <span style={{ color: hitColor(r.hit_rate), fontWeight: 600 }}>
+                        {r.hit_rate}%
+                      </span>
+                    </div>
+                    <div style={{ color: C.textMuted, fontSize: 11, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>
+                        命中 {formatTokens(r.cached_tokens)} / 写入 {formatTokens(r.cache_creation_tokens)} / 输入 {formatTokens(r.input_tokens)}
+                      </span>
+                      <span>
+                        {new Date(r.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </>
+  )
+}
+
 function CardSkeleton() {
   return (
     <div style={{ ...cardStyle, height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -512,12 +723,13 @@ function formatTokens(n: number): string {
 
 // ─── Tabs ────────────────────────────────────────────────────────────────────
 
-type Tab = 'status' | 'channels' | 'logs' | 'scheduler'
+type Tab = 'status' | 'channels' | 'logs' | 'scheduler' | 'cache'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'status', label: '总览' },
   { key: 'channels', label: '供应商' },
   { key: 'logs', label: '日志' },
+  { key: 'cache', label: '缓存' },
   { key: 'scheduler', label: '运维' },
 ]
 
@@ -537,6 +749,8 @@ export default function AdminPage() {
   const [lockMinutes, setLockMinutes] = useState(120)
   const [schedulerData, setSchedulerData] = useState<{ jobs: any[]; last_keepalive_ts: string | null; recent_keepalive: any[] } | null>(null)
   const [restarting, setRestarting] = useState(false)
+  const [cacheHealth, setCacheHealth] = useState<CacheHealth | null>(null)
+  const [cacheHours, setCacheHours] = useState(24)
 
   const loadLockStatus = useCallback(async () => {
     try {
@@ -596,6 +810,14 @@ export default function AdminPage() {
     } catch { setUsage(null) }
   }, [])
 
+  const loadCacheHealth = useCallback(async (hours: number) => {
+    try {
+      setCacheHealth(null)
+      const data = await adminFetch<CacheHealth>(`/admin/cache/health?hours=${hours}&limit=30`)
+      setCacheHealth(data)
+    } catch { setCacheHealth(null) }
+  }, [])
+
   const loadScheduler = useCallback(async () => {
     try {
       const data = await adminFetch<{ jobs: any[]; last_keepalive_ts: string | null; recent_keepalive: any[] }>('/admin/scheduler/status')
@@ -620,7 +842,8 @@ export default function AdminPage() {
     if (tab === 'channels') loadChannels()
     if (tab === 'logs') loadLogs()
     if (tab === 'scheduler') loadScheduler()
-  }, [tab, loadStatus, loadChannels, loadLogs, loadUsage, loadLockStatus, loadScheduler])
+    if (tab === 'cache') loadCacheHealth(cacheHours)
+  }, [tab, cacheHours, loadStatus, loadChannels, loadLogs, loadUsage, loadLockStatus, loadScheduler, loadCacheHealth])
 
   const handleTestChannel = async (ch: ChannelInfo) => {
     try {
@@ -888,6 +1111,15 @@ export default function AdminPage() {
         )}
 
         {tab === 'logs' && <LogsSection logs={logs} />}
+
+        {tab === 'cache' && (
+          <CacheSection
+            data={cacheHealth}
+            hours={cacheHours}
+            onHoursChange={setCacheHours}
+            onRefresh={() => loadCacheHealth(cacheHours)}
+          />
+        )}
 
         {tab === 'scheduler' && (
           <>
