@@ -240,7 +240,9 @@ function TOC({
   return (
     <>
       {isMobile && open && <div className="xd-toc-backdrop" onClick={onClose} />}
-      <aside className={`xd-toc ${open ? 'open' : ''} ${isMobile ? 'mobile' : ''}`}>
+      <aside
+        className={`xd-toc ${open ? 'open' : ''} ${isMobile ? 'mobile' : ''} ${!isMobile && style === 'timeline' ? 'rail-mode' : ''}`}
+      >
         <div className="xd-toc-head">
           <span className="xd-toc-title">目录 · TOC</span>
           {isMobile && (
@@ -880,6 +882,98 @@ function DiaryStyles() {
       }
       .xd-spine.active .xd-spine-count { color: ${K.gold}; opacity: 1; }
 
+      /* ── Rail mode (collapsed timeline as guide) ─────────────── */
+      .xd-toc.rail-mode {
+        width: 22px;
+        padding: 20px 0;
+        border-right: none;
+        overflow: visible;
+        background: transparent;
+        transition:
+          width 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+          padding 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+          background 0.28s,
+          box-shadow 0.28s,
+          border-color 0.28s;
+      }
+      .xd-toc.rail-mode .xd-toc-head,
+      .xd-toc.rail-mode .xd-style-switch,
+      .xd-toc.rail-mode .xd-toc-foot {
+        opacity: 0;
+        visibility: hidden;
+        transform: translateX(-8px);
+        transition: opacity 0.15s, transform 0.2s, visibility 0s 0.15s;
+        pointer-events: none;
+      }
+      .xd-toc.rail-mode:hover {
+        width: 240px;
+        padding: 24px 16px 20px;
+        background: rgba(30, 24, 18, 0.88);
+        backdrop-filter: blur(12px) saturate(1.15);
+        -webkit-backdrop-filter: blur(12px) saturate(1.15);
+        border-right: 1px solid rgba(196, 162, 97, 0.22);
+        box-shadow:
+          4px 0 28px rgba(0,0,0,0.45),
+          inset -1px 0 0 rgba(244, 230, 200, 0.04);
+        z-index: 20;
+      }
+      .xd-toc.rail-mode:hover .xd-toc-head,
+      .xd-toc.rail-mode:hover .xd-style-switch,
+      .xd-toc.rail-mode:hover .xd-toc-foot {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(0);
+        transition: opacity 0.28s 0.08s, transform 0.28s 0.08s, visibility 0s;
+        pointer-events: auto;
+      }
+      /* Rail-mode timeline layout */
+      .xd-toc.rail-mode .xd-timeline {
+        padding: 0;
+        overflow: visible;
+      }
+      .xd-toc.rail-mode:hover .xd-timeline {
+        padding: 8px 4px;
+        overflow-y: auto;
+      }
+      .xd-toc.rail-mode .xd-timeline-rail {
+        left: 10px;
+        opacity: 0.55;
+        transition: left 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.28s;
+      }
+      .xd-toc.rail-mode:hover .xd-timeline-rail {
+        left: 12px;
+        opacity: 0.45;
+      }
+      .xd-toc.rail-mode .xd-tl-row {
+        padding: 10px 0;
+        gap: 0;
+        justify-content: flex-start;
+        transition: padding 0.32s, gap 0.32s;
+      }
+      .xd-toc.rail-mode:hover .xd-tl-row {
+        padding: 8px 6px 8px 0;
+        gap: 14px;
+      }
+      .xd-toc.rail-mode .xd-tl-dot {
+        margin-left: 6px;
+        transition: margin 0.32s, box-shadow 0.28s, background 0.28s, border-color 0.28s;
+      }
+      .xd-toc.rail-mode:hover .xd-tl-dot {
+        margin-left: 8px;
+      }
+      .xd-toc.rail-mode .xd-tl-body {
+        opacity: 0;
+        transform: translateX(-6px);
+        pointer-events: none;
+        transition: opacity 0.18s, transform 0.2s;
+      }
+      .xd-toc.rail-mode:hover .xd-tl-body {
+        opacity: 1;
+        transform: translateX(0);
+        transition: opacity 0.3s 0.12s, transform 0.3s 0.12s;
+        pointer-events: auto;
+      }
+
       /* ── Style III: Timeline ─────────────────────────────────── */
       .xd-timeline {
         position: relative;
@@ -915,24 +1009,47 @@ function DiaryStyles() {
       .xd-tl-dot {
         position: relative;
         flex-shrink: 0;
-        width: 9px; height: 9px;
+        width: 10px; height: 10px;
         margin-left: 8px;
-        border-radius: 50%;
+        /* irregular ink-blot shape */
+        border-radius: 54% 46% 51% 49% / 48% 53% 47% 52%;
         background: ${K.shellBg0};
         border: 1.5px solid ${K.copper};
-        transition: all 0.22s;
+        transition: border-radius 0.4s, border-color 0.28s, background 0.28s, box-shadow 0.28s, transform 0.28s;
         z-index: 1;
       }
       .xd-tl-row:hover { color: ${K.gold}; }
       .xd-tl-row:hover .xd-tl-dot {
         border-color: ${K.gold};
-        box-shadow: 0 0 0 3px rgba(196, 162, 97, 0.12);
+        box-shadow: 0 0 0 3px rgba(196, 162, 97, 0.14);
+        /* slight reshape on hover */
+        border-radius: 48% 52% 54% 46% / 52% 47% 53% 48%;
       }
       .xd-tl-row.active { color: ${K.gold}; }
       .xd-tl-row.active .xd-tl-dot {
         background: ${K.gold};
         border-color: ${K.gold};
-        box-shadow: 0 0 0 4px rgba(196, 162, 97, 0.22), 0 0 10px rgba(196, 162, 97, 0.5);
+        /* wet ink: irregular halo, warmer glow */
+        border-radius: 51% 49% 48% 52% / 50% 53% 47% 50%;
+        box-shadow:
+          0 0 0 3px rgba(196, 162, 97, 0.22),
+          0 0 10px rgba(196, 162, 97, 0.55),
+          0 0 22px rgba(196, 162, 97, 0.32),
+          0 0 36px rgba(196, 162, 97, 0.15);
+      }
+      /* A soft wet-ink ring that subtly pulses on the active dot */
+      .xd-tl-row.active .xd-tl-dot::before {
+        content: '';
+        position: absolute;
+        inset: -5px;
+        border-radius: 50% 48% 52% 49% / 49% 52% 48% 51%;
+        background: radial-gradient(circle, rgba(196, 162, 97, 0.35) 0%, transparent 70%);
+        animation: xd-ink-pulse 2.6s ease-in-out infinite;
+        pointer-events: none;
+      }
+      @keyframes xd-ink-pulse {
+        0%, 100% { opacity: 0.55; transform: scale(1); }
+        50%      { opacity: 0.9;  transform: scale(1.15); }
       }
       .xd-tl-body {
         display: flex; flex-direction: column; gap: 2px;
