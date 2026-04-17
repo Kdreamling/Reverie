@@ -682,7 +682,7 @@ function DiaryStyles() {
 
       /* Scroll container */
       .xd-scroll {
-        flex: 1; overflow-y: auto;
+        flex: 1; overflow-y: auto; overflow-x: hidden;
         padding: 32px 16px 60px;
         -webkit-overflow-scrolling: touch;
         overscroll-behavior: contain;
@@ -704,6 +704,7 @@ function DiaryStyles() {
         color: ${K.ink};
         padding: 56px 64px 72px;
         border-radius: 2px;
+        overflow: hidden;
         box-shadow:
           0 0 0 1px rgba(90, 60, 30, 0.08),
           0 20px 60px -20px rgba(0,0,0,0.55),
@@ -904,6 +905,12 @@ function DiaryStyles() {
         line-height: 1.95;
         color: ${K.ink};
         font-family: 'Noto Serif SC', 'Songti SC', serif;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+      .xd-body h2, .xd-body h3, .xd-body blockquote, .xd-body .xd-li {
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
       @media (max-width: 640px) {
         .xd-body { font-size: 15px; line-height: 1.9; }
