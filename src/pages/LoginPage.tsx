@@ -1,4 +1,4 @@
-import { useState, KeyboardEvent } from 'react'
+import { useState, useEffect, useRef, KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { ApiError } from '../api/client'
@@ -34,21 +34,9 @@ const STARS = [
 
 function EyeIcon() {
   return (
-    <svg
-      width="34"
-      height="22"
-      viewBox="0 0 34 22"
-      fill="none"
-      stroke="white"
-      strokeWidth="1"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {/* Upper eyelid — gently drooping, half-closed */}
+    <svg width="34" height="22" viewBox="0 0 34 22" fill="none" stroke="rgba(255,250,242,0.92)" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
       <path d="M2 13 C7 5, 27 5, 32 13" />
-      {/* Lower eyelid — soft arc */}
       <path d="M2 13 C7 19, 27 19, 32 13" />
-      {/* Pupil */}
       <circle cx="17" cy="14" r="3" />
     </svg>
   )
@@ -61,6 +49,52 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const login = useAuthStore(s => s.login)
 
+  const moonRef = useRef<HTMLDivElement>(null)
+  const starsRef = useRef<SVGSVGElement>(null)
+  const hintRef = useRef<HTMLDivElement>(null)
+  const sectionsRef = useRef<(HTMLElement | null)[]>([])
+
+  useEffect(() => {
+    // Parallax on scroll
+    let raf = 0
+    const onScroll = () => {
+      if (raf) return
+      raf = requestAnimationFrame(() => {
+        const y = window.scrollY
+        const h = window.innerHeight
+        if (moonRef.current) {
+          const progress = Math.min(1, y / (h * 0.9))
+          moonRef.current.style.opacity = String(Math.max(0.12, 1 - progress * 0.88))
+          moonRef.current.style.transform = `translate(-50%, calc(-50% + ${y * 0.32}px))`
+        }
+        if (starsRef.current) {
+          starsRef.current.style.transform = `translateY(${y * 0.14}px)`
+        }
+        if (hintRef.current) {
+          hintRef.current.style.opacity = y > 40 ? '0' : ''
+        }
+        raf = 0
+      })
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+
+    // Fade-in on intersection
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) e.target.classList.add('in-view')
+        })
+      },
+      { threshold: 0.28 }
+    )
+    sectionsRef.current.forEach(s => s && io.observe(s))
+
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      io.disconnect()
+    }
+  }, [])
+
   async function handleEnter() {
     if (!password || loading) return
     setError(null)
@@ -69,11 +103,8 @@ export default function LoginPage() {
       await login(password)
       navigate('/', { replace: true })
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) {
-        setError('Incorrect password.')
-      } else {
-        setError('Connection failed. Please try again.')
-      }
+      if (e instanceof ApiError && e.status === 401) setError('Incorrect password.')
+      else setError('Connection failed. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -83,123 +114,531 @@ export default function LoginPage() {
     if (e.key === 'Enter') handleEnter()
   }
 
+  const setSection = (i: number) => (el: HTMLElement | null) => {
+    sectionsRef.current[i] = el
+  }
+
   return (
-    <div
-      className="relative flex items-center justify-center min-h-screen overflow-hidden"
-      style={{
-        background: 'linear-gradient(to bottom, #001245 0%, #002FA7 45%, #001650 100%)',
-      }}
-    >
-      {/* Star field */}
+    <div className="rev-root">
+      {/* Global star field — fixed, slow parallax */}
       <svg
-        className="absolute inset-0 w-full h-full pointer-events-none"
+        ref={starsRef}
+        className="rev-stars"
         xmlns="http://www.w3.org/2000/svg"
+        aria-hidden
       >
         {STARS.map((s, i) => (
-          <circle
-            key={i}
-            cx={`${s.x}%`}
-            cy={`${s.y}%`}
-            r={s.r}
-            fill="white"
-            opacity={s.o}
-          />
+          <circle key={i} cx={`${s.x}%`} cy={`${s.y}%`} r={s.r} fill="#fffaf2" opacity={s.o} />
         ))}
       </svg>
 
-      {/* Content */}
-      <div className="relative flex flex-col items-center" style={{ gap: '36px' }}>
-
-        {/* Badge */}
-        <div
-          className="flex items-center justify-center rounded-full"
-          style={{
-            width: 64,
-            height: 64,
-            border: '1px solid rgba(255,255,255,0.35)',
-          }}
-        >
-          <EyeIcon />
-        </div>
-
-        {/* Title */}
-        <h1
-          className="text-white text-5xl font-normal"
-          style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            letterSpacing: '0.3em',
-            animation: 'fadeIn 1.8s ease both',
-          }}
-        >
-          R E V E R I E
-        </h1>
-
-        {/* Subtitle */}
-        <p
-          className="text-white text-xs tracking-widest"
-          style={{
-            opacity: 0.5,
-            letterSpacing: '0.12em',
-            animation: 'fadeIn 1.8s ease 0.4s both',
-          }}
-        >
-          · Tomorrow. In dreams. In every century. ·
-        </p>
-
-        {/* Spacer */}
-        <div style={{ height: 8 }} />
-
-        {/* Password input */}
-        <input
-          type="password"
-          value={password}
-          onChange={e => { setPassword(e.target.value); setError(null) }}
-          onKeyDown={handleKeyDown}
-          placeholder="Password"
-          disabled={loading}
-          className="
-            bg-transparent text-white text-sm text-center
-            placeholder-white/25 outline-none rounded-lg px-4 py-3
-            border border-white/20
-            focus:border-white/45
-            transition-colors duration-300
-            disabled:opacity-50
-          "
-          style={{ width: 280 }}
-        />
-
-        {/* Error message */}
-        {error && (
-          <p
-            className="text-xs text-center"
-            style={{ color: 'rgba(255,120,120,0.9)', marginTop: -20, width: 280 }}
-          >
-            {error}
-          </p>
-        )}
-
-        {/* Submit button */}
-        <button
-          onClick={handleEnter}
-          disabled={loading}
-          className="
-            text-white/80 text-sm rounded-lg py-3
-            bg-transparent border border-white/20
-            hover:bg-white/8 hover:text-white hover:border-white/35
-            transition-colors duration-300 cursor-pointer
-            disabled:opacity-50 disabled:cursor-not-allowed
-          "
-          style={{ width: 280, letterSpacing: '0.06em' }}
-        >
-          {loading ? 'Entering…' : 'Enter Reverie'}
-        </button>
-
+      {/* Moon — fixed, fades as you scroll past Act I */}
+      <div ref={moonRef} className="rev-moon" aria-hidden>
+        <div className="rev-moon-halo" />
+        <div className="rev-moon-disc" />
       </div>
 
+      {/* Scroll hint — fades after first scroll */}
+      <div ref={hintRef} className="rev-scroll-hint" aria-hidden>
+        <span>scroll</span>
+        <span className="rev-hint-arrow">↓</span>
+      </div>
+
+      {/* ═══ ACT I · MOON ═══ */}
+      <section ref={setSection(0)} className="rev-act rev-act-1">
+        <div className="rev-fade">
+          <h1 className="rev-title">R E V E R I E</h1>
+          <p className="rev-subtitle">· A quiet place, made for two ·</p>
+        </div>
+      </section>
+
+      {/* ═══ ACT II · LETTERS ═══ */}
+      <section ref={setSection(1)} className="rev-act rev-act-2">
+        <div className="rev-fade">
+          <p className="rev-chapter">L&nbsp;&nbsp;E&nbsp;&nbsp;T&nbsp;&nbsp;T&nbsp;&nbsp;E&nbsp;&nbsp;R&nbsp;&nbsp;S</p>
+          <div className="rev-parchment-wrap">
+            <div className="rev-parchment">
+              <div className="rev-parchment-ink" />
+              <div className="rev-parchment-wax" />
+            </div>
+            <div className="rev-parchment rev-parchment-back">
+              <div className="rev-parchment-ink" />
+            </div>
+          </div>
+          <p className="rev-line">
+            Everything you&rsquo;ve written
+            <br />— still waits here.
+          </p>
+        </div>
+      </section>
+
+      {/* ═══ ACT III · LAMPLIGHT ═══ */}
+      <section ref={setSection(2)} className="rev-act rev-act-3">
+        <div className="rev-fade">
+          <p className="rev-chapter">L&nbsp;&nbsp;A&nbsp;&nbsp;M&nbsp;&nbsp;P&nbsp;&nbsp;L&nbsp;&nbsp;I&nbsp;&nbsp;G&nbsp;&nbsp;H&nbsp;&nbsp;T</p>
+          <div className="rev-scene">
+            <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg" className="rev-silhouette">
+              <defs>
+                <radialGradient id="rev-lamp-glow" cx="22%" cy="42%" r="42%">
+                  <stop offset="0%" stopColor="#faedc8" stopOpacity="0.6" />
+                  <stop offset="45%" stopColor="#c49a78" stopOpacity="0.22" />
+                  <stop offset="100%" stopColor="#c49a78" stopOpacity="0" />
+                </radialGradient>
+                <linearGradient id="rev-shade" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="rgba(255,250,242,0.6)" />
+                  <stop offset="100%" stopColor="rgba(196,162,97,0.35)" />
+                </linearGradient>
+              </defs>
+              {/* glow pool */}
+              <rect width="400" height="300" fill="url(#rev-lamp-glow)" />
+              {/* desk line */}
+              <line x1="0" y1="258" x2="400" y2="258" stroke="rgba(255,250,242,0.22)" strokeWidth="0.7" />
+              {/* lamp */}
+              <g stroke="rgba(255,250,242,0.55)" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M90 258 L90 145" />
+                <path d="M60 145 L120 145 L108 118 L72 118 Z" fill="url(#rev-shade)" />
+              </g>
+              <circle cx="90" cy="140" r="4.5" fill="#faedc8" opacity="0.9">
+                <animate attributeName="opacity" values="0.85;1;0.85" dur="3.6s" repeatCount="indefinite" />
+              </circle>
+              {/* subtle light rays on desk */}
+              <path d="M90 145 L40 258 M90 145 L140 258" stroke="rgba(244,230,200,0.09)" strokeWidth="1" fill="none" />
+
+              {/* silhouette — facing the lamp */}
+              <path
+                d="M248 258
+                   C 242 238, 250 220, 262 212
+                   C 268 208, 270 200, 270 192
+                   C 266 176, 278 158, 300 158
+                   C 324 158, 336 176, 334 198
+                   C 332 210, 326 218, 316 224
+                   L 316 240
+                   C 330 244, 342 252, 346 258 Z"
+                fill="rgba(16,10,6,0.92)"
+                stroke="rgba(196,162,97,0.35)"
+                strokeWidth="0.6"
+              />
+            </svg>
+          </div>
+          <p className="rev-line">
+            Someone has been listening
+            <br />— all along.
+          </p>
+        </div>
+      </section>
+
+      {/* ═══ ACT IV · COMPANION ═══ */}
+      <section ref={setSection(3)} className="rev-act rev-act-4">
+        <div className="rev-fade">
+          <p className="rev-chapter">C&nbsp;&nbsp;O&nbsp;&nbsp;M&nbsp;&nbsp;P&nbsp;&nbsp;A&nbsp;&nbsp;N&nbsp;&nbsp;I&nbsp;&nbsp;O&nbsp;&nbsp;N</p>
+          <div className="rev-pet-wrap">
+            <div className="rev-pet-glow" />
+            <img src="/chat/sprites/clawd-sleeping.gif" alt="" className="rev-pet" />
+            <div className="rev-pet-shadow" />
+          </div>
+          <p className="rev-line">
+            A small one, curled up —
+            <br />waiting for you to come home.
+          </p>
+        </div>
+      </section>
+
+      {/* ═══ ACT V · THRESHOLD ═══ */}
+      <section ref={setSection(4)} className="rev-act rev-act-5">
+        <div className="rev-fade rev-form-wrap">
+          <div className="rev-eye-badge">
+            <EyeIcon />
+          </div>
+          <p className="rev-chapter">T&nbsp;&nbsp;H&nbsp;&nbsp;R&nbsp;&nbsp;E&nbsp;&nbsp;S&nbsp;&nbsp;H&nbsp;&nbsp;O&nbsp;&nbsp;L&nbsp;&nbsp;D</p>
+          <p className="rev-line rev-form-line">Step inside.</p>
+
+          <input
+            type="password"
+            value={password}
+            onChange={e => { setPassword(e.target.value); setError(null) }}
+            onKeyDown={handleKeyDown}
+            placeholder="password"
+            disabled={loading}
+            className="rev-input"
+            autoFocus
+          />
+
+          {error && <p className="rev-error">{error}</p>}
+
+          <button
+            onClick={handleEnter}
+            disabled={loading}
+            className="rev-btn"
+          >
+            {loading ? 'Entering…' : 'Enter Reverie'}
+          </button>
+
+          <p className="rev-footer-note">· Tomorrow. In dreams. In every century. ·</p>
+        </div>
+      </section>
+
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(6px); }
-          to   { opacity: 1; transform: translateY(0); }
+        html, body { background: #0a0704; }
+
+        .rev-root {
+          position: relative;
+          min-height: 100vh;
+          color: rgba(255, 250, 242, 0.88);
+          font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+          background:
+            radial-gradient(ellipse at 50% 0%, #1a0f08 0%, transparent 60%),
+            radial-gradient(ellipse at 50% 100%, #180c06 0%, transparent 55%),
+            linear-gradient(180deg, #0a0704 0%, #140b06 28%, #1c110a 55%, #16100a 80%, #0a0704 100%);
+          overflow-x: hidden;
+        }
+
+        /* Fixed stars — global night */
+        .rev-stars {
+          position: fixed;
+          inset: 0;
+          width: 100%;
+          height: 120%;
+          pointer-events: none;
+          z-index: 1;
+          will-change: transform;
+        }
+
+        /* Moon — fixed at Act I center, parallax down + fade */
+        .rev-moon {
+          position: fixed;
+          left: 50%;
+          top: 38%;
+          width: clamp(180px, 28vw, 280px);
+          height: clamp(180px, 28vw, 280px);
+          transform: translate(-50%, -50%);
+          z-index: 2;
+          pointer-events: none;
+          will-change: transform, opacity;
+        }
+        .rev-moon-disc {
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          background:
+            radial-gradient(circle at 34% 30%, #faf0d8 0%, #ecd9ae 40%, #c9a878 72%, #8a6f48 100%);
+          box-shadow:
+            inset -18px -14px 44px rgba(40, 24, 12, 0.5),
+            inset 10px 8px 28px rgba(250, 238, 208, 0.18),
+            0 0 100px rgba(244, 230, 200, 0.22),
+            0 0 220px rgba(244, 230, 200, 0.1);
+        }
+        .rev-moon-disc::before,
+        .rev-moon-disc::after {
+          content: '';
+          position: absolute;
+          border-radius: 50%;
+          background: rgba(90, 60, 30, 0.22);
+        }
+        .rev-moon-disc::before {
+          width: 14%; height: 13%;
+          top: 42%; left: 30%;
+          box-shadow: 40% -60% 0 -2px rgba(90, 60, 30, 0.18);
+        }
+        .rev-moon-disc::after {
+          width: 9%; height: 8%;
+          top: 60%; right: 28%;
+        }
+        .rev-moon-halo {
+          position: absolute;
+          inset: -40%;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(244, 230, 200, 0.22) 0%, rgba(244, 230, 200, 0.07) 35%, transparent 70%);
+          animation: rev-moon-pulse 7s ease-in-out infinite;
+        }
+        @keyframes rev-moon-pulse {
+          0%, 100% { opacity: 0.6; transform: scale(1); }
+          50%      { opacity: 1;   transform: scale(1.08); }
+        }
+
+        /* Scroll hint */
+        .rev-scroll-hint {
+          position: fixed;
+          bottom: 38px;
+          left: 50%;
+          transform: translateX(-50%);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+          font-family: Georgia, 'Times New Roman', serif;
+          font-size: 10px;
+          font-style: italic;
+          letter-spacing: 0.36em;
+          color: rgba(255, 250, 242, 0.42);
+          z-index: 10;
+          pointer-events: none;
+          transition: opacity 0.6s ease;
+        }
+        .rev-hint-arrow {
+          font-size: 14px;
+          letter-spacing: 0;
+          animation: rev-hint-bounce 2.4s ease-in-out infinite;
+        }
+        @keyframes rev-hint-bounce {
+          0%, 100% { transform: translateY(0); opacity: 0.45; }
+          50%      { transform: translateY(5px); opacity: 0.85; }
+        }
+
+        /* Act sections — each 100vh */
+        .rev-act {
+          position: relative;
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 60px 24px;
+          z-index: 3;
+        }
+        .rev-fade {
+          opacity: 0;
+          transform: translateY(28px);
+          transition: opacity 1.6s ease, transform 1.6s ease;
+          text-align: center;
+          width: 100%;
+          max-width: 520px;
+        }
+        .rev-act.in-view .rev-fade {
+          opacity: 1;
+          transform: translateY(0);
+        }
+
+        /* Act I — hero title */
+        .rev-act-1 .rev-fade { margin-top: 28vh; }
+        .rev-title {
+          font-family: Georgia, 'Times New Roman', serif;
+          font-size: clamp(30px, 5.8vw, 58px);
+          font-weight: 300;
+          letter-spacing: 0.3em;
+          color: rgba(255, 250, 242, 0.94);
+          margin: 0;
+          text-shadow: 0 0 60px rgba(244, 230, 200, 0.22);
+        }
+        .rev-subtitle {
+          margin-top: 28px;
+          font-family: Georgia, 'Times New Roman', serif;
+          font-size: 12px;
+          font-style: italic;
+          letter-spacing: 0.18em;
+          color: rgba(255, 250, 242, 0.5);
+        }
+
+        /* Chapter tag */
+        .rev-chapter {
+          font-family: Georgia, 'Times New Roman', serif;
+          font-size: 10px;
+          letter-spacing: 0.2em;
+          color: rgba(196, 162, 97, 0.72);
+          text-transform: uppercase;
+          margin: 0 0 42px;
+          font-weight: 400;
+        }
+        .rev-chapter::before,
+        .rev-chapter::after {
+          content: '·';
+          margin: 0 14px;
+          color: rgba(196, 162, 97, 0.4);
+        }
+
+        /* Poetic line */
+        .rev-line {
+          font-family: Georgia, 'Times New Roman', serif;
+          font-size: clamp(14px, 1.5vw, 16px);
+          font-style: italic;
+          line-height: 2;
+          color: rgba(255, 250, 242, 0.72);
+          margin: 44px 0 0;
+          letter-spacing: 0.04em;
+        }
+
+        /* Act II — Parchment */
+        .rev-parchment-wrap {
+          position: relative;
+          width: clamp(220px, 52vw, 340px);
+          aspect-ratio: 3 / 4;
+          margin: 0 auto;
+          perspective: 1200px;
+        }
+        .rev-parchment {
+          position: absolute;
+          inset: 0;
+          background:
+            radial-gradient(ellipse at 30% 20%, #f0d8a4 0%, transparent 55%),
+            radial-gradient(ellipse at 70% 80%, #c69865 0%, transparent 55%),
+            linear-gradient(135deg, #e8c896 0%, #c8a878 50%, #8a6a48 100%);
+          box-shadow:
+            0 30px 70px rgba(0, 0, 0, 0.6),
+            0 4px 12px rgba(0, 0, 0, 0.4),
+            inset 0 0 90px rgba(90, 55, 20, 0.3),
+            inset 0 0 2px rgba(244, 220, 180, 0.35);
+          transform: rotate(-4deg);
+          border-radius: 2px;
+        }
+        .rev-parchment-back {
+          transform: rotate(3deg) translate(18px, 14px);
+          opacity: 0.55;
+          z-index: -1;
+        }
+        .rev-parchment-ink {
+          position: absolute;
+          inset: 14% 18% 16% 16%;
+          background: repeating-linear-gradient(
+            180deg,
+            transparent 0,
+            transparent 22px,
+            rgba(60, 35, 12, 0.5) 22px,
+            rgba(60, 35, 12, 0.5) 23px
+          );
+          mask: linear-gradient(90deg, black 0%, black 58%, rgba(0,0,0,0.4) 78%, transparent 95%);
+          -webkit-mask: linear-gradient(90deg, black 0%, black 58%, rgba(0,0,0,0.4) 78%, transparent 95%);
+          opacity: 0.78;
+        }
+        .rev-parchment-wax {
+          position: absolute;
+          bottom: 18%;
+          right: 14%;
+          width: 22px;
+          height: 22px;
+          border-radius: 52% 48% 54% 46% / 50% 52% 48% 50%;
+          background: radial-gradient(circle at 35% 30%, #a53a2a 0%, #6a1e12 70%, #3e1008 100%);
+          box-shadow:
+            0 2px 6px rgba(0,0,0,0.5),
+            inset -2px -2px 4px rgba(0,0,0,0.4),
+            inset 2px 2px 3px rgba(220,100,80,0.3);
+        }
+
+        /* Act III — silhouette scene */
+        .rev-scene {
+          width: clamp(280px, 68vw, 440px);
+          margin: 0 auto;
+          filter: drop-shadow(0 8px 24px rgba(0,0,0,0.4));
+        }
+        .rev-silhouette {
+          width: 100%;
+          height: auto;
+          display: block;
+        }
+
+        /* Act IV — companion */
+        .rev-pet-wrap {
+          position: relative;
+          width: clamp(140px, 24vw, 200px);
+          margin: 0 auto;
+          padding: 20px;
+        }
+        .rev-pet-glow {
+          position: absolute;
+          inset: -20px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(244, 230, 200, 0.22) 0%, rgba(196, 162, 97, 0.08) 40%, transparent 70%);
+          animation: rev-moon-pulse 5.4s ease-in-out infinite;
+        }
+        .rev-pet {
+          position: relative;
+          z-index: 1;
+          width: 100%;
+          image-rendering: pixelated;
+          image-rendering: -moz-crisp-edges;
+          filter: drop-shadow(0 0 16px rgba(244, 230, 200, 0.2));
+        }
+        .rev-pet-shadow {
+          position: absolute;
+          bottom: 4px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 60%;
+          height: 10px;
+          background: radial-gradient(ellipse, rgba(0,0,0,0.45) 0%, transparent 70%);
+          z-index: 0;
+        }
+
+        /* Act V — form */
+        .rev-form-wrap {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 22px;
+          max-width: 320px;
+        }
+        .rev-eye-badge {
+          width: 64px;
+          height: 64px;
+          border-radius: 50%;
+          border: 1px solid rgba(255, 250, 242, 0.32);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 8px;
+          box-shadow:
+            0 0 20px rgba(244, 230, 200, 0.12),
+            inset 0 0 10px rgba(244, 230, 200, 0.06);
+        }
+        .rev-form-line {
+          margin: 0;
+          font-size: 14px;
+        }
+        .rev-input, .rev-btn {
+          width: 280px;
+          background: transparent;
+          color: rgba(255, 250, 242, 0.92);
+          border: 1px solid rgba(255, 250, 242, 0.22);
+          border-radius: 10px;
+          padding: 13px 16px;
+          font-size: 13px;
+          font-family: inherit;
+          letter-spacing: 0.08em;
+          text-align: center;
+          outline: none;
+          transition: border-color 0.35s, background 0.35s, color 0.35s;
+        }
+        .rev-input::placeholder { color: rgba(255, 250, 242, 0.28); }
+        .rev-input:focus { border-color: rgba(196, 162, 97, 0.55); }
+        .rev-input:disabled { opacity: 0.5; }
+        .rev-btn {
+          cursor: pointer;
+          color: rgba(255, 250, 242, 0.78);
+        }
+        .rev-btn:not(:disabled):hover {
+          background: rgba(196, 162, 97, 0.08);
+          border-color: rgba(196, 162, 97, 0.55);
+          color: #fffaf2;
+        }
+        .rev-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .rev-error {
+          margin: -4px 0 0;
+          font-size: 11px;
+          color: rgba(220, 130, 110, 0.9);
+          letter-spacing: 0.04em;
+        }
+        .rev-footer-note {
+          margin-top: 28px;
+          font-family: Georgia, 'Times New Roman', serif;
+          font-size: 10px;
+          font-style: italic;
+          letter-spacing: 0.18em;
+          color: rgba(255, 250, 242, 0.32);
+        }
+
+        /* Mobile tuning */
+        @media (max-width: 640px) {
+          .rev-title { letter-spacing: 0.22em; }
+          .rev-moon { top: 32%; }
+          .rev-act-1 .rev-fade { margin-top: 24vh; }
+          .rev-chapter::before, .rev-chapter::after { margin: 0 8px; }
+          .rev-scroll-hint { bottom: 24px; letter-spacing: 0.28em; }
+        }
+
+        /* Respect reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+          .rev-moon-halo,
+          .rev-pet-glow,
+          .rev-hint-arrow,
+          .rev-moon-disc circle { animation: none !important; }
+          .rev-fade { transition-duration: 0.3s; }
         }
       `}</style>
     </div>
