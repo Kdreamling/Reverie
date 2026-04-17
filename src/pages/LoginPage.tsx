@@ -49,26 +49,30 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const login = useAuthStore(s => s.login)
 
+  const rootRef = useRef<HTMLDivElement>(null)
   const moonRef = useRef<HTMLDivElement>(null)
   const starsRef = useRef<SVGSVGElement>(null)
   const hintRef = useRef<HTMLDivElement>(null)
   const sectionsRef = useRef<(HTMLElement | null)[]>([])
 
   useEffect(() => {
-    // Parallax on scroll
+    const root = rootRef.current
+    if (!root) return
+
+    // Parallax on scroll (scroll container = rev-root)
     let raf = 0
     const onScroll = () => {
       if (raf) return
       raf = requestAnimationFrame(() => {
-        const y = window.scrollY
+        const y = root.scrollTop
         const h = window.innerHeight
         if (moonRef.current) {
           const progress = Math.min(1, y / (h * 0.9))
-          moonRef.current.style.opacity = String(Math.max(0.12, 1 - progress * 0.88))
-          moonRef.current.style.transform = `translate(-50%, calc(-50% + ${y * 0.32}px))`
+          moonRef.current.style.opacity = String(Math.max(0.1, 1 - progress * 0.9))
+          moonRef.current.style.transform = `translate(-50%, calc(-50% + ${y * 0.28}px))`
         }
         if (starsRef.current) {
-          starsRef.current.style.transform = `translateY(${y * 0.14}px)`
+          starsRef.current.style.transform = `translateY(${y * 0.1}px)`
         }
         if (hintRef.current) {
           hintRef.current.style.opacity = y > 40 ? '0' : ''
@@ -76,21 +80,21 @@ export default function LoginPage() {
         raf = 0
       })
     }
-    window.addEventListener('scroll', onScroll, { passive: true })
+    root.addEventListener('scroll', onScroll, { passive: true })
 
-    // Fade-in on intersection
+    // Fade-in on intersection (root scroller = rev-root)
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach(e => {
           if (e.isIntersecting) e.target.classList.add('in-view')
         })
       },
-      { threshold: 0.28 }
+      { root, threshold: 0.28 }
     )
     sectionsRef.current.forEach(s => s && io.observe(s))
 
     return () => {
-      window.removeEventListener('scroll', onScroll)
+      root.removeEventListener('scroll', onScroll)
       io.disconnect()
     }
   }, [])
@@ -119,23 +123,25 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="rev-root">
-      {/* Global star field — fixed, slow parallax */}
-      <svg
-        ref={starsRef}
-        className="rev-stars"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-hidden
-      >
-        {STARS.map((s, i) => (
-          <circle key={i} cx={`${s.x}%`} cy={`${s.y}%`} r={s.r} fill="#fffaf2" opacity={s.o} />
-        ))}
-      </svg>
+    <div className="rev-root" ref={rootRef}>
+      {/* Sticky stage — holds stars + moon, sits on top of viewport while content scrolls */}
+      <div className="rev-stage" aria-hidden>
+        <svg
+          ref={starsRef}
+          className="rev-stars"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          {STARS.map((s, i) => (
+            <circle key={i} cx={`${s.x}%`} cy={`${s.y}%`} r={s.r} fill="#fffaf2" opacity={s.o} />
+          ))}
+        </svg>
 
-      {/* Moon — fixed, fades as you scroll past Act I */}
-      <div ref={moonRef} className="rev-moon" aria-hidden>
-        <div className="rev-moon-halo" />
-        <div className="rev-moon-disc" />
+        {/* Moon — soft moonlight, no hard disc */}
+        <div ref={moonRef} className="rev-moon">
+          <div className="rev-moon-halo" />
+          <div className="rev-moon-core" />
+          <div className="rev-moon-ring" />
+        </div>
       </div>
 
       {/* Scroll hint — fades after first scroll */}
@@ -278,77 +284,89 @@ export default function LoginPage() {
       </section>
 
       <style>{`
-        html, body { background: #0a0704; }
-
+        /* rev-root owns its own scroll (parent #root is fixed) */
         .rev-root {
-          position: relative;
-          min-height: 100vh;
+          position: absolute;
+          inset: 0;
+          overflow-y: auto;
+          overflow-x: hidden;
           color: rgba(255, 250, 242, 0.88);
           font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
           background:
             radial-gradient(ellipse at 50% 0%, #1a0f08 0%, transparent 60%),
             radial-gradient(ellipse at 50% 100%, #180c06 0%, transparent 55%),
             linear-gradient(180deg, #0a0704 0%, #140b06 28%, #1c110a 55%, #16100a 80%, #0a0704 100%);
-          overflow-x: hidden;
+          -webkit-overflow-scrolling: touch;
+          overscroll-behavior: contain;
         }
 
-        /* Fixed stars — global night */
-        .rev-stars {
-          position: fixed;
-          inset: 0;
+        /* Sticky stage — stars + moon live here, pinned to viewport while content scrolls past */
+        .rev-stage {
+          position: sticky;
+          top: 0;
+          left: 0;
           width: 100%;
-          height: 120%;
+          height: 100vh;
+          margin-bottom: -100vh;
           pointer-events: none;
           z-index: 1;
+        }
+
+        .rev-stars {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
           will-change: transform;
         }
 
-        /* Moon — fixed at Act I center, parallax down + fade */
+        /* Moon — soft moonlight, airy, no hard disc */
         .rev-moon {
-          position: fixed;
+          position: absolute;
           left: 50%;
-          top: 38%;
-          width: clamp(180px, 28vw, 280px);
-          height: clamp(180px, 28vw, 280px);
+          top: 42%;
+          width: clamp(200px, 32vw, 320px);
+          height: clamp(200px, 32vw, 320px);
           transform: translate(-50%, -50%);
-          z-index: 2;
-          pointer-events: none;
           will-change: transform, opacity;
         }
-        .rev-moon-disc {
-          position: absolute;
-          inset: 0;
-          border-radius: 50%;
-          background:
-            radial-gradient(circle at 34% 30%, #faf0d8 0%, #ecd9ae 40%, #c9a878 72%, #8a6f48 100%);
-          box-shadow:
-            inset -18px -14px 44px rgba(40, 24, 12, 0.5),
-            inset 10px 8px 28px rgba(250, 238, 208, 0.18),
-            0 0 100px rgba(244, 230, 200, 0.22),
-            0 0 220px rgba(244, 230, 200, 0.1);
-        }
-        .rev-moon-disc::before,
-        .rev-moon-disc::after {
-          content: '';
-          position: absolute;
-          border-radius: 50%;
-          background: rgba(90, 60, 30, 0.22);
-        }
-        .rev-moon-disc::before {
-          width: 14%; height: 13%;
-          top: 42%; left: 30%;
-          box-shadow: 40% -60% 0 -2px rgba(90, 60, 30, 0.18);
-        }
-        .rev-moon-disc::after {
-          width: 9%; height: 8%;
-          top: 60%; right: 28%;
-        }
+        /* Outer breathing halo */
         .rev-moon-halo {
           position: absolute;
-          inset: -40%;
+          inset: -30%;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(244, 230, 200, 0.22) 0%, rgba(244, 230, 200, 0.07) 35%, transparent 70%);
-          animation: rev-moon-pulse 7s ease-in-out infinite;
+          background: radial-gradient(
+            circle,
+            rgba(244, 230, 200, 0.18) 0%,
+            rgba(244, 230, 200, 0.08) 28%,
+            rgba(196, 162, 97, 0.03) 55%,
+            transparent 75%
+          );
+          animation: rev-moon-pulse 8s ease-in-out infinite;
+        }
+        /* Soft light core — gradient, no hard edge */
+        .rev-moon-core {
+          position: absolute;
+          inset: 18%;
+          border-radius: 50%;
+          background: radial-gradient(
+            circle at 50% 50%,
+            rgba(252, 244, 220, 0.52) 0%,
+            rgba(244, 230, 200, 0.28) 30%,
+            rgba(244, 230, 200, 0.1) 55%,
+            transparent 80%
+          );
+          filter: blur(2px);
+        }
+        /* Suggestive line ring — hints at a moon, line-style (Reverie air-feel) */
+        .rev-moon-ring {
+          position: absolute;
+          inset: 28%;
+          border-radius: 50%;
+          border: 0.8px solid rgba(244, 230, 200, 0.22);
+          box-shadow:
+            inset 0 0 18px rgba(244, 230, 200, 0.14),
+            0 0 24px rgba(244, 230, 200, 0.1);
         }
         @keyframes rev-moon-pulse {
           0%, 100% { opacity: 0.6; transform: scale(1); }
