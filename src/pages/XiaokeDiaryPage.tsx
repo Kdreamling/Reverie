@@ -488,7 +488,8 @@ function DiaryStyles() {
 
       .xd-wrap, .xd-wrap * { box-sizing: border-box; }
       .xd-wrap {
-        position: fixed; inset: 0;
+        position: fixed; left: 0; right: 0; top: 0;
+        height: 100dvh;
         display: flex; flex-direction: column;
         background:
           radial-gradient(ellipse at 20% 10%, rgba(196, 162, 97, 0.05), transparent 60%),
@@ -683,7 +684,11 @@ function DiaryStyles() {
       .xd-scroll {
         flex: 1; overflow-y: auto;
         padding: 32px 16px 60px;
-        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+      }
+      @media (min-width: 641px) {
+        .xd-scroll { scroll-behavior: smooth; }
       }
       @media (max-width: 640px) { .xd-scroll { padding: 20px 8px 40px; } }
       .xd-scroll::-webkit-scrollbar { width: 6px; }
@@ -704,6 +709,9 @@ function DiaryStyles() {
           0 20px 60px -20px rgba(0,0,0,0.55),
           0 2px 8px rgba(0,0,0,0.3);
         animation: xd-sheet-in 0.6s ease-out;
+        transform: translateZ(0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
       }
       @keyframes xd-sheet-in {
         from { opacity: 0; transform: translateY(12px); }
