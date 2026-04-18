@@ -8,6 +8,7 @@ import { updateSessionAPI } from '../api/sessions'
 import { uploadAttachment, type AttachmentInfo } from '../api/attachments'
 import type { MessageAttachment, DreamEvent } from '../api/chat'
 import { fetchDreamEvents } from '../api/chat'
+import { fetchSelectableModels, sceneTypeToScene, type SelectableModel } from '../api/models'
 import SettingsPanel from '../components/SettingsPanel'
 import EventBubble from '../components/EventBubble'
 import MessageItem from '../components/MessageItem'
@@ -36,15 +37,10 @@ const GROUPS: { key: Group; label: string }[] = [
   { key: 'previous', label: '更早' },
 ]
 
-const MODELS: { value: string; label: string }[] = [
+// 模型清单从后端动态拉取（gateway_models 表），不再硬编码
+// MODELS 作为 fallback 保底，仅在后端请求失败时使用
+const FALLBACK_MODELS: { value: string; label: string }[] = [
   { value: '[按量]claude-opus-4-6-thinking', label: 'Claude Opus 4.6' },
-  { value: 'guagua/claude-opus-4-7', label: 'Claude Opus 4.7 (呱呱)' },
-  { value: 'guagua-gcp/claude-opus-4-6', label: 'Claude Opus 4.6 (GCP)' },
-  { value: '[按量]claude-opus-4-6-thinking', label: 'Claude Opus 4.6 (按量)' },
-  { value: 'claude-opus-4-6', label: 'Claude Opus (闲鱼)' },
-  { value: 'anthropic/claude-opus-4.6', label: 'Claude Opus (OR)' },
-  { value: 'claude-opus-4.6-zenmux', label: 'Claude Opus (ZM)' },
-  { value: 'claude-opus-4.6-guagua', label: 'Claude Opus 4.6 (呱呱)' },
 ]
 
 // Sidebar navigation icons (SVG paths)
@@ -110,7 +106,21 @@ export default function ChatPage() {
     useChatStore()
   const { token } = useAuthStore()
 
-  const model = currentSession?.model ?? MODELS[0].value
+  // 动态拉取可选模型（scene_tags 过滤）—— 替代旧 MODELS 常量
+  const [models, setModels] = useState<SelectableModel[]>(FALLBACK_MODELS.map(m => ({
+    value: m.value, label: m.label, name: m.value, channel: '', channel_tag: null,
+  })))
+  const currentScene = sceneTypeToScene(currentSession?.scene_type)
+  useEffect(() => {
+    let cancelled = false
+    fetchSelectableModels(currentScene).then(list => {
+      if (cancelled || list.length === 0) return
+      setModels(list)
+    })
+    return () => { cancelled = true }
+  }, [currentScene])
+
+  const model = currentSession?.model ?? models[0]?.value ?? FALLBACK_MODELS[0].value
   const sessionEnded = streamSessionEnded || !!currentSession?.closed_by_ai
   const [showSettings, setShowSettings] = useState(false)
   const [settingsPage, setSettingsPage] = useState<'menu' | 'memory' | 'features' | 'prompt'>('menu')
@@ -1020,7 +1030,7 @@ export default function ChatPage() {
                 style={{ width: 6, height: 6, background: getModelColor(model), boxShadow: `0 0 6px ${getModelColor(model)}40` }}
               />
               <span className="text-sm font-semibold" style={{ color: C.text }}>
-                {MODELS.find(m => m.value === model)?.label ?? model}
+                {models.find(m => m.value === model)?.label ?? model}
               </span>
               <span style={{ display: 'inline-flex', transform: showModelDropdown ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.25s', color: C.textMuted }}>
                 <ChevronDown size={12} strokeWidth={2.5} />
@@ -1041,7 +1051,7 @@ export default function ChatPage() {
                 }}
               >
                 <div style={{ padding: '12px 14px 6px', fontSize: 11, color: C.textMuted, fontWeight: 600, letterSpacing: '0.05em' }}>选择模型</div>
-                {MODELS.map(m => {
+                {models.map(m => {
                   const isActive = m.value === model
                   return (
                     <div
@@ -1112,7 +1122,7 @@ export default function ChatPage() {
                   <MessageItem
                     key={msg.id}
                     msg={msgWithSeen}
-                    modelLabel={msg.role === 'assistant' ? (MODELS.find(m => m.value === model)?.label ?? model) : undefined}
+                    modelLabel={msg.role === 'assistant' ? (models.find(m => m.value === model)?.label ?? model) : undefined}
                     isDebugOpen={_debugOpenMsgId === msg.id}
                     isCopied={copiedMsgId === msg.id}
                     onToggleDebug={() => {

@@ -16,8 +16,40 @@ interface ChannelInfo {
   supports_thinking: boolean
   thinking_format: string
   enabled: boolean
+  channel_tag?: string | null
+  note?: string | null
   source: 'hardcoded' | 'hardcoded_override' | 'db'
 }
+
+// 前端可选模型（gateway_models 表）
+interface ModelInfo {
+  name: string
+  label: string
+  scene_tags: string[]
+  channel_name: string
+  upstream_model: string
+  enabled: boolean
+  sort_order: number
+  note?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+interface ChannelBrief {
+  name: string
+  channel_tag?: string | null
+  base_url?: string
+  models: string[]
+  enabled: boolean
+}
+
+const SCENE_TAG_OPTIONS: { key: string; label: string }[] = [
+  { key: 'daily', label: '日常' },
+  { key: 'rp', label: '剧本' },
+  { key: 'reading', label: '共读' },
+  { key: 'dev', label: 'Dev' },
+  { key: 'study', label: '学习' },
+]
 
 interface ServerStatus {
   version: string
@@ -165,6 +197,13 @@ function ChannelCard({ ch, onTest, onEdit, onDelete, onToggle }: {
             boxShadow: ch.enabled ? `0 0 6px ${C.success}40` : 'none',
           }} />
           <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{ch.name}</span>
+          {ch.channel_tag && (
+            <span style={{
+              fontSize: 10, padding: '2px 8px', borderRadius: 10,
+              border: `1px solid ${C.accent}50`, color: C.accent,
+              background: 'transparent',
+            }}>{ch.channel_tag}</span>
+          )}
           {!ch.enabled && <span style={{ fontSize: 10, color: C.textMuted }}>(已停用)</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -198,6 +237,12 @@ function ChannelCard({ ch, onTest, onEdit, onDelete, onToggle }: {
         {ch.supports_thinking && <span style={{ marginLeft: 8, color: C.accent }}>⚡ thinking</span>}
       </div>
 
+      {ch.note && (
+        <div style={{ fontSize: 11, color: C.textSecondary, marginBottom: 8, fontStyle: 'italic' }}>
+          备注: {ch.note}
+        </div>
+      )}
+
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <button
           onClick={handleTest}
@@ -230,7 +275,7 @@ function ChannelCard({ ch, onTest, onEdit, onDelete, onToggle }: {
 }
 
 function AddChannelForm({ onSubmit, onCancel }: {
-  onSubmit: (data: { name: string; provider: string; base_url: string; api_key: string; models: string; supports_thinking: boolean; thinking_format: string }) => void
+  onSubmit: (data: { name: string; provider: string; base_url: string; api_key: string; models: string; supports_thinking: boolean; thinking_format: string; channel_tag: string; note: string }) => void
   onCancel: () => void
 }) {
   const [name, setName] = useState('')
@@ -240,6 +285,8 @@ function AddChannelForm({ onSubmit, onCancel }: {
   const [models, setModels] = useState('')
   const [thinking, setThinking] = useState(true)
   const [thinkingFmt, setThinkingFmt] = useState('openai')
+  const [channelTag, setChannelTag] = useState('')
+  const [note, setNote] = useState('')
 
   return (
     <div style={cardStyle}>
@@ -257,6 +304,8 @@ function AddChannelForm({ onSubmit, onCancel }: {
         </div>
         <FormField label="Base URL" value={baseUrl} onChange={setBaseUrl} placeholder="https://api.example.com/v1" />
         <FormField label="API Key" value={apiKey} onChange={setApiKey} placeholder="sk-..." type="password" />
+        <FormField label="渠道标签（如：官方直出 / 谷歌出 / 中转）" value={channelTag} onChange={setChannelTag} placeholder="官方直出" />
+        <FormField label="备注（可选）" value={note} onChange={setNote} placeholder="例：稳定但偏贵" />
         <FormField label="模型名（逗号分隔）" value={models} onChange={setModels} placeholder="claude-opus-4-6-thinking" />
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <label style={{ ...labelStyle, marginBottom: 0, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
@@ -275,7 +324,7 @@ function AddChannelForm({ onSubmit, onCancel }: {
           <button
             onClick={() => {
               if (!name || !baseUrl || !apiKey || !models) { toast.warning('请填写所有必填项'); return }
-              onSubmit({ name, provider, base_url: baseUrl, api_key: apiKey, models, supports_thinking: thinking, thinking_format: thinkingFmt })
+              onSubmit({ name, provider, base_url: baseUrl, api_key: apiKey, models, supports_thinking: thinking, thinking_format: thinkingFmt, channel_tag: channelTag, note })
             }}
             style={{ ...btnStyle, flex: 1, background: C.accentGradient, color: '#fff' }}
           >
@@ -327,6 +376,8 @@ function EditChannelForm({ ch, onSubmit, onSubmitAndTest, onCancel }: {
   const [models, setModels] = useState(encodeModelsText(ch.models, ch.model_overrides))
   const [thinking, setThinking] = useState(ch.supports_thinking)
   const [thinkingFmt, setThinkingFmt] = useState(ch.thinking_format)
+  const [channelTag, setChannelTag] = useState(ch.channel_tag ?? '')
+  const [note, setNote] = useState(ch.note ?? '')
 
   const buildData = (): Record<string, unknown> => {
     const parsed = parseModelsText(models)
@@ -337,6 +388,8 @@ function EditChannelForm({ ch, onSubmit, onSubmitAndTest, onCancel }: {
       model_overrides: parsed.model_overrides,
       supports_thinking: thinking,
       thinking_format: thinkingFmt,
+      channel_tag: channelTag,
+      note: note,
     }
     if (apiKey) data.api_key = apiKey
     return data
@@ -357,6 +410,8 @@ function EditChannelForm({ ch, onSubmit, onSubmitAndTest, onCancel }: {
         </div>
         <FormField label="Base URL" value={baseUrl} onChange={setBaseUrl} />
         <FormField label="API Key（留空不修改）" value={apiKey} onChange={setApiKey} placeholder="留空保持原 Key" type="password" />
+        <FormField label="渠道标签" value={channelTag} onChange={setChannelTag} placeholder="官方直出 / 谷歌出 / 中转 ..." />
+        <FormField label="备注" value={note} onChange={setNote} placeholder="（可选）" />
         <div>
           <label style={labelStyle}>模型（每行一个，可用 <code>显示名 =&gt; 上游id</code> 自定义）</label>
           <textarea
@@ -670,6 +725,315 @@ function CacheSection({
   )
 }
 
+// ─── 模型管理：行内编辑 Row + 新增表单 ─────────────────────────────────────
+
+function ModelRow({ m, channels, onUpdate, onDelete, onToggle }: {
+  m: ModelInfo
+  channels: ChannelBrief[]
+  onUpdate: (name: string, patch: Partial<ModelInfo>, summary: string) => void
+  onDelete: (m: ModelInfo) => void
+  onToggle: (m: ModelInfo) => void
+}) {
+  const [label, setLabel] = useState(m.label)
+  const [sceneTags, setSceneTags] = useState<string[]>(m.scene_tags)
+  const [channelName, setChannelName] = useState(m.channel_name)
+  const [upstreamModel, setUpstreamModel] = useState(m.upstream_model)
+  const [sortOrder, setSortOrder] = useState(m.sort_order)
+  const [note, setNote] = useState(m.note ?? '')
+
+  // 判断哪些字段有未保存的改动
+  const dirty = {
+    label: label !== m.label,
+    scene_tags: JSON.stringify([...sceneTags].sort()) !== JSON.stringify([...m.scene_tags].sort()),
+    channel_name: channelName !== m.channel_name,
+    upstream_model: upstreamModel !== m.upstream_model,
+    sort_order: sortOrder !== m.sort_order,
+    note: note !== (m.note ?? ''),
+  }
+  const anyDirty = Object.values(dirty).some(Boolean)
+
+  // 找到当前 channel 的 models 列表（用于 datalist 提示）
+  const channelModels = channels.find(c => c.name === channelName)?.models ?? []
+
+  const dirtyBorder = (flag: boolean): React.CSSProperties => (
+    flag
+      ? { border: '1.5px solid #e67e22', background: 'rgba(230,126,34,0.04)' }
+      : {}
+  )
+
+  const toggleSceneTag = (tag: string) => {
+    setSceneTags(prev => prev.includes(tag) ? prev.filter(x => x !== tag) : [...prev, tag])
+  }
+
+  const save = () => {
+    const patch: Partial<ModelInfo> = {}
+    const summary: string[] = []
+    if (dirty.label) { patch.label = label; summary.push(`名称→「${label}」`) }
+    if (dirty.scene_tags) { patch.scene_tags = sceneTags; summary.push(`场景→${sceneTags.join(',')}`) }
+    if (dirty.channel_name) { patch.channel_name = channelName; summary.push(`供应商→${channelName}`) }
+    if (dirty.upstream_model) { patch.upstream_model = upstreamModel; summary.push(`上游→${upstreamModel}`) }
+    if (dirty.sort_order) { patch.sort_order = sortOrder; summary.push(`排序→${sortOrder}`) }
+    if (dirty.note) { patch.note = note; summary.push('备注已改') }
+    onUpdate(m.name, patch, summary.join(' / '))
+  }
+
+  const reset = () => {
+    setLabel(m.label); setSceneTags(m.scene_tags); setChannelName(m.channel_name)
+    setUpstreamModel(m.upstream_model); setSortOrder(m.sort_order); setNote(m.note ?? '')
+  }
+
+  return (
+    <div style={{
+      ...cardStyle, padding: 14, opacity: m.enabled ? 1 : 0.55,
+      position: 'relative',
+    }}>
+      {/* 顶部：启用状态 + 模型 id + 操作 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+          <div style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: m.enabled ? C.success : C.textMuted,
+            boxShadow: m.enabled ? `0 0 6px ${C.success}40` : 'none', flexShrink: 0,
+          }} />
+          <span style={{ fontSize: 11, color: C.textMuted, fontFamily: 'monospace', flexShrink: 0 }}>{m.name}</span>
+          {anyDirty && (
+            <span style={{
+              fontSize: 10, padding: '2px 8px', borderRadius: 10,
+              color: '#e67e22', border: '1px solid #e67e2250', background: 'rgba(230,126,34,0.06)',
+            }}>未保存</span>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+          <button onClick={() => onToggle(m)} style={smallBtnStyle}>
+            {m.enabled ? '停用' : '启用'}
+          </button>
+          <button onClick={() => onDelete(m)} style={{ ...smallBtnStyle, color: '#e53935' }}>
+            删除
+          </button>
+        </div>
+      </div>
+
+      {/* 显示名 + 排序 */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <input
+          value={label} onChange={e => setLabel(e.target.value)}
+          placeholder="前端显示名"
+          style={{ ...inputStyle, flex: 1, fontSize: 14, fontWeight: 600, ...dirtyBorder(dirty.label) }}
+        />
+        <input
+          type="number" value={sortOrder} onChange={e => setSortOrder(Number(e.target.value) || 0)}
+          placeholder="排序"
+          style={{ ...inputStyle, width: 80, fontSize: 12, ...dirtyBorder(dirty.sort_order) }}
+          title="同场景内排序，小的在前"
+        />
+      </div>
+
+      {/* 场景标签 */}
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>显示在哪些场景的选择框</div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {SCENE_TAG_OPTIONS.map(opt => {
+            const active = sceneTags.includes(opt.key)
+            const changed = dirty.scene_tags
+            return (
+              <button
+                key={opt.key}
+                onClick={() => toggleSceneTag(opt.key)}
+                style={{
+                  fontSize: 11, padding: '4px 10px', borderRadius: 12,
+                  border: `1px solid ${active ? C.accent : C.border}`,
+                  color: active ? C.accent : C.textMuted,
+                  background: active ? `${C.accent}0d` : 'transparent',
+                  cursor: 'pointer',
+                  boxShadow: changed ? '0 0 0 1px #e67e2280' : 'none',
+                }}
+              >
+                {active ? '● ' : '○ '}{opt.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Channel + Upstream Model */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 3 }}>供应商</div>
+          <select
+            value={channelName} onChange={e => setChannelName(e.target.value)}
+            style={{ ...inputStyle, fontSize: 12, ...dirtyBorder(dirty.channel_name) }}
+          >
+            {channels.map(c => (
+              <option key={c.name} value={c.name}>
+                {c.name}{c.channel_tag ? ` · ${c.channel_tag}` : ''}{c.enabled === false ? ' (已停用)' : ''}
+              </option>
+            ))}
+            {!channels.find(c => c.name === channelName) && (
+              <option value={channelName}>{channelName} · ⚠ 不存在</option>
+            )}
+          </select>
+        </div>
+        <div style={{ flex: 1.3, minWidth: 0 }}>
+          <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 3 }}>上游模型 id</div>
+          <input
+            list={`upstreams-${m.name}`}
+            value={upstreamModel} onChange={e => setUpstreamModel(e.target.value)}
+            style={{ ...inputStyle, fontSize: 12, fontFamily: 'monospace', ...dirtyBorder(dirty.upstream_model) }}
+          />
+          <datalist id={`upstreams-${m.name}`}>
+            {channelModels.map(cm => <option key={cm} value={cm} />)}
+          </datalist>
+        </div>
+      </div>
+
+      {/* 备注 */}
+      <input
+        value={note} onChange={e => setNote(e.target.value)}
+        placeholder="备注（可选）"
+        style={{ ...inputStyle, fontSize: 12, marginBottom: anyDirty ? 10 : 0, ...dirtyBorder(dirty.note) }}
+      />
+
+      {/* 待保存操作栏 */}
+      {anyDirty && (
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={save}
+            style={{ ...btnStyle, flex: 1, padding: '8px 0', background: 'transparent', border: `1.5px solid ${C.accent}`, color: C.accent }}
+          >
+            保存改动
+          </button>
+          <button
+            onClick={reset}
+            style={{ ...btnStyle, flex: 1, padding: '8px 0', background: 'transparent', border: `1px solid ${C.border}`, color: C.textSecondary }}
+          >
+            放弃
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+
+function AddModelForm({ channels, onSubmit, onCancel }: {
+  channels: ChannelBrief[]
+  onSubmit: (data: Omit<ModelInfo, 'created_at' | 'updated_at'>) => void
+  onCancel: () => void
+}) {
+  const [name, setName] = useState('')
+  const [label, setLabel] = useState('')
+  const [sceneTags, setSceneTags] = useState<string[]>(['daily'])
+  const [channelName, setChannelName] = useState(channels[0]?.name ?? '')
+  const [upstreamModel, setUpstreamModel] = useState('')
+  const [sortOrder, setSortOrder] = useState(100)
+  const [note, setNote] = useState('')
+
+  const channelModels = channels.find(c => c.name === channelName)?.models ?? []
+
+  const toggleSceneTag = (tag: string) => {
+    setSceneTags(prev => prev.includes(tag) ? prev.filter(x => x !== tag) : [...prev, tag])
+  }
+
+  return (
+    <div style={cardStyle}>
+      <h3 style={cardTitleStyle}>添加模型</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <FormField label="模型条目 id（英文，唯一）" value={name} onChange={setName} placeholder="opus46-guagua" />
+        </div>
+        <FormField label="前端显示名" value={label} onChange={setLabel} placeholder="Claude Opus 4.6 (呱呱)" />
+
+        <div>
+          <label style={labelStyle}>显示在哪些场景的选择框</label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {SCENE_TAG_OPTIONS.map(opt => {
+              const active = sceneTags.includes(opt.key)
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => toggleSceneTag(opt.key)}
+                  style={{
+                    fontSize: 12, padding: '5px 12px', borderRadius: 14,
+                    border: `1px solid ${active ? C.accent : C.border}`,
+                    color: active ? C.accent : C.textMuted,
+                    background: active ? `${C.accent}0d` : 'transparent',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {active ? '● ' : '○ '}{opt.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div>
+          <label style={labelStyle}>供应商</label>
+          <select value={channelName} onChange={e => setChannelName(e.target.value)} style={inputStyle}>
+            {channels.length === 0 && <option value="">（没有可用供应商，先去供应商 Tab 添加）</option>}
+            {channels.map(c => (
+              <option key={c.name} value={c.name}>
+                {c.name}{c.channel_tag ? ` · ${c.channel_tag}` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label style={labelStyle}>上游模型 id（后端真实 model 字段）</label>
+          <input
+            list="new-model-upstreams"
+            value={upstreamModel} onChange={e => setUpstreamModel(e.target.value)}
+            placeholder={channelModels[0] ?? 'claude-opus-4-6'}
+            style={{ ...inputStyle, fontFamily: 'monospace' }}
+          />
+          <datalist id="new-model-upstreams">
+            {channelModels.map(cm => <option key={cm} value={cm} />)}
+          </datalist>
+          <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4 }}>
+            从该供应商已有的模型中选，也可以手填（请确保上游有这个 id）
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ flex: 1 }}>
+            <label style={labelStyle}>排序（小在前）</label>
+            <input type="number" value={sortOrder} onChange={e => setSortOrder(Number(e.target.value) || 0)} style={inputStyle} />
+          </div>
+          <div style={{ flex: 2 }}>
+            <label style={labelStyle}>备注</label>
+            <input value={note} onChange={e => setNote(e.target.value)} placeholder="（可选）" style={inputStyle} />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+          <button
+            onClick={() => {
+              if (!name || !label || !channelName || !upstreamModel) { toast.warning('请填写所有必填项'); return }
+              if (sceneTags.length === 0) { toast.warning('请至少选择一个场景'); return }
+              onSubmit({
+                name, label, scene_tags: sceneTags,
+                channel_name: channelName, upstream_model: upstreamModel,
+                enabled: true, sort_order: sortOrder, note,
+              })
+            }}
+            style={{ ...btnStyle, flex: 1, background: C.accentGradient, color: '#fff' }}
+          >
+            添加
+          </button>
+          <button
+            onClick={onCancel}
+            style={{ ...btnStyle, flex: 1, background: 'none', border: `1px solid ${C.border}`, color: C.textSecondary }}
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
 function CardSkeleton() {
   return (
     <div style={{ ...cardStyle, height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -723,10 +1087,11 @@ function formatTokens(n: number): string {
 
 // ─── Tabs ────────────────────────────────────────────────────────────────────
 
-type Tab = 'status' | 'channels' | 'logs' | 'scheduler' | 'cache'
+type Tab = 'status' | 'models' | 'channels' | 'logs' | 'scheduler' | 'cache'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'status', label: '总览' },
+  { key: 'models', label: '模型' },
   { key: 'channels', label: '供应商' },
   { key: 'logs', label: '日志' },
   { key: 'cache', label: '缓存' },
@@ -751,6 +1116,11 @@ export default function AdminPage() {
   const [restarting, setRestarting] = useState(false)
   const [cacheHealth, setCacheHealth] = useState<CacheHealth | null>(null)
   const [cacheHours, setCacheHours] = useState(24)
+
+  // 模型管理
+  const [models, setModels] = useState<ModelInfo[] | null>(null)
+  const [channelOptions, setChannelOptions] = useState<ChannelBrief[]>([])
+  const [showAddModel, setShowAddModel] = useState(false)
 
   const loadLockStatus = useCallback(async () => {
     try {
@@ -818,6 +1188,17 @@ export default function AdminPage() {
     } catch { setCacheHealth(null) }
   }, [])
 
+  const loadModels = useCallback(async () => {
+    try {
+      const data = await adminFetch<{ models: ModelInfo[]; channels: ChannelBrief[] }>('/admin/models')
+      setModels(data.models ?? [])
+      setChannelOptions(data.channels ?? [])
+    } catch {
+      setModels([])
+      setChannelOptions([])
+    }
+  }, [])
+
   const loadScheduler = useCallback(async () => {
     try {
       const data = await adminFetch<{ jobs: any[]; last_keepalive_ts: string | null; recent_keepalive: any[] }>('/admin/scheduler/status')
@@ -839,11 +1220,12 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (tab === 'status') { loadStatus(); loadUsage(); loadLockStatus() }
+    if (tab === 'models') loadModels()
     if (tab === 'channels') loadChannels()
     if (tab === 'logs') loadLogs()
     if (tab === 'scheduler') loadScheduler()
     if (tab === 'cache') loadCacheHealth(cacheHours)
-  }, [tab, cacheHours, loadStatus, loadChannels, loadLogs, loadUsage, loadLockStatus, loadScheduler, loadCacheHealth])
+  }, [tab, cacheHours, loadStatus, loadChannels, loadLogs, loadUsage, loadLockStatus, loadScheduler, loadCacheHealth, loadModels])
 
   const handleTestChannel = async (ch: ChannelInfo) => {
     try {
@@ -861,7 +1243,7 @@ export default function AdminPage() {
     }
   }
 
-  const handleAddChannel = async (data: { name: string; provider: string; base_url: string; api_key: string; models: string; supports_thinking: boolean; thinking_format: string }) => {
+  const handleAddChannel = async (data: { name: string; provider: string; base_url: string; api_key: string; models: string; supports_thinking: boolean; thinking_format: string; channel_tag: string; note: string }) => {
     try {
       await adminFetch('/admin/channels', {
         method: 'POST',
@@ -960,6 +1342,76 @@ export default function AdminPage() {
       }
     } catch (e) {
       toast.error(`操作失败: ${e instanceof Error ? e.message : '未知错误'}`)
+    }
+  }
+
+  // ---- 模型操作 ----
+  const handleAddModel = async (data: Omit<ModelInfo, 'created_at' | 'updated_at'>) => {
+    try {
+      const resp = await adminFetch<{ success: boolean; message: string }>('/admin/models', {
+        method: 'POST', body: JSON.stringify(data),
+      })
+      if (resp.success) {
+        toast.success(resp.message)
+        setShowAddModel(false)
+        loadModels()
+      } else {
+        toast.error(resp.message)
+      }
+    } catch (e) {
+      toast.error(`添加失败: ${e instanceof Error ? e.message : '未知错误'}`)
+    }
+  }
+
+  const handleUpdateModel = async (name: string, patch: Partial<ModelInfo>, summary: string) => {
+    try {
+      const resp = await adminFetch<{ success: boolean; message: string }>(
+        `/admin/models/${encodeURIComponent(name)}`,
+        { method: 'PUT', body: JSON.stringify(patch) },
+      )
+      if (resp.success) {
+        toast.success(`已保存：${summary}`)
+        loadModels()
+      } else {
+        toast.error(resp.message)
+      }
+    } catch (e) {
+      toast.error(`保存失败: ${e instanceof Error ? e.message : '未知错误'}`)
+    }
+  }
+
+  const handleDeleteModel = async (m: ModelInfo) => {
+    if (!confirm(`确定删除模型「${m.label}」？\n（删除后，所有 ${m.scene_tags.map(t => SCENE_TAG_OPTIONS.find(o=>o.key===t)?.label||t).join('/')} 场景的对话框都会失去这个选项，此操作不可撤销）`)) return
+    try {
+      const resp = await adminFetch<{ success: boolean; message: string }>(
+        `/admin/models/${encodeURIComponent(m.name)}`,
+        { method: 'DELETE' },
+      )
+      if (resp.success) {
+        toast.success(resp.message)
+        loadModels()
+      } else {
+        toast.error(resp.message)
+      }
+    } catch (e) {
+      toast.error(`删除失败: ${e instanceof Error ? e.message : '未知错误'}`)
+    }
+  }
+
+  const handleToggleModel = async (m: ModelInfo) => {
+    try {
+      const resp = await adminFetch<{ success: boolean; enabled?: boolean; message?: string }>(
+        `/admin/models/${encodeURIComponent(m.name)}/toggle`,
+        { method: 'PATCH' },
+      )
+      if (resp.success) {
+        toast.success(`${m.label} 已${resp.enabled ? '启用' : '停用'}`)
+        loadModels()
+      } else {
+        toast.error(resp.message ?? '切换失败')
+      }
+    } catch (e) {
+      toast.error(`切换失败: ${e instanceof Error ? e.message : '未知错误'}`)
     }
   }
 
@@ -1071,6 +1523,96 @@ export default function AdminPage() {
             </div>
 
             <UsageSection usage={usage} />
+          </>
+        )}
+
+        {tab === 'models' && (
+          <>
+            <div style={{
+              fontSize: 11, color: C.textMuted, padding: '2px 4px 8px', lineHeight: 1.6,
+            }}>
+              这里管理的是"前端对话框能选到的模型"。每个条目绑定一个供应商 + 上游模型 id。改动后对应场景的选择框会立即同步，不用改代码。
+            </div>
+            {!showAddModel && (
+              <button
+                onClick={() => setShowAddModel(true)}
+                style={{
+                  ...btnStyle, width: '100%',
+                  background: 'none', border: `1px dashed ${C.border}`,
+                  color: C.accent, padding: '12px 0',
+                }}
+              >
+                + 添加模型
+              </button>
+            )}
+            {showAddModel && (
+              <AddModelForm
+                channels={channelOptions}
+                onSubmit={handleAddModel}
+                onCancel={() => setShowAddModel(false)}
+              />
+            )}
+            {models === null ? <CardSkeleton /> : models.length === 0 ? (
+              <div style={{ ...cardStyle, textAlign: 'center', color: C.textMuted, fontSize: 13, padding: 30 }}>
+                还没有模型——点上面的"+ 添加模型"开始，或者先去"供应商"Tab 加好 API 再来。
+              </div>
+            ) : (
+              <>
+                {/* 按场景分组显示 */}
+                {SCENE_TAG_OPTIONS.map(opt => {
+                  const group = models.filter(m => m.scene_tags.includes(opt.key))
+                  if (group.length === 0) return null
+                  return (
+                    <div key={opt.key}>
+                      <div style={{
+                        fontSize: 11, color: C.textMuted, marginBottom: 8, padding: '4px 2px',
+                        borderBottom: `1px dashed ${C.border}`,
+                        display: 'flex', justifyContent: 'space-between',
+                      }}>
+                        <span>场景：{opt.label}</span>
+                        <span>{group.filter(m => m.enabled).length} / {group.length} 启用</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {group.map(m => (
+                          <ModelRow
+                            key={m.name}
+                            m={m}
+                            channels={channelOptions}
+                            onUpdate={handleUpdateModel}
+                            onDelete={handleDeleteModel}
+                            onToggle={handleToggleModel}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+                {/* 无场景标签的孤儿 */}
+                {(() => {
+                  const orphans = models.filter(m => m.scene_tags.length === 0)
+                  if (orphans.length === 0) return null
+                  return (
+                    <div>
+                      <div style={{ fontSize: 11, color: '#e67e22', marginBottom: 8, padding: '4px 2px' }}>
+                        ⚠ 未分配场景（在任何对话框都不会出现）
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {orphans.map(m => (
+                          <ModelRow
+                            key={m.name}
+                            m={m}
+                            channels={channelOptions}
+                            onUpdate={handleUpdateModel}
+                            onDelete={handleDeleteModel}
+                            onToggle={handleToggleModel}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
+              </>
+            )}
           </>
         )}
 

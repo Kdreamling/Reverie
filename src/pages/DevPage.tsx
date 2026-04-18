@@ -8,6 +8,7 @@ import {
 import { useAuthStore } from '../stores/authStore'
 import { createSessionAPI, fetchSessionsAPI, type Session } from '../api/sessions'
 import { streamChat, fetchMessagesAPI } from '../api/chat'
+import { fetchSelectableModels, type SelectableModel } from '../api/models'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -112,16 +113,9 @@ function ToolIcon({ name, size = 12, color }: { name: string; size?: number; col
 
 // ─── Models ──────────────────────────────────────────────────────────────────
 
-const DEV_MODELS: { value: string; label: string }[] = [
-  { value: 'guagua-gcp/claude-sonnet-4-6', label: 'Sonnet 4.6 (呱呱GCP)' },
-  { value: 'guagua/claude-opus-4-7', label: 'Opus 4.7 (呱呱)' },
-  { value: 'guagua-gcp/claude-opus-4-6', label: 'Opus 4.6 (呱呱GCP)' },
-  { value: '[按量]claude-sonnet-4-6', label: 'Sonnet 4.6 (按量)' },
-  { value: '[按量]claude-opus-4-6-thinking', label: 'Opus 4.6 (按量)' },
-  { value: 'claude-opus-4.6-guagua', label: 'Opus 4.6 (呱呱thinking)' },
-  { value: 'claude-opus-4.6-zenmux', label: 'Opus 4.6 (ZM)' },
-  { value: 'deepseek-chat', label: 'DeepSeek Chat' },
-  { value: 'deepseek-reasoner', label: 'DeepSeek R1' },
+// DEV 模型清单从后端动态拉取（gateway_models 表, scene=dev），不再硬编码
+const FALLBACK_DEV_MODELS: { value: string; label: string }[] = [
+  { value: 'guagua-gcp/claude-sonnet-4-6', label: 'Sonnet 4.6 (fallback)' },
 ]
 
 // Extract channel name from model string, e.g. "guagua-gcp/xxx" -> "guagua-gcp"
@@ -517,7 +511,20 @@ export default function DevPage() {
   const [messages, setMessages] = useState<DevMessage[]>([])
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
-  const [model, setModel] = useState(DEV_MODELS[0].value)
+  const [devModels, setDevModels] = useState<SelectableModel[]>(FALLBACK_DEV_MODELS.map(m => ({
+    value: m.value, label: m.label, name: m.value, channel: '', channel_tag: null,
+  })))
+  const [model, setModel] = useState(FALLBACK_DEV_MODELS[0].value)
+  useEffect(() => {
+    let cancelled = false
+    fetchSelectableModels('dev').then(list => {
+      if (cancelled || list.length === 0) return
+      setDevModels(list)
+      // 如果当前选的模型不在新列表里，切到第一个
+      setModel(prev => list.find(m => m.value === prev) ? prev : list[0].value)
+    })
+    return () => { cancelled = true }
+  }, [])
   const [abortCtrl, setAbortCtrl] = useState<AbortController | null>(null)
   const [devSessions, setDevSessions] = useState<Session[]>([])
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -1108,7 +1115,7 @@ export default function DevPage() {
                   onChange={e => setModel(e.target.value)}
                   disabled={isStreaming}
                 >
-                  {DEV_MODELS.map(m => (
+                  {devModels.map(m => (
                     <option key={m.value} value={m.value}>{m.label}</option>
                   ))}
                 </select>
@@ -1143,7 +1150,7 @@ export default function DevPage() {
                   onChange={e => setModel(e.target.value)}
                   disabled={isStreaming}
                 >
-                  {DEV_MODELS.map(m => (
+                  {devModels.map(m => (
                     <option key={m.value} value={m.value}>{m.label}</option>
                   ))}
                 </select>
