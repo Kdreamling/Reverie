@@ -231,14 +231,50 @@ html.dashboard-active #root::after {
 }
 
 /* Night mode */
+body.night-mode {
+  --night-bg: #171411;
+  --night-text: #E0D5C8;
+  --night-text-light: #9A8A78;
+  --night-text-faint: #5A4E42;
+  --night-border: rgba(180,150,120,0.06);
+  --night-glass: rgba(23,20,17,0.92);
+}
 body.night-mode .room-bg { background: #171411; }
 body.night-mode .room-light {
   background: radial-gradient(ellipse 60% 50% at 50% 10%, rgba(255,220,160,0.06) 0%, transparent 70%);
 }
+body.night-mode .room-texture { opacity: 0.012; }
 body.night-mode .room-mote { background: rgba(200,170,130,0.15); }
 body.night-mode .input-fade-overlay {
   background: linear-gradient(to top, #171411 30%, transparent);
 }
+body.night-mode #root { background: #171411 !important; }
+body.night-mode #root::after { background: #171411; }
+body.night-mode .room-date-mark { color: #5A4E42; }
+body.night-mode .conv-spine::before {
+  background: linear-gradient(to bottom, transparent 0%, rgba(180,150,120,0.04) 10%, rgba(180,150,120,0.04) 90%, transparent 100%);
+}
+/* Night: markdown */
+body.night-mode .md-content { color: #E0D5C8; }
+body.night-mode .md-content a { color: #D4AE8A; }
+body.night-mode .md-content blockquote { border-left-color: rgba(180,150,120,0.12); color: #9A8A78; }
+body.night-mode .md-content code:not(pre code) { background: rgba(80,60,40,0.3); color: #D4AE8A; }
+body.night-mode .md-content pre { background: rgba(30,25,20,0.5); border-color: rgba(180,150,120,0.06); }
+body.night-mode .md-content th { background: rgba(160,120,90,0.06); }
+body.night-mode .md-content td { border-color: rgba(180,150,120,0.06); }
+body.night-mode .md-content tr:nth-child(even) { background: rgba(160,120,90,0.02); }
+body.night-mode .md-content del { color: #5A4E42; }
+/* Night: chat-header gradient */
+body.night-mode .chat-header::after {
+  background: linear-gradient(90deg, transparent, rgba(180,150,120,0.06), transparent);
+}
+/* Night: tool spinner */
+body.night-mode .tool-spinner {
+  border-color: rgba(160,120,90,0.08);
+  border-top-color: rgba(160,120,90,0.35);
+}
+/* Night: room cursor */
+body.night-mode .room-cursor { background: #D4AE8A; }
 
 /* Message action bar - show on hover */
 .room-msg-actions {

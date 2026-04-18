@@ -119,6 +119,12 @@ export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [pcHover, setPcHover] = useState(false)
   const pcHoverTimer = useRef<ReturnType<typeof setTimeout>>()
+  const [isNight, setIsNight] = useState(() => {
+    const saved = localStorage.getItem('reverie_night')
+    if (saved !== null) return saved === '1'
+    const h = new Date().getHours()
+    return h >= 20 || h < 6
+  })
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null)
   const [_debugOpenMsgId, _setDebugOpenMsgId] = useState<string | null>(null)
@@ -158,6 +164,15 @@ export default function ChatPage() {
   const [knockCount, setKnockCount] = useState(0)
   const [lockDismissed, setLockDismissed] = useState(false)
   const maxKnocks = 3
+
+  // Night mode: toggle body class + persist
+  useEffect(() => {
+    document.body.classList.toggle('night-mode', isNight)
+    localStorage.setItem('reverie_night', isNight ? '1' : '0')
+    return () => { document.body.classList.remove('night-mode') }
+  }, [isNight])
+
+  const toggleNight = useCallback(() => setIsNight(n => !n), [])
 
   // 检查封锁状态
   useEffect(() => {
@@ -693,6 +708,15 @@ export default function ChatPage() {
 
   const showWelcome = !isStreaming && !isLoadingMessages && (!Array.isArray(messages) || messages.length === 0)
 
+  // Night-aware surface colors
+  const nGlass = isNight ? 'rgba(23,20,17,0.92)' : 'rgba(248,244,238,0.92)'
+  const nGlassLight = isNight ? 'rgba(23,20,17,0.6)' : 'rgba(248,244,238,0.6)'
+  const nGlassHover = isNight ? 'rgba(40,35,28,0.8)' : 'rgba(248,244,238,0.8)'
+  const nText = isNight ? '#E0D5C8' : C.text
+  const nTextMuted = isNight ? '#9A8A78' : C.textMuted
+  const nBorder = isNight ? 'rgba(180,150,120,0.06)' : C.border
+  const nAccent = isNight ? '#D4AE8A' : C.accent
+
   return (
     <div className="overflow-hidden" style={{ height: '100%', overscrollBehavior: 'none', position: 'relative' }}>
 
@@ -735,9 +759,9 @@ export default function ChatPage() {
           width: '100%',
           maxWidth: 300,
           height: '100%',
-          background: 'rgba(248,244,238,0.95)',
+          background: isNight ? 'rgba(23,20,17,0.95)' : 'rgba(248,244,238,0.95)',
           backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
-          color: C.text,
+          color: isNight ? '#E0D5C8' : C.text,
           transform: sidebarVisible ? 'translateX(0)' : 'translateX(-100%)',
           opacity: sidebarVisible ? 1 : 0,
           boxShadow: sidebarVisible ? '12px 0 60px rgba(0,0,0,0.04)' : 'none',
@@ -893,6 +917,7 @@ export default function ChatPage() {
               { label: '剧本', action: () => { setSidebarOpen(false); navigate('/projects') } },
               { label: '日历', action: () => { setSidebarOpen(false); navigate('/calendar') } },
               { label: '共读', action: () => { setSidebarOpen(false); navigate('/bookshelf') } },
+              { label: isNight ? '☀️ 日间' : '🌙 夜间', action: toggleNight },
             ].map(n => (
               <button key={n.label} onClick={n.action}
                 className="text-xs cursor-pointer transition-colors"
@@ -927,10 +952,10 @@ export default function ChatPage() {
             {/* Left: menu button (mobile) / sidebar trigger (pc) */}
             <button
               className="flex items-center justify-center rounded-xl cursor-pointer transition-all md:opacity-0 md:pointer-events-none"
-              style={{ width: 36, height: 36, color: C.textMuted, background: 'transparent', border: 'none' }}
+              style={{ width: 36, height: 36, color: nTextMuted, background: 'transparent', border: 'none' }}
               onClick={() => setSidebarOpen(true)}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248,244,238,0.8)'; e.currentTarget.style.color = C.accent }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.textMuted }}
+              onMouseEnter={e => { e.currentTarget.style.background = nGlassHover; e.currentTarget.style.color = nAccent }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = nTextMuted }}
             >
               <Menu size={18} strokeWidth={1.5} />
             </button>
@@ -941,16 +966,16 @@ export default function ChatPage() {
                 onClick={() => setShowModelDropdown(o => !o)}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full cursor-pointer transition-all"
                 style={{
-                  border: `1px solid ${C.border}`,
-                  background: showModelDropdown ? 'rgba(248,244,238,0.92)' : 'rgba(248,244,238,0.6)',
+                  border: `1px solid ${nBorder}`,
+                  background: showModelDropdown ? nGlass : nGlassLight,
                   backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-                  fontSize: 11.5, color: C.textMuted,
+                  fontSize: 11.5, color: nTextMuted,
                   opacity: showModelDropdown ? 1 : 0.7,
                 }}
                 onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.borderColor = 'rgba(180,150,120,0.2)' }}
                 onMouseLeave={e => { if (!showModelDropdown) { e.currentTarget.style.opacity = '0.7'; e.currentTarget.style.borderColor = C.border } }}
               >
-                <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.accent }} />
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: nAccent }} />
                 {models.find(m => m.name === model || m.value === model)?.label ?? model}
                 <ChevronDown size={10} strokeWidth={2.5} style={{ transform: showModelDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.25s' }} />
               </button>
@@ -959,9 +984,9 @@ export default function ChatPage() {
                 <div className="absolute top-10 left-1/2 rounded-2xl overflow-hidden"
                   style={{
                     transform: 'translateX(-50%)', minWidth: 260,
-                    background: 'rgba(248,244,238,0.95)',
+                    background: isNight ? 'rgba(23,20,17,0.95)' : 'rgba(248,244,238,0.95)',
                     backdropFilter: 'blur(30px)', WebkitBackdropFilter: 'blur(30px)',
-                    border: `1px solid ${C.border}`,
+                    border: `1px solid ${nBorder}`,
                     boxShadow: '0 12px 48px rgba(100,80,50,0.1)', zIndex: 51,
                   }}>
                   {models.map(m => {
@@ -989,9 +1014,9 @@ export default function ChatPage() {
             <button
               onClick={() => { if (!isLockedByChen) handleCreateWithScene(currentSession?.scene_type || 'daily') }}
               className="flex items-center justify-center rounded-xl cursor-pointer transition-all"
-              style={{ width: 36, height: 36, color: C.textMuted, background: 'transparent', border: 'none', opacity: isLockedByChen ? 0.3 : 1 }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248,244,238,0.8)'; e.currentTarget.style.color = C.accent }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.textMuted }}
+              style={{ width: 36, height: 36, color: nTextMuted, background: 'transparent', border: 'none', opacity: isLockedByChen ? 0.3 : 1 }}
+              onMouseEnter={e => { e.currentTarget.style.background = nGlassHover; e.currentTarget.style.color = nAccent }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = nTextMuted }}
             >
               <Plus size={17} strokeWidth={1.5} />
             </button>
@@ -1198,13 +1223,13 @@ export default function ChatPage() {
                 className="flex items-end gap-3 px-4 py-3 transition-all duration-400"
                 style={{
                   borderRadius: showPlusMenu ? '24px 24px 0 0' : 24,
-                  background: 'rgba(248,244,238,0.92)',
+                  background: nGlass,
                   backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
-                  border: `1px solid ${isFocused ? 'rgba(196,154,120,0.25)' : 'rgba(180,150,120,0.1)'}`,
+                  border: `1px solid ${isFocused ? (isNight ? 'rgba(196,154,120,0.15)' : 'rgba(196,154,120,0.25)') : (isNight ? 'rgba(180,150,120,0.06)' : 'rgba(180,150,120,0.1)')}`,
                   borderBottom: showPlusMenu ? 'none' : undefined,
                   boxShadow: isFocused
-                    ? '0 8px 48px rgba(160,120,90,0.1), 0 0 0 4px rgba(196,154,120,0.06)'
-                    : '0 4px 32px rgba(160,120,90,0.06)',
+                    ? (isNight ? '0 8px 48px rgba(0,0,0,0.3), 0 0 0 4px rgba(196,154,120,0.04)' : '0 8px 48px rgba(160,120,90,0.1), 0 0 0 4px rgba(196,154,120,0.06)')
+                    : (isNight ? '0 4px 32px rgba(0,0,0,0.2)' : '0 4px 32px rgba(160,120,90,0.06)'),
                   transform: isFocused ? 'translateY(-2px)' : 'none',
                   opacity: isLockedByChen ? 0.35 : undefined,
                   pointerEvents: isLockedByChen ? 'none' : undefined,
@@ -1235,7 +1260,7 @@ export default function ChatPage() {
                   placeholder={isLockedByChen ? "Session locked by Claude" : sessionEnded ? "Session closed" : "说点什么..."}
                   rows={1}
                   className="flex-1 resize-none bg-transparent text-sm outline-none leading-relaxed disabled:opacity-40"
-                  style={{ color: C.text, minHeight: 24, maxHeight: 120, overflowY: 'auto', scrollbarWidth: 'none' }}
+                  style={{ color: nText, minHeight: 24, maxHeight: 120, overflowY: 'auto', scrollbarWidth: 'none' }}
                 />
                 {isStreaming ? (
                   <button
@@ -1344,6 +1369,13 @@ export default function ChatPage() {
               action: () => navigate('/calendar'),
             },
             {
+              key: 'night', label: isNight ? '切换日间' : '切换夜间',
+              icon: isNight
+                ? <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2"/><path d="M12 21v2"/><path d="M4.22 4.22l1.42 1.42"/><path d="M18.36 18.36l1.42 1.42"/><path d="M1 12h2"/><path d="M21 12h2"/><path d="M4.22 19.78l1.42-1.42"/><path d="M18.36 5.64l1.42-1.42"/></svg>
+                : <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>,
+              action: toggleNight,
+            },
+            {
               key: 'settings', label: '设置',
               icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>,
               action: () => { setSidebarOpen(true); setShowSettings(true) },
@@ -1355,19 +1387,19 @@ export default function ChatPage() {
               className="tool-float-btn group"
               style={{
                 width: 40, height: 40, borderRadius: '50%',
-                border: `1px solid ${C.border}`,
-                background: 'rgba(248,244,238,0.92)',
+                border: `1px solid ${isNight ? 'rgba(180,150,120,0.08)' : C.border}`,
+                background: isNight ? 'rgba(23,20,17,0.92)' : 'rgba(248,244,238,0.92)',
                 backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', color: C.textMuted, position: 'relative',
+                cursor: 'pointer', color: isNight ? '#9A8A78' : C.textMuted, position: 'relative',
                 boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
                 transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
               }}
               onMouseEnter={e => {
                 const el = e.currentTarget
-                el.style.borderColor = C.accent
-                el.style.color = C.accent
-                el.style.background = 'rgba(255,255,255,0.9)'
+                el.style.borderColor = isNight ? '#D4AE8A' : C.accent
+                el.style.color = isNight ? '#D4AE8A' : C.accent
+                el.style.background = isNight ? 'rgba(40,35,28,0.95)' : 'rgba(255,255,255,0.9)'
                 el.style.boxShadow = '0 4px 20px rgba(160,120,90,0.1)'
                 el.style.transform = 'scale(1.08)'
                 const tip = el.querySelector('.tool-tip') as HTMLElement
@@ -1375,9 +1407,9 @@ export default function ChatPage() {
               }}
               onMouseLeave={e => {
                 const el = e.currentTarget
-                el.style.borderColor = C.border
-                el.style.color = C.textMuted
-                el.style.background = 'rgba(248,244,238,0.92)'
+                el.style.borderColor = isNight ? 'rgba(180,150,120,0.08)' : C.border
+                el.style.color = isNight ? '#9A8A78' : C.textMuted
+                el.style.background = isNight ? 'rgba(23,20,17,0.92)' : 'rgba(248,244,238,0.92)'
                 el.style.boxShadow = '0 2px 12px rgba(0,0,0,0.03)'
                 el.style.transform = 'scale(1)'
                 const tip = el.querySelector('.tool-tip') as HTMLElement
@@ -1392,9 +1424,9 @@ export default function ChatPage() {
                   right: 'calc(100% + 10px)', top: '50%',
                   transform: 'translateY(-50%) translateX(4px)',
                   padding: '4px 10px', borderRadius: 8,
-                  background: 'rgba(248,244,238,0.92)',
-                  border: `1px solid ${C.border}`,
-                  fontSize: 11, color: C.textMuted,
+                  background: isNight ? 'rgba(23,20,17,0.92)' : 'rgba(248,244,238,0.92)',
+                  border: `1px solid ${isNight ? 'rgba(180,150,120,0.08)' : C.border}`,
+                  fontSize: 11, color: isNight ? '#9A8A78' : C.textMuted,
                   whiteSpace: 'nowrap',
                   opacity: 0, pointerEvents: 'none',
                   transition: 'all 0.2s',
