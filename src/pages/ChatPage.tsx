@@ -913,11 +913,15 @@ export default function ChatPage() {
 
         {/* Sidebar bottom — nav shortcuts (mobile) + settings */}
         <div style={{ borderTop: `1px solid ${C.border}`, paddingBottom: 'env(safe-area-inset-bottom)' }}>
-          <div className="flex items-center gap-4 px-5 pt-2.5 pb-1 md:hidden">
+          <div className="flex items-center flex-wrap gap-x-3.5 gap-y-2 px-5 pt-3 pb-1">
             {[
               { label: '剧本', action: () => { setSidebarOpen(false); navigate('/projects') } },
+              { label: '图谱', action: () => { setSidebarOpen(false); navigate('/graph') } },
               { label: '日历', action: () => { setSidebarOpen(false); navigate('/calendar') } },
               { label: '共读', action: () => { setSidebarOpen(false); navigate('/bookshelf') } },
+              { label: '学习', action: () => { setSidebarOpen(false); navigate('/study') } },
+              { label: '日记', action: () => { setSidebarOpen(false); navigate(`/diary/${new Date().toISOString().slice(0, 10)}`) } },
+              { label: '记忆', action: () => { setShowSettings(true); setSettingsPage('memory') } },
               { label: isNight ? '☀️ 日间' : '🌙 夜间', action: toggleNight },
             ].map(n => (
               <button key={n.label} onClick={n.action}
@@ -1362,7 +1366,7 @@ export default function ChatPage() {
             {
               key: 'graph', label: '记忆图谱',
               icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v4"/><path d="M7.5 17.5L11 13"/><path d="M16.5 17.5L13 13"/><circle cx="12" cy="12" r="1.5"/></svg>,
-              action: () => {},
+              action: () => navigate('/graph'),
             },
             {
               key: 'calendar', label: '回忆日历',
