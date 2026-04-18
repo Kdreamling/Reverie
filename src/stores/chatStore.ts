@@ -318,7 +318,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           set({ isStreaming: false, ...EMPTY_STREAM, lastError: '连接超时，请重试' })
           toast.error('连接超时，请重试')
         }
-      }, 30000)
+      }, 120000)
 
       try {
         while (true) {
