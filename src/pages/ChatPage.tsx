@@ -531,14 +531,15 @@ export default function ChatPage() {
   }, [currentSession?.id, loadMessages, clearMessages])
 
   // Scroll to bottom on new messages (reset user scroll state)
-  // Use 'instant' to avoid smooth-scroll lag that causes white gap after streaming ends
+  // Use RAF + smooth for mobile to avoid 'instant' jump that causes visual jank on iOS
   const prevMsgCountRef = useRef(0)
   useEffect(() => {
     userScrolledUpRef.current = false
-    // If message count jumped (e.g. streaming message finalized), use instant scroll
-    const jumped = messages.length - prevMsgCountRef.current >= 1
     prevMsgCountRef.current = messages.length
-    messagesEndRef.current?.scrollIntoView({ behavior: jumped && !isStreaming ? 'instant' : 'smooth' })
+    // Defer to next frame so layout (padding-bottom, streaming cleanup) settles first
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    })
   }, [messages.length, isStreaming])
 
   // During streaming, scroll periodically — but only if user hasn't scrolled up
@@ -757,7 +758,7 @@ export default function ChatPage() {
         onMouseLeave={handleSidebarMouseLeave}
         style={{
           width: '100%',
-          maxWidth: 300,
+          maxWidth: 'min(300px, 85vw)',
           height: '100%',
           background: isNight ? 'rgba(23,20,17,0.95)' : 'rgba(248,244,238,0.95)',
           backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
@@ -1029,7 +1030,7 @@ export default function ChatPage() {
           {showWelcome ? (
           <WelcomeScreen />
           ) : (
-            <div className="mx-auto w-full relative conv-spine" style={{ maxWidth: 760, padding: '80px 60px 280px 60px' }}>
+            <div className="mx-auto w-full relative conv-spine" style={{ maxWidth: 760, padding: 'clamp(56px, 9vw, 80px) clamp(16px, 4.5vw, 60px) clamp(140px, 28vw, 220px) clamp(16px, 4.5vw, 60px)' }}>
 
               {/* Completed messages + inline event bubbles */}
               {Array.isArray(messages) && messages.map((msg, idx) => {
@@ -1131,8 +1132,8 @@ export default function ChatPage() {
 
         {/* Input area — floating paper */}
         <div style={{
-            position: 'fixed', bottom: 48, left: '50%', transform: 'translateX(-50%)',
-            width: 580, maxWidth: 'calc(100% - 40px)',
+            position: 'fixed', bottom: 'calc(24px + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)',
+            width: 580, maxWidth: 'calc(100% - 32px)',
             zIndex: 50,
           }}>
             <div className="relative">

@@ -70,7 +70,7 @@ body { touch-action: none; }
 .md-content strong { font-weight: 600; }
 .md-content em { font-style: italic; }
 .md-content hr { border: none; border-top: 1px solid rgba(180,150,120,0.12); margin: 1rem 0; }
-.md-content table { border-collapse: collapse; width: 100%; margin-bottom: 0.875rem; font-size: 0.82rem; overflow-x: auto; display: block; }
+.md-content table { border-collapse: collapse; width: 100%; margin-bottom: 0.875rem; font-size: 0.82rem; overflow-x: auto; -webkit-overflow-scrolling: touch; display: block; }
 .md-content th { background: rgba(160,120,90,0.08); font-weight: 600; text-align: left; padding: 0.5rem 0.75rem; border: 1px solid rgba(180,150,120,0.15); white-space: nowrap; }
 .md-content td { padding: 0.4rem 0.75rem; border: 1px solid rgba(180,150,120,0.12); }
 .md-content tr:nth-child(even) { background: rgba(160,120,90,0.03); }

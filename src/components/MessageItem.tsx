@@ -29,7 +29,7 @@ const MemoryRefBlock = memo(function MemoryRefBlock({ query, found, content, ela
   const [open, setOpen] = useState(false)
   const isActive = found === undefined || found === null
   return (
-    <div className="mb-3" style={{ padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 20, border: '1px dashed rgba(196,154,120,0.25)', background: 'rgba(196,154,120,0.04)', cursor: 'pointer' }} onClick={() => setOpen(o => !o)}>
+    <div className="mb-3" style={{ padding: '8px 14px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, borderRadius: 20, border: '1px dashed rgba(196,154,120,0.25)', background: 'rgba(196,154,120,0.04)', cursor: 'pointer', maxWidth: '100%', minWidth: 0 }} onClick={() => setOpen(o => !o)}>
       {isActive ? <span className="tool-spinner" /> : <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.accent, opacity: 0.5, flexShrink: 0 }} />}
       <span style={{ fontSize: 11, color: C.textSecondary, fontFamily: ROOM_FONT, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
         {query || 'Memory search'}{found != null && ` · ${found} found`}
@@ -51,7 +51,7 @@ const MemoryOpsBlock = memo(function MemoryOpsBlock({ ops, elapsed }: { ops: Mem
   const labels: Record<string, string> = { saved: 'saved', updated: 'updated', deleted: 'deleted' }
   const colors: Record<string, string> = { saved: C.textSecondary, updated: C.textSecondary, deleted: '#c05050' }
   return (
-    <div className="mb-3" style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, padding: '8px 14px', borderRadius: 12, border: '1px dashed rgba(196,154,120,0.2)', background: 'rgba(196,154,120,0.03)', cursor: 'pointer' }} onClick={() => setOpen(o => !o)}>
+    <div className="mb-3" style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 14px', borderRadius: 12, border: '1px dashed rgba(196,154,120,0.2)', background: 'rgba(196,154,120,0.03)', cursor: 'pointer', maxWidth: '100%', minWidth: 0 }} onClick={() => setOpen(o => !o)}>
       <div className="flex items-center gap-2" style={{ color: C.textSecondary }}>
         <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.accent, opacity: 0.4 }} />
         <span style={{ fontSize: 11, fontFamily: ROOM_FONT }}>
@@ -293,8 +293,8 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
   if (msg.role === 'user') {
     // 用户消息：右侧轻气泡（书页旁注风格）
     return (
-      <div className="room-msg-group flex justify-end mb-10 room-msg-enter-right" style={{ paddingLeft: 120 }}>
-        <div className="max-w-[480px]">
+      <div className="room-msg-group flex justify-end mb-10 room-msg-enter-right" style={{ paddingLeft: 'clamp(40px, 12vw, 120px)' }}>
+        <div style={{ maxWidth: 'min(85%, 480px)', minWidth: 0 }}>
           {msg.attachments && msg.attachments.length > 0 && (
             <div className="flex justify-end mb-2">
               <AttachmentsBlock attachments={msg.attachments} />
@@ -313,8 +313,8 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
               fontSize: 14.5,
               lineHeight: 1.75,
               color: C.text,
-              wordBreak: 'break-word',
-              overflowWrap: 'anywhere',
+              overflowWrap: 'break-word',
+              wordBreak: 'normal',
             }}
           >
             {msg.content}

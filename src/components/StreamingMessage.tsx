@@ -144,9 +144,9 @@ function LiveThinkingBlock({ text, startTime, elapsed }: { text: string; startTi
 function LiveToolSearchBlock({ query, startTime }: { query: string; startTime: number }) {
   const liveElapsed = useElapsedTimer(startTime)
   return (
-    <div className="mb-3" style={{ padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 20, border: '1px dashed rgba(196,154,120,0.25)', background: 'rgba(196,154,120,0.04)' }}>
-      <span className="tool-spinner" style={{ width: 10, height: 10 }} />
-      <span style={{ fontSize: 11, color: C.textSecondary, fontFamily: ROOM_FONT }}>
+    <div className="mb-3" style={{ padding: '8px 14px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, borderRadius: 20, border: '1px dashed rgba(196,154,120,0.25)', background: 'rgba(196,154,120,0.04)', maxWidth: '100%', minWidth: 0 }}>
+      <span className="tool-spinner" style={{ width: 10, height: 10, flexShrink: 0 }} />
+      <span style={{ fontSize: 11, color: C.textSecondary, fontFamily: ROOM_FONT, overflowWrap: 'break-word', minWidth: 0 }}>
         {query || 'searching'} <span style={{ color: C.textMuted }}>({formatElapsed(liveElapsed)})</span>
       </span>
     </div>
@@ -159,16 +159,16 @@ function ToolResultBlock({ query, found, content, elapsed }: { query: string; fo
   const [open, setOpen] = useState(false)
   return (
     <div className="mb-3 cursor-pointer" onClick={() => setOpen(o => !o)}
-      style={{ display: 'inline-flex', flexDirection: 'column' as const, padding: '8px 14px', borderRadius: 20, border: '1px dashed rgba(196,154,120,0.25)', background: 'rgba(196,154,120,0.04)' }}>
-      <div className="flex items-center gap-2">
-        <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.accent, opacity: 0.5 }} />
-        <span style={{ fontSize: 11, color: C.textSecondary, fontFamily: ROOM_FONT }}>
+      style={{ display: 'flex', flexDirection: 'column' as const, padding: '8px 14px', borderRadius: 20, border: '1px dashed rgba(196,154,120,0.25)', background: 'rgba(196,154,120,0.04)', maxWidth: '100%', minWidth: 0 }}>
+      <div className="flex items-center gap-2 flex-wrap" style={{ minWidth: 0 }}>
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.accent, opacity: 0.5, flexShrink: 0 }} />
+        <span style={{ fontSize: 11, color: C.textSecondary, fontFamily: ROOM_FONT, overflowWrap: 'break-word', minWidth: 0, flex: '1 1 auto' }}>
           {query || 'search'} · {found} found
           {elapsed != null && <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
         </span>
-        {open ? <ChevronDown size={9} strokeWidth={2} style={{ color: C.textMuted }} /> : <ChevronRight size={9} strokeWidth={2} style={{ color: C.textMuted }} />}
+        {open ? <ChevronDown size={9} strokeWidth={2} style={{ color: C.textMuted, flexShrink: 0 }} /> : <ChevronRight size={9} strokeWidth={2} style={{ color: C.textMuted, flexShrink: 0 }} />}
       </div>
-      {open && content && <p className="text-xs leading-relaxed whitespace-pre-wrap mt-2" style={{ color: C.textMuted, fontFamily: ROOM_FONT }}>{content}</p>}
+      {open && content && <p className="text-xs leading-relaxed whitespace-pre-wrap mt-2" style={{ color: C.textMuted, fontFamily: ROOM_FONT, overflowWrap: 'break-word' }}>{content}</p>}
     </div>
   )
 }
@@ -177,9 +177,9 @@ function ToolResultBlock({ query, found, content, elapsed }: { query: string; fo
 
 function MemoryOpBlock({ op, elapsed }: { op: MemoryOperation; elapsed: number | null }) {
   return (
-    <div className="mb-3" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 20, border: '1px dashed rgba(196,154,120,0.2)', background: 'rgba(196,154,120,0.03)' }}>
-      <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.accent, opacity: 0.4 }} />
-      <span style={{ fontSize: 11, color: C.textSecondary, fontFamily: ROOM_FONT }}>
+    <div className="mb-3" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 20, border: '1px dashed rgba(196,154,120,0.2)', background: 'rgba(196,154,120,0.03)', maxWidth: '100%', minWidth: 0 }}>
+      <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.accent, opacity: 0.4, flexShrink: 0 }} />
+      <span style={{ fontSize: 11, color: C.textSecondary, fontFamily: ROOM_FONT, overflowWrap: 'break-word', minWidth: 0 }}>
         memory {op.type}
         {elapsed != null && <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
       </span>
