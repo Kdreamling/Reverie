@@ -284,4 +284,22 @@ body.night-mode .room-cursor { background: #D4AE8A; }
 .room-msg-group:hover .room-msg-actions {
   opacity: 1;
 }
+/* Mobile: action bar always visible (no hover) */
+@media (hover: none) {
+  .room-msg-actions { opacity: 0.7; }
+}
+
+/* ── User bubble: day + night ─────────────────────────────────────────────── */
+.user-bubble {
+  background: rgba(255,255,255,0.55);
+  border: 1px solid rgba(180,150,120,0.1);
+  box-shadow: 0 2px 16px rgba(160,120,90,0.04);
+  color: #332A22;
+}
+body.night-mode .user-bubble {
+  background: rgba(40,35,28,0.55);
+  border-color: rgba(180,150,120,0.08);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.2);
+  color: #E0D5C8;
+}
 

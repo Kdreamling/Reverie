@@ -301,18 +301,14 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
             </div>
           )}
           <div
-            className="whitespace-pre-wrap"
+            className="whitespace-pre-wrap user-bubble"
             style={{
               padding: '14px 20px',
               borderRadius: '20px 20px 4px 20px',
-              background: 'rgba(255,255,255,0.55)',
               backdropFilter: 'blur(12px)',
               WebkitBackdropFilter: 'blur(12px)',
-              border: '1px solid rgba(180,150,120,0.1)',
-              boxShadow: '0 2px 16px rgba(160,120,90,0.04)',
               fontSize: 14.5,
               lineHeight: 1.75,
-              color: C.text,
               overflowWrap: 'break-word',
               wordBreak: 'normal',
             }}
