@@ -28,6 +28,7 @@ interface ModelInfo {
   enabled: boolean
   sort_order: number
   note?: string | null
+  is_warmup_target?: boolean
 }
 
 interface ChannelBrief {
@@ -779,6 +780,24 @@ function ProviderModelsTab({ ch, models, onReload }: {
     }
   }
 
+  const handleWarmupToggle = async (m: ModelInfo, e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      const resp = await apiFetch<{ success: boolean; is_warmup_target?: boolean; message?: string }>(
+        `/admin/models/${encodeURIComponent(m.name)}/warmup-target`,
+        { method: 'PATCH' },
+      )
+      if (resp.success) {
+        toast.success(resp.message ?? (resp.is_warmup_target ? `${m.label} 已设为续命目标` : '已取消续命目标'))
+        onReload()
+      } else {
+        toast.error(resp.message ?? '切换失败')
+      }
+    } catch (err) {
+      toast.error(`切换失败: ${err instanceof Error ? err.message : '未知错误'}`)
+    }
+  }
+
   const handleBatchDelete = async () => {
     if (selected.size === 0) { setDeleteMode(false); return }
     if (!confirm(`确定删除 ${selected.size} 个模型？不可撤销`)) return
@@ -865,6 +884,18 @@ function ProviderModelsTab({ ch, models, onReload }: {
                   </div>
                 )}
               </div>
+
+              {/* 续命目标切换 ⚡ */}
+              {!deleteMode && (
+                <button onClick={e => handleWarmupToggle(m, e)} style={{
+                  background: m.is_warmup_target ? `${C.accent}18` : 'none',
+                  border: 'none', color: m.is_warmup_target ? C.accent : C.textMuted,
+                  cursor: 'pointer', fontSize: 16, padding: 6, flexShrink: 0,
+                  lineHeight: 1, borderRadius: 8,
+                }} title={m.is_warmup_target ? '当前续命目标（点击取消）' : '设为缓存续命目标'}>
+                  ⚡
+                </button>
+              )}
 
               {/* 启用/停用切换（右侧小图标） */}
               {!deleteMode && (
