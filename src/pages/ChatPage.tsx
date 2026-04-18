@@ -1027,10 +1027,10 @@ export default function ChatPage() {
             >
               <span
                 className="rounded-full flex-shrink-0"
-                style={{ width: 6, height: 6, background: getModelColor(model), boxShadow: `0 0 6px ${getModelColor(model)}40` }}
+                style={{ width: 6, height: 6, background: getModelColor(models.find(m => m.name === model || m.value === model)?.value ?? model), boxShadow: `0 0 6px ${getModelColor(models.find(m => m.name === model || m.value === model)?.value ?? model)}40` }}
               />
               <span className="text-sm font-semibold" style={{ color: C.text }}>
-                {models.find(m => m.value === model)?.label ?? model}
+                {models.find(m => m.name === model || m.value === model)?.label ?? model}
               </span>
               <span style={{ display: 'inline-flex', transform: showModelDropdown ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.25s', color: C.textMuted }}>
                 <ChevronDown size={12} strokeWidth={2.5} />
@@ -1052,11 +1052,11 @@ export default function ChatPage() {
               >
                 <div style={{ padding: '12px 14px 6px', fontSize: 11, color: C.textMuted, fontWeight: 600, letterSpacing: '0.05em' }}>选择模型</div>
                 {models.map(m => {
-                  const isActive = m.value === model
+                  const isActive = m.name === model || m.value === model
                   return (
                     <div
-                      key={m.value}
-                      onClick={() => { handleModelChange(m.value); setShowModelDropdown(false) }}
+                      key={m.name}
+                      onClick={() => { handleModelChange(m.name); setShowModelDropdown(false) }}
                       className="flex items-center gap-3 cursor-pointer transition-colors"
                       style={{
                         padding: '12px 14px',
@@ -1122,7 +1122,7 @@ export default function ChatPage() {
                   <MessageItem
                     key={msg.id}
                     msg={msgWithSeen}
-                    modelLabel={msg.role === 'assistant' ? (models.find(m => m.value === model)?.label ?? model) : undefined}
+                    modelLabel={msg.role === 'assistant' ? (models.find(m => m.name === model || m.value === model)?.label ?? model) : undefined}
                     isDebugOpen={_debugOpenMsgId === msg.id}
                     isCopied={copiedMsgId === msg.id}
                     onToggleDebug={() => {

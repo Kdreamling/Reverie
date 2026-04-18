@@ -520,8 +520,8 @@ export default function DevPage() {
     fetchSelectableModels('dev').then(list => {
       if (cancelled || list.length === 0) return
       setDevModels(list)
-      // 如果当前选的模型不在新列表里，切到第一个
-      setModel(prev => list.find(m => m.value === prev) ? prev : list[0].value)
+      // 如果当前选的模型不在新列表里，切到第一个（同时支持 name / 旧 value）
+      setModel(prev => list.find(m => m.name === prev || m.value === prev) ? prev : list[0].name)
     })
     return () => { cancelled = true }
   }, [])
@@ -1116,7 +1116,7 @@ export default function DevPage() {
                   disabled={isStreaming}
                 >
                   {devModels.map(m => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
+                    <option key={m.name} value={m.name}>{m.label}</option>
                   ))}
                 </select>
               </>
@@ -1151,7 +1151,7 @@ export default function DevPage() {
                   disabled={isStreaming}
                 >
                   {devModels.map(m => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
+                    <option key={m.name} value={m.name}>{m.label}</option>
                   ))}
                 </select>
               </div>
