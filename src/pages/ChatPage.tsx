@@ -18,17 +18,6 @@ import MemorySheetPanel from '../components/MemorySheetPanel'
 import PushNotification from '../components/PushNotification'
 import { C, getModelColor } from '../theme'
 
-// Nav icons as inline SVGs
-function NavIcon({ type }: { type: string }) {
-  const s = { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
-  if (type === 'chats') return <svg {...s}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
-  if (type === 'scripts') return <svg {...s}><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M2 8h20" /><circle cx="8" cy="6" r="0.7" fill="currentColor" stroke="none" /><circle cx="11" cy="6" r="0.7" fill="currentColor" stroke="none" /><path d="M7 13l3 2-3 2" /><path d="M13 17h4" /></svg>
-  if (type === 'reading') return <svg {...s}><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z" /><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" /></svg>
-  if (type === 'graph') return <svg {...s}><circle cx="12" cy="5" r="2" /><circle cx="5" cy="19" r="2" /><circle cx="19" cy="19" r="2" /><path d="M12 7v4M7.5 17.5L11 13M16.5 17.5L13 13" /><circle cx="12" cy="12" r="1.5" /></svg>
-  if (type === 'calendar') return <svg {...s}><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /><circle cx="8" cy="14" r="1" fill="currentColor" stroke="none" /><circle cx="12" cy="14" r="1" fill="currentColor" stroke="none" /><circle cx="16" cy="14" r="1" fill="currentColor" stroke="none" /><circle cx="8" cy="18" r="1" fill="currentColor" stroke="none" /></svg>
-  return null
-}
-
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const GROUPS: { key: Group; label: string }[] = [
@@ -41,15 +30,6 @@ const GROUPS: { key: Group; label: string }[] = [
 // MODELS 作为 fallback 保底，仅在后端请求失败时使用
 const FALLBACK_MODELS: { value: string; label: string }[] = [
   { value: '[按量]claude-opus-4-6-thinking', label: 'Claude Opus 4.6' },
-]
-
-// Sidebar navigation icons (SVG paths)
-const NAV_ITEMS: { key: string; label: string; iconPath: string; enabled: boolean; badge?: string }[] = [
-  { key: 'chats', label: '对话', iconPath: 'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z', enabled: true },
-  { key: 'scripts', label: '剧本世界', iconPath: '', enabled: true, badge: '3' }, // custom icon
-  { key: 'reading', label: '共读', iconPath: 'M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z', enabled: true },
-  { key: 'graph', label: '记忆图谱', iconPath: '', enabled: true }, // custom icon
-  { key: 'calendar', label: '回忆日历', iconPath: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z', enabled: true },
 ]
 
 const ACCEPTED_FILE_TYPES = 'image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,text/markdown,text/csv,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,.docx,.doc,.xlsx,.xls'
@@ -137,7 +117,8 @@ export default function ChatPage() {
   const [showSettings, setShowSettings] = useState(false)
   const [settingsPage, setSettingsPage] = useState<'menu' | 'memory' | 'features' | 'prompt'>('menu')
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [activeNav, setActiveNav] = useState('chats')
+  const [pcHover, setPcHover] = useState(false)
+  const pcHoverTimer = useRef<ReturnType<typeof setTimeout>>()
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null)
   const [_debugOpenMsgId, _setDebugOpenMsgId] = useState<string | null>(null)
@@ -296,6 +277,31 @@ export default function ChatPage() {
       { enableHighAccuracy: true, timeout: 10000 }
     )
   }
+
+  // ─── Sidebar hover (PC) ───
+  const sidebarVisible = sidebarOpen || pcHover
+  const handleSidebarMouseEnter = useCallback(() => {
+    if (window.innerWidth < 768) return
+    clearTimeout(pcHoverTimer.current)
+    setPcHover(true)
+  }, [])
+  const handleSidebarMouseLeave = useCallback(() => {
+    if (window.innerWidth < 768) return
+    pcHoverTimer.current = setTimeout(() => setPcHover(false), 300)
+  }, [])
+
+  // ─── Right-bottom floating tools (PC) ───
+  const [toolsHover, setToolsHover] = useState(false)
+  const toolsHoverTimer = useRef<ReturnType<typeof setTimeout>>()
+  const handleToolsEnter = useCallback(() => {
+    if (window.innerWidth < 768) return
+    clearTimeout(toolsHoverTimer.current)
+    setToolsHover(true)
+  }, [])
+  const handleToolsLeave = useCallback(() => {
+    if (window.innerWidth < 768) return
+    toolsHoverTimer.current = setTimeout(() => setToolsHover(false), 300)
+  }, [])
 
   // ─── Stable callbacks for MessageItem (prevent re-renders) ───
   const handleCopyMsg = useCallback(async (msgId: string, content: string) => {
@@ -459,8 +465,8 @@ export default function ChatPage() {
 
   // Clean up swipe/rename state
   useEffect(() => {
-    if (!sidebarOpen) { setSwipedId(null); setRenameModal(null) }
-  }, [sidebarOpen])
+    if (!sidebarOpen && !pcHover) { setSwipedId(null); setRenameModal(null) }
+  }, [sidebarOpen, pcHover])
 
   // Click outside to close scene panel
   useEffect(() => {
@@ -701,6 +707,13 @@ export default function ChatPage() {
         if (todaySession) selectSession(todaySession.id)
       }} />
 
+      {/* ── PC edge trigger — hover to reveal sidebar ── */}
+      <div
+        className="hidden md:block fixed inset-y-0 left-0"
+        style={{ width: 16, zIndex: 200 }}
+        onMouseEnter={handleSidebarMouseEnter}
+      />
+
       {/* ── Mobile sidebar overlay ── */}
       {sidebarOpen && (
         <div
@@ -713,18 +726,22 @@ export default function ChatPage() {
         />
       )}
 
-      {/* ── Mobile sidebar (drawer) ── */}
+      {/* ── Sidebar (mobile: drawer, PC: hover) ── */}
       <aside
-        className="fixed inset-y-0 left-0 flex flex-col flex-shrink-0 transition-transform duration-350 ease-out"
+        className="fixed inset-y-0 left-0 flex flex-col flex-shrink-0"
+        onMouseEnter={handleSidebarMouseEnter}
+        onMouseLeave={handleSidebarMouseLeave}
         style={{
           width: '100%',
-          maxWidth: 360,
+          maxWidth: 300,
           height: '100%',
           background: 'rgba(248,244,238,0.95)',
           backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
           color: C.text,
-          transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
-          boxShadow: sidebarOpen ? '12px 0 60px rgba(0,0,0,0.04)' : 'none',
+          transform: sidebarVisible ? 'translateX(0)' : 'translateX(-100%)',
+          opacity: sidebarVisible ? 1 : 0,
+          boxShadow: sidebarVisible ? '12px 0 60px rgba(0,0,0,0.04)' : 'none',
+          transition: 'transform 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.4s cubic-bezier(0.4,0,0.2,1), box-shadow 0.4s',
           zIndex: 210,
           borderRight: `1px solid ${C.border}`,
         }}
@@ -733,8 +750,8 @@ export default function ChatPage() {
         <div className="px-5 py-4" style={{ paddingTop: 'calc(16px + env(safe-area-inset-top))' }}>
           <div className="flex items-center justify-between">
             <button
-              onClick={() => setSidebarOpen(false)}
-              className="flex items-center justify-center rounded-md cursor-pointer"
+              onClick={() => { setSidebarOpen(false); setPcHover(false) }}
+              className="flex items-center justify-center rounded-md cursor-pointer md:hidden"
               style={{ width: 32, height: 32, color: C.textSecondary }}
             >
               <X size={18} strokeWidth={2} />
@@ -755,56 +772,11 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Navigation tabs */}
-        <div style={{ padding: '4px 10px 12px' }}>
-          {NAV_ITEMS.map(n => {
-            const act = activeNav === n.key
-            return (
-              <button
-                key={n.key}
-                onClick={() => {
-                  if (!n.enabled) return
-                  setActiveNav(n.key)
-                  if (n.key === 'reading') {
-                    setSidebarOpen(false)
-                    navigate('/bookshelf')
-                  } else if (n.key === 'graph') {
-                    setSidebarOpen(false)
-                  } else if (n.key === 'scripts') {
-                    setSidebarOpen(false)
-                    navigate('/projects')
-                  } else if (n.key === 'calendar') {
-                    setSidebarOpen(false)
-                    navigate('/calendar')
-                  }
-                }}
-                className="w-full flex items-center gap-3 transition-all duration-150"
-                style={{
-                  padding: '10px 12px', borderRadius: 10, border: 'none',
-                  background: act ? C.sidebarActive : 'transparent',
-                  color: n.enabled ? (act ? C.text : C.textSecondary) : '#d0c8c0',
-                  fontSize: 14, fontWeight: act ? 600 : 400,
-                  cursor: n.enabled ? 'pointer' : 'default',
-                  opacity: n.enabled ? 1 : 0.4, position: 'relative',
-                  textAlign: 'left' as const, marginBottom: 1,
-                }}
-              >
-                {act && <div style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: 3, height: 18, borderRadius: 2, background: C.accent }} />}
-                <span style={{ display: 'flex', opacity: act ? 0.85 : 0.5 }}><NavIcon type={n.key} /></span>
-                <span style={{ flex: 1 }}>{n.label}</span>
-                {n.badge && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 8, background: C.accent + '14', color: C.accent, fontWeight: 600 }}>{n.badge}</span>}
-              </button>
-            )
-          })}
-        </div>
-
-        <div style={{ height: 1, background: C.border, margin: '0 18px' }} />
-
         {/* Search */}
         <div style={{ padding: '12px 14px 6px' }}>
-          <div className="flex items-center gap-2" style={{ padding: '7px 11px', borderRadius: 10, background: 'transparent', border: `1px solid ${C.border}` }}>
+          <div className="flex items-center gap-2" style={{ padding: '9px 14px', borderRadius: 12, background: 'transparent', border: `1px solid ${C.border}` }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.textMuted} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-            <input placeholder="搜索..." className="flex-1 border-none outline-none bg-transparent" style={{ color: C.text, fontSize: 13 }} />
+            <input placeholder="搜索..." className="flex-1 border-none outline-none bg-transparent" style={{ color: C.text, fontSize: 12.5, fontFamily: "'EB Garamond', 'Noto Serif SC', serif" }} />
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto px-3 pt-2 pb-2" style={{ scrollbarWidth: 'none' }}>
@@ -914,8 +886,22 @@ export default function ChatPage() {
           </>
         )}
 
-        {/* Sidebar bottom */}
+        {/* Sidebar bottom — nav shortcuts (mobile) + settings */}
         <div style={{ borderTop: `1px solid ${C.border}`, paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <div className="flex items-center gap-4 px-5 pt-2.5 pb-1 md:hidden">
+            {[
+              { label: '剧本', action: () => { setSidebarOpen(false); navigate('/projects') } },
+              { label: '日历', action: () => { setSidebarOpen(false); navigate('/calendar') } },
+              { label: '共读', action: () => { setSidebarOpen(false); navigate('/bookshelf') } },
+            ].map(n => (
+              <button key={n.label} onClick={n.action}
+                className="text-xs cursor-pointer transition-colors"
+                style={{ color: C.textMuted, fontFamily: "'EB Garamond', 'Noto Serif SC', serif", letterSpacing: '0.04em' }}
+              >
+                {n.label}
+              </button>
+            ))}
+          </div>
           <div className="flex items-center justify-between px-5 py-3">
             <button onClick={() => setShowSettings(true)}
               className="flex items-center gap-2.5 text-sm transition-colors duration-150 cursor-pointer"
@@ -940,7 +926,7 @@ export default function ChatPage() {
           <div className="flex items-center justify-between px-4 py-3" style={{ pointerEvents: 'auto' }}>
             {/* Left: menu button (mobile) / sidebar trigger (pc) */}
             <button
-              className="flex items-center justify-center rounded-xl cursor-pointer transition-all"
+              className="flex items-center justify-center rounded-xl cursor-pointer transition-all md:opacity-0 md:pointer-events-none"
               style={{ width: 36, height: 36, color: C.textMuted, background: 'transparent', border: 'none' }}
               onClick={() => setSidebarOpen(true)}
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248,244,238,0.8)'; e.currentTarget.style.color = C.accent }}
@@ -1322,6 +1308,105 @@ export default function ChatPage() {
               </div>
             </div>
           </div>
+
+        {/* ── PC floating tools — right bottom corner ── */}
+        <div
+          className="hidden md:block fixed"
+          style={{ bottom: 0, right: 0, width: 60, height: 120, zIndex: 70 }}
+          onMouseEnter={handleToolsEnter}
+        />
+        <div
+          className="hidden md:flex fixed flex-col gap-1.5"
+          onMouseEnter={handleToolsEnter}
+          onMouseLeave={handleToolsLeave}
+          style={{
+            bottom: 24, right: 24, zIndex: 70,
+            opacity: toolsHover ? 1 : 0,
+            transform: toolsHover ? 'translateY(0)' : 'translateY(8px)',
+            transition: 'all 0.35s cubic-bezier(0.4,0,0.2,1)',
+            pointerEvents: toolsHover ? 'auto' : 'none',
+          }}
+        >
+          {[
+            {
+              key: 'scripts', label: '剧本世界',
+              icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 8h20"/><path d="M7 13l3 2-3 2"/><path d="M13 17h4"/></svg>,
+              action: () => navigate('/projects'),
+            },
+            {
+              key: 'graph', label: '记忆图谱',
+              icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v4"/><path d="M7.5 17.5L11 13"/><path d="M16.5 17.5L13 13"/><circle cx="12" cy="12" r="1.5"/></svg>,
+              action: () => {},
+            },
+            {
+              key: 'calendar', label: '回忆日历',
+              icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>,
+              action: () => navigate('/calendar'),
+            },
+            {
+              key: 'settings', label: '设置',
+              icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>,
+              action: () => { setSidebarOpen(true); setShowSettings(true) },
+            },
+          ].map(btn => (
+            <button
+              key={btn.key}
+              onClick={btn.action}
+              className="tool-float-btn group"
+              style={{
+                width: 40, height: 40, borderRadius: '50%',
+                border: `1px solid ${C.border}`,
+                background: 'rgba(248,244,238,0.92)',
+                backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', color: C.textMuted, position: 'relative',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
+                transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
+              }}
+              onMouseEnter={e => {
+                const el = e.currentTarget
+                el.style.borderColor = C.accent
+                el.style.color = C.accent
+                el.style.background = 'rgba(255,255,255,0.9)'
+                el.style.boxShadow = '0 4px 20px rgba(160,120,90,0.1)'
+                el.style.transform = 'scale(1.08)'
+                const tip = el.querySelector('.tool-tip') as HTMLElement
+                if (tip) { tip.style.opacity = '1'; tip.style.transform = 'translateY(-50%) translateX(0)' }
+              }}
+              onMouseLeave={e => {
+                const el = e.currentTarget
+                el.style.borderColor = C.border
+                el.style.color = C.textMuted
+                el.style.background = 'rgba(248,244,238,0.92)'
+                el.style.boxShadow = '0 2px 12px rgba(0,0,0,0.03)'
+                el.style.transform = 'scale(1)'
+                const tip = el.querySelector('.tool-tip') as HTMLElement
+                if (tip) { tip.style.opacity = '0'; tip.style.transform = 'translateY(-50%) translateX(4px)' }
+              }}
+            >
+              {btn.icon}
+              <span
+                className="tool-tip"
+                style={{
+                  position: 'absolute',
+                  right: 'calc(100% + 10px)', top: '50%',
+                  transform: 'translateY(-50%) translateX(4px)',
+                  padding: '4px 10px', borderRadius: 8,
+                  background: 'rgba(248,244,238,0.92)',
+                  border: `1px solid ${C.border}`,
+                  fontSize: 11, color: C.textMuted,
+                  whiteSpace: 'nowrap',
+                  opacity: 0, pointerEvents: 'none',
+                  transition: 'all 0.2s',
+                  backdropFilter: 'blur(20px)',
+                  fontFamily: "'EB Garamond', 'Noto Serif SC', serif",
+                }}
+              >
+                {btn.label}
+              </span>
+            </button>
+          ))}
+        </div>
 
         {/* Artifact Panel */}
         <ArtifactPanel />
