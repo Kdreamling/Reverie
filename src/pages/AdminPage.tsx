@@ -1087,12 +1087,11 @@ function formatTokens(n: number): string {
 
 // ─── Tabs ────────────────────────────────────────────────────────────────────
 
-type Tab = 'status' | 'models' | 'channels' | 'logs' | 'scheduler' | 'cache'
+type Tab = 'status' | 'models' | 'logs' | 'scheduler' | 'cache'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'status', label: '总览' },
-  { key: 'models', label: '模型' },
-  { key: 'channels', label: '供应商' },
+  { key: 'models', label: '模型路由' },
   { key: 'logs', label: '日志' },
   { key: 'cache', label: '缓存' },
   { key: 'scheduler', label: '运维' },
@@ -1121,6 +1120,7 @@ export default function AdminPage() {
   const [models, setModels] = useState<ModelInfo[] | null>(null)
   const [channelOptions, setChannelOptions] = useState<ChannelBrief[]>([])
   const [showAddModel, setShowAddModel] = useState(false)
+  const [sceneFilter, setSceneFilter] = useState<string>('all')
 
   const loadLockStatus = useCallback(async () => {
     try {
@@ -1220,8 +1220,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (tab === 'status') { loadStatus(); loadUsage(); loadLockStatus() }
-    if (tab === 'models') loadModels()
-    if (tab === 'channels') loadChannels()
+    if (tab === 'models') { loadModels(); loadChannels() }
     if (tab === 'logs') loadLogs()
     if (tab === 'scheduler') loadScheduler()
     if (tab === 'cache') loadCacheHealth(cacheHours)
@@ -1528,10 +1527,37 @@ export default function AdminPage() {
 
         {tab === 'models' && (
           <>
+            {/* 场景筛选 chip 行 */}
             <div style={{
-              fontSize: 11, color: C.textMuted, padding: '2px 4px 8px', lineHeight: 1.6,
+              display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center',
+              padding: '2px 2px 4px',
             }}>
-              这里管理的是"前端对话框能选到的模型"。每个条目绑定一个供应商 + 上游模型 id。改动后对应场景的选择框会立即同步，不用改代码。
+              <span style={{ fontSize: 11, color: C.textMuted, marginRight: 4 }}>筛选</span>
+              {([{ key: 'all', label: '全部' }, ...SCENE_TAG_OPTIONS] as { key: string; label: string }[]).map(opt => {
+                const active = sceneFilter === opt.key
+                return (
+                  <button
+                    key={opt.key}
+                    onClick={() => setSceneFilter(opt.key)}
+                    style={{
+                      fontSize: 11, padding: '4px 10px', borderRadius: 12,
+                      border: `1px solid ${active ? C.accent : C.border}`,
+                      color: active ? C.accent : C.textMuted,
+                      background: active ? `${C.accent}0d` : 'transparent',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* —— 模型路由 —— */}
+            <div style={{
+              fontSize: 11, color: C.textMuted, padding: '2px 4px 4px', lineHeight: 1.6,
+            }}>
+              <b style={{ color: C.textSecondary, fontWeight: 600 }}>模型路由</b> · 对话框能选到的条目，每条绑定下方一个供应商的上游模型 id。改完立即同步，不用改代码。
             </div>
             {!showAddModel && (
               <button
@@ -1554,12 +1580,12 @@ export default function AdminPage() {
             )}
             {models === null ? <CardSkeleton /> : models.length === 0 ? (
               <div style={{ ...cardStyle, textAlign: 'center', color: C.textMuted, fontSize: 13, padding: 30 }}>
-                还没有模型——点上面的"+ 添加模型"开始，或者先去"供应商"Tab 加好 API 再来。
+                还没有模型——点"+ 添加模型"开始；没有供应商的话先到下面"供应商"区加一个。
               </div>
             ) : (
               <>
-                {/* 按场景分组显示 */}
-                {SCENE_TAG_OPTIONS.map(opt => {
+                {/* 按场景分组显示（根据 sceneFilter 过滤） */}
+                {SCENE_TAG_OPTIONS.filter(opt => sceneFilter === 'all' || sceneFilter === opt.key).map(opt => {
                   const group = models.filter(m => m.scene_tags.includes(opt.key))
                   if (group.length === 0) return null
                   return (
@@ -1587,8 +1613,8 @@ export default function AdminPage() {
                     </div>
                   )
                 })}
-                {/* 无场景标签的孤儿 */}
-                {(() => {
+                {/* 无场景标签的孤儿（仅全部视图显示） */}
+                {sceneFilter === 'all' && (() => {
                   const orphans = models.filter(m => m.scene_tags.length === 0)
                   if (orphans.length === 0) return null
                   return (
@@ -1613,42 +1639,51 @@ export default function AdminPage() {
                 })()}
               </>
             )}
-          </>
-        )}
 
-        {tab === 'channels' && (
-          <>
-            {!showAddForm && !editingChannel && (
-              <button
-                onClick={() => setShowAddForm(true)}
-                style={{
-                  ...btnStyle, width: '100%',
-                  background: 'none', border: `1px dashed ${C.border}`,
-                  color: C.accent, padding: '12px 0',
-                }}
-              >
-                + 添加供应商
-              </button>
-            )}
-            {showAddForm && <AddChannelForm onSubmit={handleAddChannel} onCancel={() => setShowAddForm(false)} />}
-            {editingChannel && (
-              <EditChannelForm
-                ch={editingChannel}
-                onSubmit={handleEditChannel}
-                onSubmitAndTest={handleEditAndTestChannel}
-                onCancel={() => setEditingChannel(null)}
-              />
-            )}
-            {channels === null ? <CardSkeleton /> : channels.map(ch => (
-              <ChannelCard
-                key={ch.name}
-                ch={ch}
-                onTest={handleTestChannel}
-                onEdit={(c) => { setShowAddForm(false); setEditingChannel(c) }}
-                onDelete={handleDeleteChannel}
-                onToggle={handleToggleChannel}
-              />
-            ))}
+            {/* —— 供应商 —— */}
+            <div style={{
+              marginTop: 18, paddingTop: 14,
+              borderTop: `1px solid ${C.border}`,
+            }}>
+              <div style={{
+                fontSize: 11, color: C.textMuted, padding: '2px 4px 8px', lineHeight: 1.6,
+              }}>
+                <b style={{ color: C.textSecondary, fontWeight: 600 }}>供应商 (API Key · URL)</b> · 模型从这里取密钥转发。一个供应商可以被多个模型引用。
+              </div>
+              {!showAddForm && !editingChannel && (
+                <button
+                  onClick={() => setShowAddForm(true)}
+                  style={{
+                    ...btnStyle, width: '100%',
+                    background: 'none', border: `1px dashed ${C.border}`,
+                    color: C.accent, padding: '12px 0', marginBottom: 10,
+                  }}
+                >
+                  + 添加供应商
+                </button>
+              )}
+              {showAddForm && <AddChannelForm onSubmit={handleAddChannel} onCancel={() => setShowAddForm(false)} />}
+              {editingChannel && (
+                <EditChannelForm
+                  ch={editingChannel}
+                  onSubmit={handleEditChannel}
+                  onSubmitAndTest={handleEditAndTestChannel}
+                  onCancel={() => setEditingChannel(null)}
+                />
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {channels === null ? <CardSkeleton /> : channels.map(ch => (
+                  <ChannelCard
+                    key={ch.name}
+                    ch={ch}
+                    onTest={handleTestChannel}
+                    onEdit={(c) => { setShowAddForm(false); setEditingChannel(c) }}
+                    onDelete={handleDeleteChannel}
+                    onToggle={handleToggleChannel}
+                  />
+                ))}
+              </div>
+            </div>
           </>
         )}
 
