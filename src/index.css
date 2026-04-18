@@ -1,7 +1,8 @@
-@import "tailwindcss";
-@import "highlight.js/styles/github.css";
 @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Italianno&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Noto+Serif+SC:wght@200;300;400;500&display=swap');
+@import "tailwindcss";
+@import "highlight.js/styles/github.css";
 
 html, body, #root {
   margin: 0;
@@ -138,3 +139,113 @@ html.dashboard-active #root::after {
   0%, 100% { opacity: 0.3; transform: scale(1); box-shadow: 0 0 6px 2px rgba(160,120,90,0.12); }
   50% { opacity: 0.8; transform: scale(1.3); box-shadow: 0 0 12px 5px rgba(160,120,90,0.25); }
 }
+
+/* ═══════ Room UI v4 ═══════ */
+
+/* Room atmosphere layer */
+.room-bg {
+  position: fixed; inset: 0; z-index: 0;
+  background: #F8F4EE;
+  transition: background 3s ease;
+}
+.room-light {
+  position: fixed; inset: 0; z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 100% 80% at 85% 15%, rgba(255,240,210,0.12) 0%, transparent 65%);
+  transition: all 4s ease;
+}
+.room-texture {
+  position: fixed; inset: 0; z-index: 0;
+  pointer-events: none;
+  opacity: 0.018;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='5' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 300px;
+}
+
+/* Floating dust motes */
+.room-mote {
+  position: fixed;
+  width: 3px; height: 3px;
+  border-radius: 50%;
+  background: rgba(200,170,130,0.35);
+  pointer-events: none;
+  animation: moteFloat linear infinite;
+  z-index: 0;
+}
+@keyframes moteFloat {
+  0%   { transform: translate(0,0) scale(1); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0.5); opacity: 0; }
+}
+
+/* Conversation spine line */
+.conv-spine::before {
+  content: '';
+  position: absolute;
+  left: 28px; top: 0; bottom: 0;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent 0%, rgba(180,150,120,0.1) 10%, rgba(180,150,120,0.1) 90%, transparent 100%);
+}
+
+/* Book-page message animations */
+@keyframes roomEmerge {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes roomEmergeRight {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.room-msg-enter { animation: roomEmerge 0.6s cubic-bezier(0.4,0,0.2,1) both; }
+.room-msg-enter-right { animation: roomEmergeRight 0.5s cubic-bezier(0.4,0,0.2,1) both; }
+
+/* Streaming cursor */
+.room-cursor {
+  display: inline-block;
+  width: 2px; height: 18px;
+  background: #C49A78;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink 1.2s ease-in-out infinite;
+}
+
+/* Input fade gradient */
+.input-fade-overlay {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 200px;
+  background: linear-gradient(to top, #F8F4EE 30%, transparent);
+  pointer-events: none;
+  z-index: 40;
+}
+
+/* Date mark in conversation */
+.room-date-mark {
+  text-align: center;
+  margin: 48px 0 36px;
+  font-family: 'EB Garamond', 'Noto Serif SC', serif;
+  font-size: 13px;
+  letter-spacing: 0.15em;
+  color: #C0B0A0;
+}
+
+/* Night mode */
+body.night-mode .room-bg { background: #171411; }
+body.night-mode .room-light {
+  background: radial-gradient(ellipse 60% 50% at 50% 10%, rgba(255,220,160,0.06) 0%, transparent 70%);
+}
+body.night-mode .room-mote { background: rgba(200,170,130,0.15); }
+body.night-mode .input-fade-overlay {
+  background: linear-gradient(to top, #171411 30%, transparent);
+}
+
+/* Message action bar - show on hover */
+.room-msg-actions {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.room-msg-group:hover .room-msg-actions {
+  opacity: 1;
+}
+

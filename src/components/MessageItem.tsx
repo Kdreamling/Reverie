@@ -8,9 +8,12 @@ import { C } from '../theme'
 
 function formatMsgTime(iso: string) {
   const d = new Date(iso)
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  const now = new Date()
+  const isToday = d.toDateString() === now.toDateString()
+  const time = d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
+  if (isToday) return time
+  const month = d.getMonth() + 1
+  const day = d.getDate()
   return `${month}/${day} ${time}`
 }
 
@@ -20,21 +23,21 @@ function formatElapsed(seconds: number): string {
 
 // ─── Sub-components (all memo'd) ─────────────────────────────────────────────
 
+const ROOM_FONT = "'EB Garamond', 'Noto Serif SC', 'Cormorant Garamond', Georgia, serif"
+
 const MemoryRefBlock = memo(function MemoryRefBlock({ query, found, content, elapsed }: { query: string; found: number; content: string; elapsed?: number | null }) {
   const [open, setOpen] = useState(false)
   const isActive = found === undefined || found === null
   return (
-    <div className="mb-3 rounded-xl overflow-hidden" style={{ background: C.toolBg }}>
-      <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer" style={{ color: C.textSecondary, minWidth: 0 }}>
-        {isActive ? <span className="tool-spinner" /> : <span style={{ fontSize: 11 }}>◎</span>}
-        <span className="text-xs font-medium" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', minWidth: 0 }}>
-          {query || 'Memory search'}{found != null && ` · found ${found}`}
-          {elapsed != null && <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
-        </span>
-        {!isActive && (open ? <ChevronDown size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} />)}
-      </button>
+    <div className="mb-3" style={{ padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 20, border: '1px dashed rgba(196,154,120,0.25)', background: 'rgba(196,154,120,0.04)', cursor: 'pointer' }} onClick={() => setOpen(o => !o)}>
+      {isActive ? <span className="tool-spinner" /> : <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.accent, opacity: 0.5, flexShrink: 0 }} />}
+      <span style={{ fontSize: 11, color: C.textSecondary, fontFamily: ROOM_FONT, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+        {query || 'Memory search'}{found != null && ` · ${found} found`}
+        {elapsed != null && <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
+      </span>
+      {!isActive && (open ? <ChevronDown size={10} strokeWidth={2} style={{ marginLeft: 4, color: C.textMuted }} /> : <ChevronRight size={10} strokeWidth={2} style={{ marginLeft: 4, color: C.textMuted }} />)}
       {open && content && (
-        <p className="px-3.5 pb-2.5 text-xs leading-relaxed whitespace-pre-wrap" style={{ color: C.textMuted, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+        <p className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: C.textMuted, wordBreak: 'break-word', overflowWrap: 'anywhere', marginTop: 4, fontFamily: ROOM_FONT }}>
           {content || '（无内容）'}
         </p>
       )}
@@ -48,24 +51,24 @@ const MemoryOpsBlock = memo(function MemoryOpsBlock({ ops, elapsed }: { ops: Mem
   const labels: Record<string, string> = { saved: 'saved', updated: 'updated', deleted: 'deleted' }
   const colors: Record<string, string> = { saved: C.textSecondary, updated: C.textSecondary, deleted: '#c05050' }
   return (
-    <div className="mb-3 rounded-xl overflow-hidden" style={{ background: C.toolBg }}>
-      <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer" style={{ color: C.textSecondary }}>
-        <span style={{ fontSize: 11 }}>◑</span>
-        <span className="text-xs font-medium">
-          Memory ops · {ops.length}
+    <div className="mb-3" style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, padding: '8px 14px', borderRadius: 12, border: '1px dashed rgba(196,154,120,0.2)', background: 'rgba(196,154,120,0.03)', cursor: 'pointer' }} onClick={() => setOpen(o => !o)}>
+      <div className="flex items-center gap-2" style={{ color: C.textSecondary }}>
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.accent, opacity: 0.4 }} />
+        <span style={{ fontSize: 11, fontFamily: ROOM_FONT }}>
+          Memory · {ops.length}
           {elapsed != null && <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
         </span>
-        {open ? <ChevronDown size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} />}
-      </button>
+        {open ? <ChevronDown size={10} strokeWidth={2} style={{ color: C.textMuted }} /> : <ChevronRight size={10} strokeWidth={2} style={{ color: C.textMuted }} />}
+      </div>
       {open && (
-        <div className="px-3.5 pb-2.5 space-y-1.5">
+        <div className="space-y-1.5 mt-1">
           {ops.map((op, i) => (
-            <div key={i} className="flex items-start gap-2 text-xs" style={{ color: C.textSecondary }}>
+            <div key={i} className="flex items-start gap-2" style={{ fontSize: 11, color: C.textSecondary, fontFamily: ROOM_FONT }}>
               <span className="flex-shrink-0" style={{ color: colors[op.type], fontSize: 10 }}>
                 {symbols[op.type]} {labels[op.type]}
               </span>
               <span className="leading-relaxed" style={{ color: C.textMuted }}>
-                {op.type === 'deleted' ? `ID: ${op.memory_id?.slice(0, 8)}... ${op.reason ? `(${op.reason})` : ''}` : (op.content || '（内容为空）')}
+                {op.type === 'deleted' ? `ID: ${op.memory_id?.slice(0, 8)}...` : (op.content || '（内容为空）')}
               </span>
             </div>
           ))}
@@ -78,17 +81,27 @@ const MemoryOpsBlock = memo(function MemoryOpsBlock({ ops, elapsed }: { ops: Mem
 const ThinkingBlock = memo(function ThinkingBlock({ text, thinkingTime }: { text: string; thinkingTime?: number | null }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="mb-3 rounded-xl overflow-hidden" style={{ background: C.thinkingBg, border: `1px solid ${C.border}` }}>
-      <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer" style={{ color: C.textMuted }}>
-        <span style={{ fontSize: 11 }}>✦</span>
-        <span className="text-xs font-medium">
-          思考了
-          {thinkingTime != null && thinkingTime > 0 && <span style={{ marginLeft: 4 }}>{formatElapsed(thinkingTime)}</span>}
-        </span>
-        {open ? <ChevronDown size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} />}
-      </button>
+    <div className="mb-3 cursor-pointer" onClick={() => setOpen(o => !o)}
+      style={{
+        padding: '10px 16px',
+        borderLeft: '2px solid rgba(196,154,120,0.2)',
+        fontFamily: ROOM_FONT,
+        fontSize: 12,
+        fontStyle: 'italic',
+        color: C.textMuted,
+        lineHeight: 1.6,
+        transition: 'border-color 0.3s',
+      }}
+      onMouseEnter={e => (e.currentTarget.style.borderLeftColor = 'rgba(196,154,120,0.4)')}
+      onMouseLeave={e => (e.currentTarget.style.borderLeftColor = 'rgba(196,154,120,0.2)')}
+    >
+      <div className="flex items-center gap-2" style={{ fontStyle: 'normal', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: C.textMuted, marginBottom: open ? 6 : 0 }}>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(196,154,120,0.5)" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        thought{thinkingTime != null && thinkingTime > 0 ? ` · ${formatElapsed(thinkingTime)}` : ''}
+        {open ? <ChevronDown size={9} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={9} strokeWidth={2} style={{ marginLeft: 'auto' }} />}
+      </div>
       {open && (
-        <p className="px-3.5 pb-2.5 text-xs leading-relaxed whitespace-pre-wrap" style={{ color: C.textSecondary, fontStyle: 'italic', borderTop: `1px solid ${C.border}`, paddingTop: 10, marginTop: 0 }}>
+        <p className="whitespace-pre-wrap" style={{ color: C.textSecondary, fontStyle: 'italic', fontFamily: ROOM_FONT, fontSize: 12, lineHeight: 1.7 }}>
           {text}
         </p>
       )}
@@ -278,118 +291,132 @@ interface MessageItemProps {
 
 const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, isCopied, onToggleDebug, onCopy, onDelete, onRetry }: MessageItemProps) {
   if (msg.role === 'user') {
-    // 用户消息：右对齐气泡
+    // 用户消息：右侧轻气泡（书页旁注风格）
     return (
-      <div className="flex gap-2.5 mb-6 flex-row-reverse msg-fade-in">
-        <UserAvatar />
-        <div className="flex flex-col items-end min-w-0" style={{ maxWidth: '78%' }}>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-xs" style={{ color: C.metaText }}>{formatMsgTime(msg.created_at)}</span>
-            <span className="text-sm font-semibold" style={{ color: C.text }}>Dream</span>
-          </div>
+      <div className="room-msg-group flex justify-end mb-10 room-msg-enter-right" style={{ paddingLeft: 120 }}>
+        <div className="max-w-[480px]">
           {msg.attachments && msg.attachments.length > 0 && (
-            <AttachmentsBlock attachments={msg.attachments} />
+            <div className="flex justify-end mb-2">
+              <AttachmentsBlock attachments={msg.attachments} />
+            </div>
           )}
           <div
-            className="text-sm leading-relaxed whitespace-pre-wrap"
+            className="whitespace-pre-wrap"
             style={{
-              padding: '11px 16px',
+              padding: '14px 20px',
               borderRadius: '20px 20px 4px 20px',
-              background: C.userBubble,
-              border: `1px solid ${C.userBubbleBorder}`,
+              background: 'rgba(255,255,255,0.55)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              border: '1px solid rgba(180,150,120,0.1)',
+              boxShadow: '0 2px 16px rgba(160,120,90,0.04)',
+              fontSize: 14.5,
+              lineHeight: 1.75,
               color: C.text,
-              boxShadow: '0 1px 6px rgba(180,160,130,0.08)',
               wordBreak: 'break-word',
               overflowWrap: 'anywhere',
             }}
           >
             {msg.content}
           </div>
-          <div className="flex gap-1.5 items-center mt-1.5">
+          <div className="flex items-center justify-end gap-2 mt-1.5 pr-1">
             {msg.silentRead && (
-              <span className="text-xs italic mr-1" style={{ color: C.textMuted, fontSize: 10 }}>已读</span>
+              <span style={{ fontSize: 10, color: C.textMuted, fontStyle: 'italic' }}>已读</span>
             )}
-            <button onClick={() => onCopy(msg.id, msg.content)} className="flex items-center justify-center transition-colors cursor-pointer p-1" style={{ color: isCopied ? C.success : C.btnDefault }} title="复制">
-              {isCopied ? <Check size={13} strokeWidth={2} /> : <Copy size={13} strokeWidth={1.8} />}
-            </button>
-            {msg.conversationId && (
-              <button onClick={() => onDelete(msg.conversationId!)} className="flex items-center justify-center transition-colors cursor-pointer p-1" style={{ color: C.btnDefault }} onMouseEnter={e => (e.currentTarget.style.color = C.btnDanger)} onMouseLeave={e => (e.currentTarget.style.color = C.btnDefault)} title="删除">
-                <Trash2 size={13} strokeWidth={1.8} />
+            <span style={{ fontSize: 11, color: C.textMuted }}>{formatMsgTime(msg.created_at)}</span>
+            <div className="room-msg-actions flex gap-1">
+              <button onClick={() => onCopy(msg.id, msg.content)} className="p-1 cursor-pointer transition-colors" style={{ color: isCopied ? C.success : C.btnDefault }} title="复制">
+                {isCopied ? <Check size={12} strokeWidth={2} /> : <Copy size={12} strokeWidth={1.8} />}
               </button>
-            )}
+              {msg.conversationId && (
+                <button onClick={() => onDelete(msg.conversationId!)} className="p-1 cursor-pointer transition-colors" style={{ color: C.btnDefault }} onMouseEnter={e => (e.currentTarget.style.color = C.btnDanger)} onMouseLeave={e => (e.currentTarget.style.color = C.btnDefault)} title="删除">
+                  <Trash2 size={12} strokeWidth={1.8} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
     )
   }
 
-  // AI 消息
+  // AI 消息：书页段落风格
   const isKeepalive = msg.source === 'keepalive'
   return (
-    <div className="flex gap-2.5 mb-7 msg-fade-in" style={isKeepalive ? { opacity: 0.75 } : undefined}>
-      <AiAvatar />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1.5">
-          <span className="text-sm font-semibold" style={{ color: C.text }}>Claude</span>
-          {isKeepalive && (
-            <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 6, background: `${C.accent}18`, color: C.accent, fontWeight: 600, letterSpacing: '0.04em' }}>自由时间</span>
-          )}
-          {modelLabel && !isKeepalive && (
-            <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 6, background: C.surface, color: C.textMuted, fontWeight: 600, letterSpacing: '0.04em' }}>{modelLabel}</span>
-          )}
-          <span className="text-xs" style={{ color: C.metaText }}>{formatMsgTime(msg.created_at)}</span>
-        </div>
-        {(msg.thinking || msg.thinking_summary) && (
-          <ThinkingBlock text={(msg.thinking ?? msg.thinking_summary)!} thinkingTime={msg.thinkingTime} />
+    <div className="room-msg-group mb-10 room-msg-enter" style={isKeepalive ? { opacity: 0.75 } : undefined}>
+      {/* Meta line */}
+      <div className="flex items-center gap-2 mb-3">
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.accent, opacity: 0.6, flexShrink: 0 }} />
+        <span style={{ fontFamily: "'EB Garamond', 'Noto Serif SC', serif", fontSize: 13, fontWeight: 500, color: C.accent, letterSpacing: '0.06em' }}>
+          Claude
+        </span>
+        {isKeepalive && (
+          <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 6, background: `${C.accent}18`, color: C.accent, fontWeight: 600, letterSpacing: '0.04em' }}>keepalive</span>
         )}
-        {msg.memoryRefs && msg.memoryRefs.length > 0 ? (
-          msg.memoryRefs.map((ref, i) => (
-            <MemoryRefBlock key={i} query={ref.query} found={ref.found} content={ref.content} />
-          ))
-        ) : msg.memoryRef ? (
-          <MemoryRefBlock query={msg.memoryRef.query} found={msg.memoryRef.found} content={msg.memoryRef.content} />
-        ) : null}
-        {msg.memoryOps && msg.memoryOps.length > 0 && (
-          <MemoryOpsBlock ops={msg.memoryOps} />
-        )}
-        <div style={{ fontSize: 15, color: C.text, lineHeight: 1.75 }}>
-          <MarkdownContent content={msg.content} />
-        </div>
-        {/* Action row */}
-        <div className="flex items-center justify-between mt-2.5" style={{ minHeight: 24 }}>
-          <span className="flex items-center gap-1 text-xs" style={{ color: C.metaText, fontSize: 11 }}>
-            {msg.tokens && (
-              <>
-                <span>{msg.tokens.input.toLocaleString()} tokens</span>
-                {(msg.tokens.cached ?? 0) > 0 && (
-                  <>
-                    <span style={{ margin: '0 2px' }}>·</span>
-                    <span style={{ color: C.accentWarm, fontWeight: 500 }}>✦ 缓存 {(msg.tokens.cached ?? 0).toLocaleString()}/{msg.tokens.input.toLocaleString()}</span>
-                  </>
-                )}
-              </>
-            )}
-          </span>
-          <div className="flex items-center gap-1.5">
-            {msg.debugInfo && (
-              <button onClick={onToggleDebug} className="flex items-center justify-center transition-colors cursor-pointer p-1" style={{ color: isDebugOpen ? C.accent : C.btnDefault }} onMouseEnter={e => (e.currentTarget.style.color = C.accent)} onMouseLeave={e => { if (!isDebugOpen) e.currentTarget.style.color = C.btnDefault }} title="上下文详情">
-                <Brain size={14} strokeWidth={1.8} />
-              </button>
-            )}
-            <button onClick={() => onCopy(msg.id, msg.content)} className="flex items-center justify-center transition-colors cursor-pointer p-1" style={{ color: isCopied ? C.success : C.btnDefault }} title="复制">
-              {isCopied ? <Check size={14} strokeWidth={2} /> : <Copy size={14} strokeWidth={1.8} />}
+        <span style={{ fontSize: 11, color: C.textMuted }}>{formatMsgTime(msg.created_at)}</span>
+      </div>
+
+      {/* Thinking — margin note style */}
+      {(msg.thinking || msg.thinking_summary) && (
+        <ThinkingBlock text={(msg.thinking ?? msg.thinking_summary)!} thinkingTime={msg.thinkingTime} />
+      )}
+
+      {/* Memory refs */}
+      {msg.memoryRefs && msg.memoryRefs.length > 0 ? (
+        msg.memoryRefs.map((ref, i) => (
+          <MemoryRefBlock key={i} query={ref.query} found={ref.found} content={ref.content} />
+        ))
+      ) : msg.memoryRef ? (
+        <MemoryRefBlock query={msg.memoryRef.query} found={msg.memoryRef.found} content={msg.memoryRef.content} />
+      ) : null}
+      {msg.memoryOps && msg.memoryOps.length > 0 && (
+        <MemoryOpsBlock ops={msg.memoryOps} />
+      )}
+
+      {/* Body — serif book paragraph */}
+      <div style={{
+        fontFamily: "'EB Garamond', 'Noto Serif SC', 'Cormorant Garamond', Georgia, serif",
+        fontSize: 16.5,
+        lineHeight: 2,
+        color: C.text,
+        letterSpacing: '0.01em',
+      }}>
+        <MarkdownContent content={msg.content} />
+      </div>
+
+      {/* Action row — only on hover */}
+      <div className="room-msg-actions flex items-center justify-between mt-2" style={{ minHeight: 20 }}>
+        <span className="flex items-center gap-1" style={{ fontSize: 11, color: C.metaText }}>
+          {msg.tokens && (
+            <>
+              <span>{msg.tokens.input.toLocaleString()} tokens</span>
+              {(msg.tokens.cached ?? 0) > 0 && (
+                <>
+                  <span style={{ margin: '0 2px' }}>·</span>
+                  <span style={{ color: C.accentWarm, fontWeight: 500 }}>cache {(msg.tokens.cached ?? 0).toLocaleString()}</span>
+                </>
+              )}
+            </>
+          )}
+        </span>
+        <div className="flex items-center gap-1">
+          {msg.debugInfo && (
+            <button onClick={onToggleDebug} className="p-1 cursor-pointer transition-colors" style={{ color: isDebugOpen ? C.accent : C.btnDefault }} title="上下文详情">
+              <Brain size={13} strokeWidth={1.8} />
             </button>
-            <button onClick={() => onRetry(msg.id)} className="flex items-center justify-center transition-colors cursor-pointer p-1" style={{ color: C.btnDefault }} onMouseEnter={e => (e.currentTarget.style.color = C.accent)} onMouseLeave={e => (e.currentTarget.style.color = C.btnDefault)} title="重发">
-              <RotateCcw size={14} strokeWidth={1.8} />
+          )}
+          <button onClick={() => onCopy(msg.id, msg.content)} className="p-1 cursor-pointer transition-colors" style={{ color: isCopied ? C.success : C.btnDefault }} title="复制">
+            {isCopied ? <Check size={13} strokeWidth={2} /> : <Copy size={13} strokeWidth={1.8} />}
+          </button>
+          <button onClick={() => onRetry(msg.id)} className="p-1 cursor-pointer transition-colors" style={{ color: C.btnDefault }} onMouseEnter={e => (e.currentTarget.style.color = C.accent)} onMouseLeave={e => (e.currentTarget.style.color = C.btnDefault)} title="重发">
+            <RotateCcw size={13} strokeWidth={1.8} />
+          </button>
+          {msg.conversationId && (
+            <button onClick={() => onDelete(msg.conversationId!)} className="p-1 cursor-pointer transition-colors" style={{ color: C.btnDefault }} onMouseEnter={e => (e.currentTarget.style.color = C.btnDanger)} onMouseLeave={e => (e.currentTarget.style.color = C.btnDefault)} title="删除">
+              <Trash2 size={13} strokeWidth={1.8} />
             </button>
-            {msg.conversationId && (
-              <button onClick={() => onDelete(msg.conversationId!)} className="flex items-center justify-center transition-colors cursor-pointer p-1" style={{ color: C.btnDefault }} onMouseEnter={e => (e.currentTarget.style.color = C.btnDanger)} onMouseLeave={e => (e.currentTarget.style.color = C.btnDefault)} title="删除">
-                <Trash2 size={14} strokeWidth={1.8} />
-              </button>
-            )}
-          </div>
+          )}
         </div>
-        {/* ContextDebugPanel is now shown as a sheet overlay from ChatPage */}
       </div>
     </div>
   )

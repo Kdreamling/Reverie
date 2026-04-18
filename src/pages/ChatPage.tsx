@@ -76,17 +76,29 @@ function WelcomeScreen() {
   const [greeting] = useState(() => WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)])
 
   return (
-    <div className="flex flex-col items-center justify-center flex-1 gap-4 select-none" style={{ paddingBottom: 80 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: C.accent, letterSpacing: '0.28em' }}>
+    <div className="flex flex-col items-center justify-center flex-1 gap-4 select-none" style={{ paddingBottom: 80, minHeight: '60vh' }}>
+      <div style={{
+        fontFamily: "'EB Garamond', 'Noto Serif SC', serif",
+        fontSize: 48,
+        fontWeight: 400,
+        letterSpacing: '0.2em',
+        color: C.accent,
+        opacity: 0.7,
+      }}>
         REVERIE
       </div>
-      <p
-        style={{
-          fontSize: 13,
-          color: C.textMuted,
-          fontStyle: 'italic',
-        }}
-      >
+      <div style={{ width: 1, height: 48, background: `linear-gradient(to bottom, ${C.accent}, transparent)`, opacity: 0.4 }} />
+      <p style={{
+        fontFamily: "'EB Garamond', 'Noto Serif SC', serif",
+        fontSize: 17,
+        fontStyle: 'italic',
+        color: C.textMuted,
+        fontWeight: 400,
+        letterSpacing: '0.03em',
+        lineHeight: 1.8,
+        maxWidth: 360,
+        textAlign: 'center',
+      }}>
         {greeting}
       </p>
     </div>
@@ -676,16 +688,20 @@ export default function ChatPage() {
   const showWelcome = !isStreaming && !isLoadingMessages && (!Array.isArray(messages) || messages.length === 0)
 
   return (
-    <div className="flex overflow-hidden" style={{ background: C.bg, height: '100%', overscrollBehavior: 'none' }}>
+    <div className="overflow-hidden" style={{ height: '100%', overscrollBehavior: 'none', position: 'relative' }}>
+
+      {/* ── Room atmosphere ── */}
+      <div className="room-bg" />
+      <div className="room-light" />
+      <div className="room-texture" />
 
       {/* ── Push notification banner ── */}
       <PushNotification onTap={() => {
-        // Navigate to today's session
         const todaySession = sessions.find(s => s.scene_type === 'daily')
         if (todaySession) selectSession(todaySession.id)
       }} />
 
-      {/* ── Sidebar overlay ── */}
+      {/* ── Mobile sidebar overlay ── */}
       {sidebarOpen && (
         <div
           onClick={() => setSidebarOpen(false)}
@@ -694,43 +710,38 @@ export default function ChatPage() {
             background: 'rgba(50,42,34,0.25)',
             backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)',
           }}
-          className="md:hidden"
         />
       )}
 
-      {/* ── Sidebar ── */}
+      {/* ── Mobile sidebar (drawer) ── */}
       <aside
-        className="fixed inset-y-0 left-0 z-210 flex flex-col flex-shrink-0 transition-transform duration-350 ease-out md:relative md:translate-x-0"
+        className="fixed inset-y-0 left-0 flex flex-col flex-shrink-0 transition-transform duration-350 ease-out"
         style={{
           width: '100%',
           maxWidth: 360,
           height: '100%',
-          background: C.sidebarBg,
+          background: 'rgba(248,244,238,0.95)',
+          backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
           color: C.text,
           transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
-          boxShadow: sidebarOpen ? '8px 0 40px rgba(100,80,50,0.1)' : 'none',
+          boxShadow: sidebarOpen ? '12px 0 60px rgba(0,0,0,0.04)' : 'none',
           zIndex: 210,
+          borderRight: `1px solid ${C.border}`,
         }}
       >
-        <style>{`
-          @media (min-width: 768px) {
-            aside { width: 260px !important; max-width: 260px !important; transform: translateX(0) !important; position: relative !important; }
-          }
-        `}</style>
-
         {/* Sidebar top */}
         <div className="px-5 py-4" style={{ paddingTop: 'calc(16px + env(safe-area-inset-top))' }}>
           <div className="flex items-center justify-between">
             <button
               onClick={() => setSidebarOpen(false)}
-              className="flex md:hidden items-center justify-center rounded-md cursor-pointer"
+              className="flex items-center justify-center rounded-md cursor-pointer"
               style={{ width: 32, height: 32, color: C.textSecondary }}
             >
               <X size={18} strokeWidth={2} />
             </button>
 
-            <span className="text-sm font-bold select-none" style={{ letterSpacing: '0.18em', color: C.accent }}>
-              REVERIE
+            <span style={{ fontFamily: "'EB Garamond', 'Noto Serif SC', serif", fontSize: 22, fontWeight: 400, color: C.accent, letterSpacing: '0.06em' }}>
+              Reverie
             </span>
 
             <button
@@ -759,7 +770,6 @@ export default function ChatPage() {
                     navigate('/bookshelf')
                   } else if (n.key === 'graph') {
                     setSidebarOpen(false)
-                    // TODO: navigate to graph page
                   } else if (n.key === 'scripts') {
                     setSidebarOpen(false)
                     navigate('/projects')
@@ -790,65 +800,46 @@ export default function ChatPage() {
 
         <div style={{ height: 1, background: C.border, margin: '0 18px' }} />
 
-        {/* Search — below nav tabs */}
+        {/* Search */}
         <div style={{ padding: '12px 14px 6px' }}>
-          <div className="flex items-center gap-2" style={{ padding: '7px 11px', borderRadius: 10, background: C.surface, border: `1px solid ${C.border}` }}>
+          <div className="flex items-center gap-2" style={{ padding: '7px 11px', borderRadius: 10, background: 'transparent', border: `1px solid ${C.border}` }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.textMuted} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
             <input placeholder="搜索..." className="flex-1 border-none outline-none bg-transparent" style={{ color: C.text, fontSize: 13 }} />
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto px-3 pt-2 pb-2" style={{ scrollbarWidth: 'none' }}>
           {loading && !sessions.length && (
-            <p className="px-3 py-4 text-sm" style={{ color: C.textMuted }}>
-              Loading…
-            </p>
+            <p className="px-3 py-4 text-sm" style={{ color: C.textMuted }}>Loading…</p>
           )}
           {GROUPS.map(({ key, label }) => {
             const items = sessions.filter(s => getGroup(s.created_at) === key && s.scene_type !== 'reading')
             if (!items.length) return null
             return (
               <div key={key} className="mb-2">
-                <div
-                  className="flex items-center gap-2 px-3 pt-3 pb-1.5 select-none"
-                  style={{ color: C.textMuted }}
-                >
-                  <span style={{ width: 14, height: 1, background: 'currentColor', opacity: 0.35, flexShrink: 0 }} />
-                  <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-                    {label}
-                  </span>
+                <div className="flex items-center gap-2 px-3 pt-3 pb-1.5 select-none" style={{ color: C.textMuted }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{label}</span>
                 </div>
                 {items.map(session => {
                   const isActive = session.id === currentSession?.id
                   const isHovered = session.id === hoveredId
                   const isSwiped = session.id === swipedId
                   return (
-                    <div
-                      key={session.id}
-                      className="relative mb-1 rounded-xl select-none"
-                      style={{ overflow: 'hidden' }}
-                    >
+                    <div key={session.id} className="relative mb-1 rounded-xl select-none" style={{ overflow: 'hidden' }}>
                       {isSwiped && (
-                        <div
-                          className="absolute right-0 top-0 bottom-0 flex"
-                          style={{ width: 130 }}
+                        <div className="absolute right-0 top-0 bottom-0 flex" style={{ width: 130 }}
                           onTouchStart={e => e.nativeEvent.stopImmediatePropagation()}
                           onTouchMove={e => e.nativeEvent.stopImmediatePropagation()}
-                          onTouchEnd={e => e.nativeEvent.stopImmediatePropagation()}
-                        >
-                          <button
-                            className="flex-1 flex items-center justify-center text-xs cursor-pointer"
+                          onTouchEnd={e => e.nativeEvent.stopImmediatePropagation()}>
+                          <button className="flex-1 flex items-center justify-center text-xs cursor-pointer"
                             style={{ background: C.surfaceSolid, color: C.textSecondary }}
                             onClick={e => { e.stopPropagation(); setSwipedId(null); setRenameModal({ id: session.id, title: session.title || '' }) }}
-                            onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); setSwipedId(null); setRenameModal({ id: session.id, title: session.title || '' }) }}
-                          >
+                            onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); setSwipedId(null); setRenameModal({ id: session.id, title: session.title || '' }) }}>
                             重命名
                           </button>
-                          <button
-                            className="flex-1 flex items-center justify-center text-xs cursor-pointer"
+                          <button className="flex-1 flex items-center justify-center text-xs cursor-pointer"
                             style={{ background: C.errorBg, color: C.errorText }}
                             onClick={e => { e.stopPropagation(); setSwipedId(null); if (window.confirm('确定要删除这个对话吗？')) deleteSession(session.id) }}
-                            onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); setSwipedId(null); if (window.confirm('确定要删除这个对话吗？')) deleteSession(session.id) }}
-                          >
+                            onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); setSwipedId(null); if (window.confirm('确定要删除这个对话吗？')) deleteSession(session.id) }}>
                             删除
                           </button>
                         </div>
@@ -856,11 +847,7 @@ export default function ChatPage() {
                       <button
                         onClick={() => {
                           if (isSwiped) { setSwipedId(null); return }
-                          if (session.scene_type === 'reading') {
-                            navigate(`/read/${session.id}`)
-                            setSidebarOpen(false)
-                            return
-                          }
+                          if (session.scene_type === 'reading') { navigate(`/read/${session.id}`); setSidebarOpen(false); return }
                           selectSession(session.id); setSidebarOpen(false)
                         }}
                         onMouseEnter={() => setHoveredId(session.id)}
@@ -868,23 +855,18 @@ export default function ChatPage() {
                         onTouchStart={e => { e.nativeEvent.stopImmediatePropagation(); handleItemTouchStart(e, session.id) }}
                         onTouchMove={e => { e.nativeEvent.stopImmediatePropagation(); handleItemTouchMove(e) }}
                         onTouchEnd={e => { e.nativeEvent.stopImmediatePropagation(); handleItemTouchEnd(e) }}
-                        className="relative w-full text-left rounded-xl px-4 py-3.5 transition-colors duration-150 cursor-pointer"
+                        className="relative w-full text-left rounded-xl px-4 py-3 transition-colors duration-150 cursor-pointer"
                         style={{
-                          background: isActive ? C.sidebarActive : isHovered ? 'rgba(160,120,90,0.04)' : 'transparent',
+                          background: isActive ? 'rgba(160,120,90,0.06)' : isHovered ? 'rgba(160,120,90,0.03)' : 'transparent',
+                          border: `1px solid ${isActive ? 'rgba(196,154,120,0.18)' : 'transparent'}`,
                           color: C.text,
                           transform: isSwiped ? 'translateX(-130px)' : 'translateX(0)',
                           transition: 'transform 0.25s ease',
-                        }}
-                      >
-                        {isActive && (
-                          <div style={{ position: 'absolute', left: 4, top: 10, bottom: 10, width: 2, borderRadius: 2, background: C.accent }} />
-                        )}
+                        }}>
                         <div className="flex items-start justify-between gap-3">
-                          <p
-                            className="text-sm leading-snug"
+                          <p className="text-sm leading-snug"
                             style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: isActive ? 600 : 400, color: C.text }}
-                            onDoubleClick={e => { e.stopPropagation(); setRenameModal({ id: session.id, title: session.title || '' }) }}
-                          >
+                            onDoubleClick={e => { e.stopPropagation(); setRenameModal({ id: session.id, title: session.title || '' }) }}>
                             {session.title || 'New Chat'}
                           </p>
                           <span className="flex-shrink-0" style={{ color: C.metaText, fontSize: 11 }}>
@@ -892,14 +874,12 @@ export default function ChatPage() {
                           </span>
                         </div>
                         {isHovered && (
-                          <span
-                            role="button"
+                          <span role="button"
                             onClick={e => { e.stopPropagation(); if (window.confirm('确定要删除这个对话吗？')) deleteSession(session.id) }}
-                            className="absolute right-2 top-1/2 hidden md:flex items-center justify-center rounded cursor-pointer"
+                            className="absolute right-2 top-1/2 flex items-center justify-center rounded cursor-pointer"
                             style={{ width: 18, height: 18, transform: 'translateY(-50%)', color: C.textMuted }}
                             onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = C.errorText)}
-                            onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = C.textMuted)}
-                          >
+                            onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = C.textMuted)}>
                             <X size={12} strokeWidth={2} />
                           </span>
                         )}
@@ -916,41 +896,19 @@ export default function ChatPage() {
         {renameModal && (
           <>
             <div className="fixed inset-0 z-50" style={{ background: 'rgba(50,42,34,0.5)' }} onClick={() => { setRenameModal(null); setSwipedId(null) }} onTouchStart={e => e.nativeEvent.stopImmediatePropagation()} onTouchEnd={e => { e.nativeEvent.stopImmediatePropagation(); e.preventDefault(); setRenameModal(null); setSwipedId(null) }} />
-            <div
-              className="fixed z-50 rounded-2xl shadow-xl"
-              onClick={e => e.stopPropagation()}
-              onTouchStart={e => e.nativeEvent.stopImmediatePropagation()}
-              onTouchMove={e => e.nativeEvent.stopImmediatePropagation()}
-              onTouchEnd={e => e.nativeEvent.stopImmediatePropagation()}
-              style={{
-                left: '50%', top: '40%', transform: 'translate(-50%, -50%)',
-                width: 280, background: C.bg,
-                border: `1px solid ${C.borderStrong}`, padding: '20px',
-              }}
-            >
+            <div className="fixed z-50 rounded-2xl shadow-xl" onClick={e => e.stopPropagation()}
+              onTouchStart={e => e.nativeEvent.stopImmediatePropagation()} onTouchMove={e => e.nativeEvent.stopImmediatePropagation()} onTouchEnd={e => e.nativeEvent.stopImmediatePropagation()}
+              style={{ left: '50%', top: '40%', transform: 'translate(-50%, -50%)', width: 280, background: C.bg, border: `1px solid ${C.borderStrong}`, padding: '20px' }}>
               <p className="text-sm mb-3 font-medium" style={{ color: C.text }}>重命名对话</p>
-              <input
-                autoFocus
-                value={renameModal.title}
-                onChange={e => setRenameModal({ ...renameModal, title: e.target.value })}
+              <input autoFocus value={renameModal.title} onChange={e => setRenameModal({ ...renameModal, title: e.target.value })}
                 onKeyDown={e => { if (e.key === 'Enter') doRename(); if (e.key === 'Escape') { setRenameModal(null); setSwipedId(null) } }}
-                placeholder="输入新名称…"
-                className="w-full text-sm outline-none rounded-xl px-3 py-2"
-                style={{ background: C.surface, color: C.text, border: `1px solid ${C.borderStrong}` }}
-              />
+                placeholder="输入新名称…" className="w-full text-sm outline-none rounded-xl px-3 py-2"
+                style={{ background: C.surface, color: C.text, border: `1px solid ${C.borderStrong}` }} />
               <div className="flex gap-2 mt-4 justify-end">
-                <button
-                  className="px-4 py-1.5 rounded-lg text-sm cursor-pointer"
-                  style={{ color: C.textSecondary, background: 'transparent' }}
-                  onClick={() => { setRenameModal(null); setSwipedId(null) }}
-                  onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); setRenameModal(null); setSwipedId(null) }}
-                >取消</button>
-                <button
-                  className="px-4 py-1.5 rounded-lg text-sm cursor-pointer"
-                  style={{ background: C.accent, color: '#fff' }}
-                  onClick={doRename}
-                  onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); doRename() }}
-                >确认</button>
+                <button className="px-4 py-1.5 rounded-lg text-sm cursor-pointer" style={{ color: C.textSecondary, background: 'transparent' }}
+                  onClick={() => { setRenameModal(null); setSwipedId(null) }}>取消</button>
+                <button className="px-4 py-1.5 rounded-lg text-sm cursor-pointer" style={{ background: C.accent, color: '#fff' }}
+                  onClick={doRename}>确认</button>
               </div>
             </div>
           </>
@@ -959,154 +917,108 @@ export default function ChatPage() {
         {/* Sidebar bottom */}
         <div style={{ borderTop: `1px solid ${C.border}`, paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <div className="flex items-center justify-between px-5 py-3">
-            <button
-              onClick={() => setShowSettings(true)}
+            <button onClick={() => setShowSettings(true)}
               className="flex items-center gap-2.5 text-sm transition-colors duration-150 cursor-pointer"
-              style={{ color: C.textSecondary }}
-            >
+              style={{ color: C.textSecondary }}>
               <Settings size={15} strokeWidth={1.6} />
               <span>设置</span>
             </button>
-            <span className="text-xs" style={{ color: C.metaText }}>v3.0</span>
+            <span className="text-xs" style={{ color: C.metaText }}>v4.0</span>
           </div>
         </div>
 
         {showSettings && (
-          <SettingsPanel
-            page={settingsPage}
-            onPageChange={setSettingsPage}
-            onClose={() => { setShowSettings(false); setSettingsPage('menu') }}
-          />
+          <SettingsPanel page={settingsPage} onPageChange={setSettingsPage} onClose={() => { setShowSettings(false); setSettingsPage('menu') }} />
         )}
       </aside>
 
-      {/* ── Chat area ── */}
-      <div className="flex flex-col flex-1 min-w-0 h-full" style={{ background: C.bgGradient }}>
+      {/* ── Main chat area (full-screen room) ── */}
+      <div className="flex flex-col flex-1 min-w-0 h-full" style={{ position: 'relative', zIndex: 10 }}>
 
-        {/* Top bar */}
-        <header
-          className="chat-header flex items-center justify-between flex-shrink-0 px-3.5"
-          style={{
-            height: 54,
-            paddingTop: 'env(safe-area-inset-top)',
-            background: C.glass,
-            backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
-            borderBottom: `1px solid ${C.border}`,
-            position: 'relative',
-            zIndex: 30,
-          }}
-        >
-          {fromCalendar ? (
+        {/* Floating header — minimal */}
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 30, pointerEvents: 'none', paddingTop: 'env(safe-area-inset-top)' }}>
+          <div className="flex items-center justify-between px-4 py-3" style={{ pointerEvents: 'auto' }}>
+            {/* Left: menu button (mobile) / sidebar trigger (pc) */}
             <button
-              className="flex items-center justify-center rounded-md cursor-pointer"
-              style={{ width: 32, height: 32, color: C.textSecondary, padding: 6, background: 'none', border: 'none', fontSize: 18 }}
-              onClick={() => navigate('/calendar')}
+              className="flex items-center justify-center rounded-xl cursor-pointer transition-all"
+              style={{ width: 36, height: 36, color: C.textMuted, background: 'transparent', border: 'none' }}
+              onClick={() => setSidebarOpen(true)}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248,244,238,0.8)'; e.currentTarget.style.color = C.accent }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.textMuted }}
             >
-              ←
-            </button>
-          ) : (
-            <button
-              className="flex md:hidden items-center justify-center rounded-md cursor-pointer"
-              style={{ width: 32, height: 32, color: C.textSecondary, padding: 6 }}
-              onClick={() => { setSidebarOpen(true) }}
-            >
-              <Menu size={20} strokeWidth={1.8} />
-            </button>
-          )}
-          <div className="hidden md:block" style={{ width: 32 }} />
-
-          {/* Center: model selector */}
-          <div className="relative" ref={modelDropdownRef}>
-            <button
-              onClick={() => setShowModelDropdown(o => !o)}
-              className="flex items-center gap-2 px-4 py-1.5 rounded-full cursor-pointer transition-all duration-200"
-              style={{
-                background: showModelDropdown ? C.surface : 'transparent',
-                border: `1px solid ${showModelDropdown ? C.borderStrong : 'transparent'}`,
-              }}
-            >
-              <span
-                className="rounded-full flex-shrink-0"
-                style={{ width: 6, height: 6, background: getModelColor(models.find(m => m.name === model || m.value === model)?.value ?? model), boxShadow: `0 0 6px ${getModelColor(models.find(m => m.name === model || m.value === model)?.value ?? model)}40` }}
-              />
-              <span className="text-sm font-semibold" style={{ color: C.text }}>
-                {models.find(m => m.name === model || m.value === model)?.label ?? model}
-              </span>
-              <span style={{ display: 'inline-flex', transform: showModelDropdown ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.25s', color: C.textMuted }}>
-                <ChevronDown size={12} strokeWidth={2.5} />
-              </span>
+              <Menu size={18} strokeWidth={1.5} />
             </button>
 
-            {showModelDropdown && (
-              <div
-                className="absolute top-12 left-1/2 rounded-2xl overflow-hidden"
+            {/* Center: model tag — barely visible */}
+            <div className="relative" ref={modelDropdownRef}>
+              <button
+                onClick={() => setShowModelDropdown(o => !o)}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full cursor-pointer transition-all"
                 style={{
-                  transform: 'translateX(-50%)',
-                  minWidth: 260,
-                  background: 'rgba(255,252,248,0.72)',
-                  backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
                   border: `1px solid ${C.border}`,
-                  boxShadow: '0 12px 48px rgba(100,80,50,0.14)',
-                  zIndex: 51,
+                  background: showModelDropdown ? 'rgba(248,244,238,0.92)' : 'rgba(248,244,238,0.6)',
+                  backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+                  fontSize: 11.5, color: C.textMuted,
+                  opacity: showModelDropdown ? 1 : 0.7,
                 }}
+                onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.borderColor = 'rgba(180,150,120,0.2)' }}
+                onMouseLeave={e => { if (!showModelDropdown) { e.currentTarget.style.opacity = '0.7'; e.currentTarget.style.borderColor = C.border } }}
               >
-                <div style={{ padding: '12px 14px 6px', fontSize: 11, color: C.textMuted, fontWeight: 600, letterSpacing: '0.05em' }}>选择模型</div>
-                {models.map(m => {
-                  const isActive = m.name === model || m.value === model
-                  return (
-                    <div
-                      key={m.name}
-                      onClick={() => { handleModelChange(m.name); setShowModelDropdown(false) }}
-                      className="flex items-center gap-3 cursor-pointer transition-colors"
-                      style={{
-                        padding: '12px 14px',
-                        background: isActive ? C.sidebarActive : 'transparent',
-                      }}
-                      onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(160,120,90,0.04)' }}
-                      onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
-                    >
-                      <span
-                        className="rounded-full flex-shrink-0"
-                        style={{ width: 8, height: 8, background: getModelColor(m.value), boxShadow: isActive ? `0 0 8px ${getModelColor(m.value)}60` : 'none' }}
-                      />
-                      <span className="text-sm" style={{ fontWeight: isActive ? 700 : 500, color: isActive ? C.text : C.textSecondary }}>
-                        {m.label}
-                      </span>
-                      {isActive && (
-                        <span style={{ marginLeft: 'auto', color: C.accent }}>
-                          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-                        </span>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.accent }} />
+                {models.find(m => m.name === model || m.value === model)?.label ?? model}
+                <ChevronDown size={10} strokeWidth={2.5} style={{ transform: showModelDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.25s' }} />
+              </button>
+
+              {showModelDropdown && (
+                <div className="absolute top-10 left-1/2 rounded-2xl overflow-hidden"
+                  style={{
+                    transform: 'translateX(-50%)', minWidth: 260,
+                    background: 'rgba(248,244,238,0.95)',
+                    backdropFilter: 'blur(30px)', WebkitBackdropFilter: 'blur(30px)',
+                    border: `1px solid ${C.border}`,
+                    boxShadow: '0 12px 48px rgba(100,80,50,0.1)', zIndex: 51,
+                  }}>
+                  {models.map(m => {
+                    const isActive = m.name === model || m.value === model
+                    return (
+                      <div key={m.name}
+                        onClick={() => { handleModelChange(m.name); setShowModelDropdown(false) }}
+                        className="flex items-center gap-3 cursor-pointer transition-colors"
+                        style={{ padding: '12px 14px', background: isActive ? 'rgba(160,120,90,0.06)' : 'transparent' }}
+                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(160,120,90,0.04)' }}
+                        onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: getModelColor(m.value) }} />
+                        <span className="text-sm" style={{ fontWeight: isActive ? 600 : 400, color: isActive ? C.text : C.textSecondary }}>{m.label}</span>
+                        {isActive && <span style={{ marginLeft: 'auto', color: C.accent }}>
+                          <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                        </span>}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Right: new chat */}
+            <button
+              onClick={() => { if (!isLockedByChen) handleCreateWithScene(currentSession?.scene_type || 'daily') }}
+              className="flex items-center justify-center rounded-xl cursor-pointer transition-all"
+              style={{ width: 36, height: 36, color: C.textMuted, background: 'transparent', border: 'none', opacity: isLockedByChen ? 0.3 : 1 }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248,244,238,0.8)'; e.currentTarget.style.color = C.accent }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.textMuted }}
+            >
+              <Plus size={17} strokeWidth={1.5} />
+            </button>
           </div>
+        </div>
 
-          {/* Right: new chat */}
-          <button
-            onClick={() => {
-              if (isLockedByChen) return
-              const scene = currentSession?.scene_type || 'daily'
-              handleCreateWithScene(scene)
-            }}
-            className="flex items-center justify-center rounded-md cursor-pointer transition-colors"
-            style={{ width: 32, height: 32, color: C.textSecondary, padding: 6, opacity: isLockedByChen ? 0.3 : 1, cursor: isLockedByChen ? 'not-allowed' : 'pointer' }}
-            onMouseEnter={e => { if (!isLockedByChen) e.currentTarget.style.color = C.text }}
-            onMouseLeave={e => (e.currentTarget.style.color = C.textSecondary)}
-            title={isLockedByChen ? "Locked" : "New chat"}
-          >
-            <Plus size={18} strokeWidth={2} />
-          </button>
-        </header>
-
-        {/* Messages */}
-        <main ref={mainRef} className="flex-1 overflow-y-auto flex flex-col" style={{ WebkitOverflowScrolling: 'touch' }}>
+        {/* Messages — full room scroll */}
+        <main ref={mainRef} className="flex-1 overflow-y-auto flex flex-col" style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
+          <style>{`.main-scroll::-webkit-scrollbar { width: 0; }`}</style>
           {showWelcome ? (
           <WelcomeScreen />
           ) : (
-            <div className="mx-auto w-full px-4 md:px-6 pt-5" style={{ maxWidth: 720, paddingBottom: 16 }}>
+            <div className="mx-auto w-full relative conv-spine" style={{ maxWidth: 760, padding: '80px 60px 280px 60px' }}>
 
               {/* Completed messages + inline event bubbles */}
               {Array.isArray(messages) && messages.map((msg, idx) => {
@@ -1203,14 +1115,16 @@ export default function ChatPage() {
 
         </main>
 
-        {/* Input area — outside main, always at bottom */}
-        <div className="flex-shrink-0" style={{
-            background: C.glass,
-            backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
-            borderTop: `1px solid ${C.border}`,
-            paddingBottom: 'max(10px, env(safe-area-inset-bottom))',
+        {/* Input fade overlay */}
+        <div className="input-fade-overlay" />
+
+        {/* Input area — floating paper */}
+        <div style={{
+            position: 'fixed', bottom: 48, left: '50%', transform: 'translateX(-50%)',
+            width: 580, maxWidth: 'calc(100% - 40px)',
+            zIndex: 50,
           }}>
-            <div className="mx-auto px-4 md:px-6 py-2 relative" style={{ maxWidth: 720 }}>
+            <div className="relative">
               {/* Hidden file input */}
               <input
                 ref={fileInputRef}
@@ -1223,15 +1137,24 @@ export default function ChatPage() {
 
               {/* 敲门弹窗已移至最外层 */}
 
-              {/* Dream lock toggle */}
-              <div className="flex items-center justify-end mb-1">
+              {/* Dream lock toggle — minimal, room-style */}
+              <div className="flex items-center justify-end mb-1.5">
                 <button
                   onClick={handleToggleDreamLock}
-                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 transition-all cursor-pointer"
                   style={{
-                    color: dreamLockedChen ? '#e53935' : C.textMuted,
-                    background: dreamLockedChen ? 'rgba(229,57,53,0.08)' : 'transparent',
+                    padding: '4px 12px',
+                    borderRadius: 16,
+                    border: `1px solid ${dreamLockedChen ? 'rgba(229,57,53,0.15)' : 'rgba(180,150,120,0.1)'}`,
+                    background: 'transparent',
+                    fontFamily: "'EB Garamond', 'Noto Serif SC', serif",
+                    fontSize: 11,
+                    letterSpacing: '0.04em',
+                    color: dreamLockedChen ? 'rgba(229,57,53,0.7)' : C.textMuted,
+                    opacity: 0.6,
                   }}
+                  onMouseEnter={e => { e.currentTarget.style.opacity = '1' }}
+                  onMouseLeave={e => { e.currentTarget.style.opacity = '0.6' }}
                   title={dreamLockedChen ? '打开门（解除封锁）' : '关上门（封锁 Claude 2小时）'}
                 >
                   <span>{dreamLockedChen ? '开门' : '关门'}</span>
@@ -1286,13 +1209,17 @@ export default function ChatPage() {
 
               <div ref={plusMenuRef}>
               <div
-                className="flex items-end gap-2.5 px-3.5 py-2.5 transition-all duration-300"
+                className="flex items-end gap-3 px-4 py-3 transition-all duration-400"
                 style={{
-                  borderRadius: showPlusMenu ? '22px 22px 0 0' : (isFocused ? 22 : 26),
-                  background: C.inputBg,
-                  border: `1px solid ${isFocused || showPlusMenu ? C.borderStrong : C.border}`,
+                  borderRadius: showPlusMenu ? '24px 24px 0 0' : 24,
+                  background: 'rgba(248,244,238,0.92)',
+                  backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
+                  border: `1px solid ${isFocused ? 'rgba(196,154,120,0.25)' : 'rgba(180,150,120,0.1)'}`,
                   borderBottom: showPlusMenu ? 'none' : undefined,
-                  boxShadow: isFocused ? '0 4px 24px rgba(160,120,90,0.08)' : 'none',
+                  boxShadow: isFocused
+                    ? '0 8px 48px rgba(160,120,90,0.1), 0 0 0 4px rgba(196,154,120,0.06)'
+                    : '0 4px 32px rgba(160,120,90,0.06)',
+                  transform: isFocused ? 'translateY(-2px)' : 'none',
                   opacity: isLockedByChen ? 0.35 : undefined,
                   pointerEvents: isLockedByChen ? 'none' : undefined,
                 }}

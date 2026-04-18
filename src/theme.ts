@@ -30,6 +30,16 @@ export const C = {
 
   // 毛玻璃
   glass: 'rgba(253,250,246,0.75)',
+  glassStrong: 'rgba(248, 244, 238, 0.92)',
+
+  // 房间
+  roomBg: '#F8F4EE',
+  roomBgDeep: '#EDE6DA',
+  warmGlow: 'rgba(196, 154, 120, 0.08)',
+  warmGlowStrong: 'rgba(196, 154, 120, 0.18)',
+
+  // 淡色文字
+  textFaint: '#C0B0A0',
 
   // 功能色块
   thinkingBg: 'rgba(160,120,90,0.05)',
@@ -62,6 +72,7 @@ export const C = {
 } as const
 
 export const FONT = "'Instrument Sans', 'SF Pro Display', -apple-system, sans-serif"
+export const SERIF = "'EB Garamond', 'Noto Serif SC', 'Cormorant Garamond', Georgia, serif"
 
 // 模型颜色
 export function getModelColor(value: string): string {

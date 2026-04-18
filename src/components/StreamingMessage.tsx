@@ -115,6 +115,8 @@ function StreamingTextBlock({ text }: { text: string }) {
   )
 }
 
+const ROOM_FONT = "'EB Garamond', 'Noto Serif SC', 'Cormorant Garamond', Georgia, serif"
+
 // ─── Live thinking block with elapsed timer
 
 function LiveThinkingBlock({ text, startTime, elapsed }: { text: string; startTime: number; elapsed: number | null }) {
@@ -124,20 +126,15 @@ function LiveThinkingBlock({ text, startTime, elapsed }: { text: string; startTi
   const displayTime = elapsed ?? liveElapsed
 
   return (
-    <div className="mb-3 rounded-xl overflow-hidden" style={{ background: C.thinkingBg, border: `1px solid ${C.border}` }}>
-      <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer" style={{ color: C.textMuted }}>
-        {isActive ? <span className="tool-spinner" /> : <span style={{ fontSize: 11 }}>✦</span>}
-        <span className="text-xs font-medium">
-          思考中
-          {displayTime != null && displayTime > 0 && <span style={{ marginLeft: 4 }}>({formatElapsed(displayTime)})</span>}
-        </span>
-        {open ? <ChevronDown size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} />}
-      </button>
-      {open && (
-        <p className="px-3.5 pb-2.5 text-xs leading-relaxed whitespace-pre-wrap" style={{ color: C.textSecondary, fontStyle: 'italic' }}>
-          {text}
-        </p>
-      )}
+    <div className="mb-3 cursor-pointer" onClick={() => setOpen(o => !o)}
+      style={{ padding: '10px 16px', borderLeft: '2px solid rgba(196,154,120,0.25)', fontFamily: ROOM_FONT, fontSize: 12, color: C.textMuted, lineHeight: 1.6 }}>
+      <div className="flex items-center gap-2" style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase' as const, marginBottom: open ? 6 : 0 }}>
+        {isActive ? <span className="tool-spinner" style={{ width: 10, height: 10 }} /> :
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(196,154,120,0.5)" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>}
+        thinking{displayTime != null && displayTime > 0 ? ` · ${formatElapsed(displayTime)}` : ''}
+        {open ? <ChevronDown size={9} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={9} strokeWidth={2} style={{ marginLeft: 'auto' }} />}
+      </div>
+      {open && <p className="whitespace-pre-wrap" style={{ fontStyle: 'italic', fontFamily: ROOM_FONT, fontSize: 12, lineHeight: 1.7, color: C.textSecondary }}>{text}</p>}
     </div>
   )
 }
@@ -147,14 +144,11 @@ function LiveThinkingBlock({ text, startTime, elapsed }: { text: string; startTi
 function LiveToolSearchBlock({ query, startTime }: { query: string; startTime: number }) {
   const liveElapsed = useElapsedTimer(startTime)
   return (
-    <div className="mb-3 rounded-xl overflow-hidden" style={{ background: C.toolBg, border: `1px solid ${C.border}` }}>
-      <div className="flex items-center gap-2 px-3.5 py-2.5" style={{ color: C.textSecondary }}>
-        <span className="tool-spinner" />
-        <span className="text-xs font-medium">
-          {query || '工具调用'}
-          <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(liveElapsed)})</span>
-        </span>
-      </div>
+    <div className="mb-3" style={{ padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 20, border: '1px dashed rgba(196,154,120,0.25)', background: 'rgba(196,154,120,0.04)' }}>
+      <span className="tool-spinner" style={{ width: 10, height: 10 }} />
+      <span style={{ fontSize: 11, color: C.textSecondary, fontFamily: ROOM_FONT }}>
+        {query || 'searching'} <span style={{ color: C.textMuted }}>({formatElapsed(liveElapsed)})</span>
+      </span>
     </div>
   )
 }
@@ -164,20 +158,17 @@ function LiveToolSearchBlock({ query, startTime }: { query: string; startTime: n
 function ToolResultBlock({ query, found, content, elapsed }: { query: string; found: number; content: string; elapsed: number | null }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="mb-3 rounded-xl overflow-hidden" style={{ background: C.toolBg, border: `1px solid ${C.border}` }}>
-      <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer" style={{ color: C.textSecondary }}>
-        <span style={{ fontSize: 11 }}>◎</span>
-        <span className="text-xs font-medium">
-          {query || '工具调用'} · found {found}
+    <div className="mb-3 cursor-pointer" onClick={() => setOpen(o => !o)}
+      style={{ display: 'inline-flex', flexDirection: 'column' as const, padding: '8px 14px', borderRadius: 20, border: '1px dashed rgba(196,154,120,0.25)', background: 'rgba(196,154,120,0.04)' }}>
+      <div className="flex items-center gap-2">
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.accent, opacity: 0.5 }} />
+        <span style={{ fontSize: 11, color: C.textSecondary, fontFamily: ROOM_FONT }}>
+          {query || 'search'} · {found} found
           {elapsed != null && <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
         </span>
-        {open ? <ChevronDown size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={12} strokeWidth={2} style={{ marginLeft: 'auto' }} />}
-      </button>
-      {open && content && (
-        <p className="px-3.5 pb-2.5 text-xs leading-relaxed whitespace-pre-wrap" style={{ color: C.textMuted }}>
-          {content || '（无内容）'}
-        </p>
-      )}
+        {open ? <ChevronDown size={9} strokeWidth={2} style={{ color: C.textMuted }} /> : <ChevronRight size={9} strokeWidth={2} style={{ color: C.textMuted }} />}
+      </div>
+      {open && content && <p className="text-xs leading-relaxed whitespace-pre-wrap mt-2" style={{ color: C.textMuted, fontFamily: ROOM_FONT }}>{content}</p>}
     </div>
   )
 }
@@ -186,14 +177,12 @@ function ToolResultBlock({ query, found, content, elapsed }: { query: string; fo
 
 function MemoryOpBlock({ op, elapsed }: { op: MemoryOperation; elapsed: number | null }) {
   return (
-    <div className="mb-3 rounded-xl overflow-hidden" style={{ background: C.toolBg, border: `1px solid ${C.border}` }}>
-      <div className="flex items-center gap-2 px-3.5 py-2.5" style={{ color: C.textSecondary }}>
-        <span style={{ fontSize: 11 }}>{op.type === 'saved' ? '◉' : op.type === 'updated' ? '◎' : '⊗'}</span>
-        <span className="text-xs font-medium">
-          Memory {op.type}
-          {elapsed != null && <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
-        </span>
-      </div>
+    <div className="mb-3" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 20, border: '1px dashed rgba(196,154,120,0.2)', background: 'rgba(196,154,120,0.03)' }}>
+      <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.accent, opacity: 0.4 }} />
+      <span style={{ fontSize: 11, color: C.textSecondary, fontFamily: ROOM_FONT }}>
+        memory {op.type}
+        {elapsed != null && <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
+      </span>
     </div>
   )
 }
@@ -250,12 +239,21 @@ export default function StreamingMessage() {
   if (!isStreaming || streamBlocks.length === 0) return null
 
   return (
-    <div className="flex gap-2.5 mb-8">
-      <AiAvatar />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1.5">
-          <span className="text-sm font-semibold" style={{ color: C.text }}>Claude</span>
-        </div>
+    <div className="mb-10 room-msg-enter">
+      {/* Meta line */}
+      <div className="flex items-center gap-2 mb-3">
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.accent, opacity: 0.6, flexShrink: 0 }} />
+        <span style={{ fontFamily: "'EB Garamond', 'Noto Serif SC', serif", fontSize: 13, fontWeight: 500, color: C.accent, letterSpacing: '0.06em' }}>
+          Claude
+        </span>
+      </div>
+      <div style={{
+        fontFamily: "'EB Garamond', 'Noto Serif SC', 'Cormorant Garamond', Georgia, serif",
+        fontSize: 16.5,
+        lineHeight: 2,
+        color: C.text,
+        letterSpacing: '0.01em',
+      }}>
         {streamBlocks.map((block, i) => (
           <StreamBlockRenderer key={`sb-${i}`} block={block} />
         ))}
