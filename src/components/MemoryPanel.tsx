@@ -8,14 +8,12 @@ const LAYER_FILTERS = [
   { key: 'all', label: '全部', color: C.textSecondary },
   { key: 'core_base', label: '基石', color: '#C49A78' },
   { key: 'core_living', label: '活水', color: '#7A9A8A' },
-  { key: 'scene', label: '场景', color: '#9A8A7A' },
   { key: 'ai_journal', label: '日记', color: '#8A7A6A' },
 ]
 
 const LAYER_OPTIONS = [
   { key: 'core_base', label: '基石' },
   { key: 'core_living', label: '活水' },
-  { key: 'scene', label: '场景' },
 ]
 
 const LAYER_COLORS: Record<string, string> = {
@@ -184,7 +182,7 @@ function MemorySheet({
 // ─── Main Panel ──────────────────────────────────────────────────────────────
 
 // Internal layers that shouldn't appear in the user-facing memory editor
-const HIDDEN_LAYERS = new Set(['conversation_snapshot'])
+const HIDDEN_LAYERS = new Set(['conversation_snapshot', 'scene'])
 const PAGE_SIZE = 80
 
 export default function MemoryPanel({ onBack }: Props) {
