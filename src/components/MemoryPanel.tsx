@@ -183,25 +183,33 @@ function MemorySheet({
 
 // ─── Main Panel ──────────────────────────────────────────────────────────────
 
+// Internal layers that shouldn't appear in the user-facing memory editor
+const HIDDEN_LAYERS = new Set(['conversation_snapshot'])
+const PAGE_SIZE = 80
+
 export default function MemoryPanel({ onBack }: Props) {
   const [memories, setMemories] = useState<Memory[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
   // Sheet state
   const [sheetMode, setSheetMode] = useState<'add' | 'edit' | null>(null)
   const [sheetMemory, setSheetMemory] = useState<Memory | undefined>()
 
-  useEffect(() => { loadMemories() }, [filter])
+  useEffect(() => { loadMemories(); setVisibleCount(PAGE_SIZE) }, [filter])
+  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [searchQuery])
 
   async function loadMemories() {
     setLoading(true)
     try {
       const layer = filter === 'all' ? undefined : filter
       const data = await fetchMemoriesAPI(layer)
-      setMemories(data)
+      // Strip internal layers (conversation_snapshot etc.) and rows with empty content
+      const cleaned = (data || []).filter(m => m && m.content && !HIDDEN_LAYERS.has(m.layer))
+      setMemories(cleaned)
     } catch (err) {
       console.error('Failed to load memories:', err)
     } finally {
@@ -244,10 +252,12 @@ export default function MemoryPanel({ onBack }: Props) {
 
   const layerColor = (layer: string) => LAYER_COLORS[layer] || C.textSecondary
 
-  // Simple client-side search filter
+  // Simple client-side search filter — guard against null content
   const filtered = searchQuery.trim()
-    ? memories.filter(m => m.content.toLowerCase().includes(searchQuery.toLowerCase()))
+    ? memories.filter(m => (m.content || '').toLowerCase().includes(searchQuery.toLowerCase()))
     : memories
+  const visible = filtered.slice(0, visibleCount)
+  const hasMore = filtered.length > visibleCount
 
   return (
     <div className="flex flex-col h-full" style={{ background: C.bg, color: C.text }}>
@@ -339,12 +349,13 @@ export default function MemoryPanel({ onBack }: Props) {
             {searchQuery ? '没有匹配的记忆' : '暂无记忆'}
           </p>
         ) : (
-          filtered.map(mem => {
+          visible.map(mem => {
             const hasWeight = (mem.ai_weight ?? 0) > 0
             const isExpanded = expandedId === mem.id
             const lc = layerColor(mem.layer)
-            const contentLines = mem.content.split('\n')
-            const isLong = mem.content.length > 120 || contentLines.length > 3
+            const safeContent = mem.content || ''
+            const contentLines = safeContent.split('\n')
+            const isLong = safeContent.length > 120 || contentLines.length > 3
 
             return (
               <div
@@ -398,7 +409,7 @@ export default function MemoryPanel({ onBack }: Props) {
                         } : {}),
                       }}
                     >
-                      {mem.content}
+                      {safeContent}
                     </p>
                     {isLong && !isExpanded && (
                       <span className="text-xs" style={{ color: C.accent }}>展开</span>
@@ -443,6 +454,17 @@ export default function MemoryPanel({ onBack }: Props) {
               </div>
             )
           })
+        )}
+        {hasMore && !loading && (
+          <div className="flex justify-center py-4">
+            <button
+              onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+              className="px-4 py-2 rounded-full text-xs cursor-pointer transition-colors"
+              style={{ color: C.textSecondary, background: C.surface, border: `1px solid ${C.border}` }}
+            >
+              加载更多 ({filtered.length - visibleCount} 条)
+            </button>
+          </div>
         )}
       </div>
 

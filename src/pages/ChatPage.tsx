@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
-import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square, MapPin, Image } from 'lucide-react'
+import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square, MapPin, Image, DoorClosed, DoorOpen } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
@@ -951,6 +951,9 @@ export default function ChatPage() {
       {/* ── Main chat area (full-screen room) ── */}
       <div className="flex flex-col flex-1 min-w-0 h-full" style={{ position: 'relative', zIndex: 10 }}>
 
+        {/* Header fade overlay — keeps nav buttons readable when messages scroll underneath */}
+        <div className="header-fade-overlay" />
+
         {/* Floating header — minimal */}
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 30, pointerEvents: 'none', paddingTop: 'env(safe-area-inset-top)' }}>
           <div className="flex items-center justify-between px-4 py-3" style={{ pointerEvents: 'auto' }}>
@@ -988,25 +991,42 @@ export default function ChatPage() {
               {showModelDropdown && (
                 <div className="absolute top-10 left-1/2 rounded-2xl overflow-hidden"
                   style={{
-                    transform: 'translateX(-50%)', minWidth: 260,
-                    background: isNight ? 'rgba(23,20,17,0.95)' : 'rgba(248,244,238,0.95)',
-                    backdropFilter: 'blur(30px)', WebkitBackdropFilter: 'blur(30px)',
-                    border: `1px solid ${nBorder}`,
-                    boxShadow: '0 12px 48px rgba(100,80,50,0.1)', zIndex: 51,
+                    transform: 'translateX(-50%)', minWidth: 240,
+                    background: isNight ? 'rgba(23,20,17,0.55)' : 'rgba(255,255,255,0.55)',
+                    backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
+                    border: `1px solid ${isNight ? 'rgba(180,150,120,0.08)' : 'rgba(180,150,120,0.12)'}`,
+                    boxShadow: isNight ? '0 12px 48px rgba(0,0,0,0.35)' : '0 12px 48px rgba(160,120,90,0.08)',
+                    padding: '6px',
+                    zIndex: 51,
                   }}>
                   {models.map(m => {
                     const isActive = m.name === model || m.value === model
                     return (
                       <div key={m.name}
                         onClick={() => { handleModelChange(m.name); setShowModelDropdown(false) }}
-                        className="flex items-center gap-3 cursor-pointer transition-colors"
-                        style={{ padding: '12px 14px', background: isActive ? 'rgba(160,120,90,0.06)' : 'transparent' }}
-                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(160,120,90,0.04)' }}
+                        className="flex items-center gap-2.5 cursor-pointer transition-colors rounded-xl"
+                        style={{
+                          padding: '10px 12px',
+                          background: isActive
+                            ? (isNight ? 'rgba(212,174,138,0.08)' : 'rgba(160,120,90,0.06)')
+                            : 'transparent',
+                        }}
+                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = isNight ? 'rgba(212,174,138,0.04)' : 'rgba(160,120,90,0.035)' }}
                         onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: getModelColor(m.value) }} />
-                        <span className="text-sm" style={{ fontWeight: isActive ? 600 : 400, color: isActive ? C.text : C.textSecondary }}>{m.label}</span>
-                        {isActive && <span style={{ marginLeft: 'auto', color: C.accent }}>
-                          <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                        <span style={{
+                          width: 6, height: 6, borderRadius: '50%',
+                          background: getModelColor(m.value),
+                          opacity: isActive ? 1 : 0.5,
+                          flexShrink: 0,
+                        }} />
+                        <span style={{
+                          fontSize: 13,
+                          fontWeight: isActive ? 500 : 400,
+                          letterSpacing: '0.01em',
+                          color: isActive ? nText : (isNight ? 'rgba(224,213,200,0.7)' : C.textSecondary),
+                        }}>{m.label}</span>
+                        {isActive && <span style={{ marginLeft: 'auto', color: nAccent, opacity: 0.7 }}>
+                          <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
                         </span>}
                       </div>
                     )
@@ -1034,12 +1054,12 @@ export default function ChatPage() {
           {showWelcome ? (
           <WelcomeScreen />
           ) : (
-            <div className="mx-auto w-full relative conv-spine" style={{ maxWidth: 760, padding: 'clamp(56px, 9vw, 80px) clamp(16px, 4.5vw, 60px) clamp(140px, 28vw, 220px) clamp(16px, 4.5vw, 60px)' }}>
+            <div className="mx-auto w-full relative conv-spine" style={{ maxWidth: 680, padding: 'clamp(56px, 9vw, 80px) clamp(28px, 7vw, 56px) clamp(140px, 28vw, 220px) clamp(28px, 7vw, 56px)' }}>
 
-              {/* Completed messages + inline event bubbles */}
+              {/* Completed messages — event bubbles hidden on frontend per Dream, backend still sees them */}
               {Array.isArray(messages) && messages.map((msg, idx) => {
                 if (msg.role === 'event') {
-                  return <EventBubble key={msg.id} content={msg.content} createdAt={msg.created_at} />
+                  return null
                 }
                 // Mark user messages as "seen" if there's an assistant reply after them
                 const hasReply = msg.role === 'user' && messages.slice(idx + 1).some(m => m.role === 'assistant')
@@ -1152,30 +1172,6 @@ export default function ChatPage() {
               />
 
               {/* 敲门弹窗已移至最外层 */}
-
-              {/* Dream lock toggle — minimal, room-style */}
-              <div className="flex items-center justify-end mb-1.5">
-                <button
-                  onClick={handleToggleDreamLock}
-                  className="flex items-center gap-1.5 transition-all cursor-pointer"
-                  style={{
-                    padding: '4px 12px',
-                    borderRadius: 16,
-                    border: `1px solid ${dreamLockedChen ? 'rgba(229,57,53,0.15)' : 'rgba(180,150,120,0.1)'}`,
-                    background: 'transparent',
-                    fontFamily: "'EB Garamond', 'Noto Serif SC', serif",
-                    fontSize: 11,
-                    letterSpacing: '0.04em',
-                    color: dreamLockedChen ? 'rgba(229,57,53,0.7)' : C.textMuted,
-                    opacity: 0.6,
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.opacity = '1' }}
-                  onMouseLeave={e => { e.currentTarget.style.opacity = '0.6' }}
-                  title={dreamLockedChen ? '打开门（解除封锁）' : '关上门（封锁 Claude 2小时）'}
-                >
-                  <span>{dreamLockedChen ? '开门' : '关门'}</span>
-                </button>
-              </div>
 
               {/* Streaming hint */}
               {isStreaming && (
@@ -1300,39 +1296,60 @@ export default function ChatPage() {
                   opacity: showPlusMenu ? 1 : 0,
                   overflow: 'hidden',
                   transition: 'max-height 0.25s ease, opacity 0.2s ease',
-                  background: C.inputBg,
+                  background: nGlass,
+                  backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
                   borderRadius: '0 0 22px 22px',
-                  border: showPlusMenu ? `1px solid ${C.borderStrong}` : `1px solid transparent`,
+                  border: showPlusMenu
+                    ? `1px solid ${isNight ? 'rgba(180,150,120,0.06)' : 'rgba(180,150,120,0.1)'}`
+                    : `1px solid transparent`,
                   borderTop: 'none',
+                  boxShadow: showPlusMenu
+                    ? (isNight ? '0 4px 32px rgba(0,0,0,0.2)' : '0 4px 32px rgba(160,120,90,0.06)')
+                    : 'none',
                 }}
               >
                 <div
                   className="flex items-center gap-1 px-3"
-                  style={{ padding: '10px 12px 14px', borderTop: `1px dashed ${C.border}` }}
+                  style={{
+                    padding: '10px 12px 14px',
+                    borderTop: `1px dashed ${isNight ? 'rgba(180,150,120,0.1)' : 'rgba(180,150,120,0.15)'}`,
+                  }}
                 >
                   {[
-                    { icon: Image, title: '图片', action: () => {
+                    { icon: Image, title: '图片', tone: 'normal' as const, action: () => {
                       const inp = document.createElement('input')
                       inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true
                       inp.onchange = () => { handleFileSelect(inp.files); setShowPlusMenu(false) }
                       inp.click()
                     }},
-                    { icon: FileText, title: '文件', action: () => { fileInputRef.current?.click(); setShowPlusMenu(false) }},
-                    { icon: MapPin, title: '位置', action: () => { handleShareLocation(); setShowPlusMenu(false) }},
-                  ].map(item => (
-                    <button
-                      key={item.title}
-                      onClick={item.action}
-                      disabled={isUploading}
-                      title={item.title}
-                      className="flex items-center justify-center rounded-xl transition-colors cursor-pointer disabled:opacity-40"
-                      style={{ width: 44, height: 44, color: C.textSecondary }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(160,120,90,0.06)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      <item.icon size={20} strokeWidth={1.5} />
-                    </button>
-                  ))}
+                    { icon: FileText, title: '文件', tone: 'normal' as const, action: () => { fileInputRef.current?.click(); setShowPlusMenu(false) }},
+                    { icon: MapPin, title: '位置', tone: 'normal' as const, action: () => { handleShareLocation(); setShowPlusMenu(false) }},
+                    {
+                      icon: dreamLockedChen ? DoorOpen : DoorClosed,
+                      title: dreamLockedChen ? '开门（解除封锁）' : '关门（封锁 2 小时）',
+                      tone: dreamLockedChen ? ('warn' as const) : ('normal' as const),
+                      action: () => { handleToggleDreamLock(); setShowPlusMenu(false) },
+                    },
+                  ].map(item => {
+                    const isWarn = item.tone === 'warn'
+                    const baseColor = isWarn
+                      ? 'rgba(229,57,53,0.7)'
+                      : (isNight ? 'rgba(224,213,200,0.75)' : C.textSecondary)
+                    return (
+                      <button
+                        key={item.title}
+                        onClick={item.action}
+                        disabled={isUploading && !isWarn}
+                        title={item.title}
+                        className="flex items-center justify-center rounded-xl transition-colors cursor-pointer disabled:opacity-40"
+                        style={{ width: 44, height: 44, color: baseColor }}
+                        onMouseEnter={e => (e.currentTarget.style.background = isWarn ? 'rgba(229,57,53,0.06)' : (isNight ? 'rgba(224,213,200,0.06)' : 'rgba(160,120,90,0.06)'))}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <item.icon size={20} strokeWidth={1.5} />
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
               </div>

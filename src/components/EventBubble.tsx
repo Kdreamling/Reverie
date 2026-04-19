@@ -50,16 +50,15 @@ export default function EventBubble({ content, createdAt }: Props) {
   const time = formatTime(createdAt)
 
   return (
-    <div className="flex justify-center my-2">
+    <div className="flex justify-center my-2.5">
       <span
+        className="event-bubble-label"
         style={{
           fontFamily: "'EB Garamond', 'Noto Serif SC', serif",
-          fontSize: 11,
+          fontSize: 12.5,
           fontStyle: 'italic',
-          color: C.textMuted,
           letterSpacing: '0.04em',
-          lineHeight: '20px',
-          opacity: 0.7,
+          lineHeight: '22px',
         }}
       >
         — {label} · {time} —

@@ -78,30 +78,32 @@ const MemoryOpsBlock = memo(function MemoryOpsBlock({ ops, elapsed }: { ops: Mem
   )
 })
 
+const READABLE_FONT = "'Iowan Old Style', 'Charter', 'Palatino Linotype', 'Palatino', 'Noto Serif SC', Georgia, serif"
+
 const ThinkingBlock = memo(function ThinkingBlock({ text, thinkingTime }: { text: string; thinkingTime?: number | null }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="mb-3 cursor-pointer" onClick={() => setOpen(o => !o)}
       style={{
-        padding: '10px 16px',
+        padding: '12px 18px',
         borderLeft: '2px solid rgba(196,154,120,0.2)',
-        fontFamily: ROOM_FONT,
-        fontSize: 12,
+        fontFamily: READABLE_FONT,
+        fontSize: 14.5,
         fontStyle: 'italic',
         color: C.textMuted,
-        lineHeight: 1.6,
+        lineHeight: 1.8,
         transition: 'border-color 0.3s',
       }}
       onMouseEnter={e => (e.currentTarget.style.borderLeftColor = 'rgba(196,154,120,0.4)')}
       onMouseLeave={e => (e.currentTarget.style.borderLeftColor = 'rgba(196,154,120,0.2)')}
     >
-      <div className="flex items-center gap-2" style={{ fontStyle: 'normal', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: C.textMuted, marginBottom: open ? 6 : 0 }}>
+      <div className="flex items-center gap-2" style={{ fontStyle: 'normal', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: C.textMuted, marginBottom: open ? 8 : 0 }}>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(196,154,120,0.5)" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         thought{thinkingTime != null && thinkingTime > 0 ? ` · ${formatElapsed(thinkingTime)}` : ''}
-        {open ? <ChevronDown size={9} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={9} strokeWidth={2} style={{ marginLeft: 'auto' }} />}
+        {open ? <ChevronDown size={10} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={10} strokeWidth={2} style={{ marginLeft: 'auto' }} />}
       </div>
       {open && (
-        <p className="whitespace-pre-wrap" style={{ color: C.textSecondary, fontStyle: 'italic', fontFamily: ROOM_FONT, fontSize: 12, lineHeight: 1.7 }}>
+        <p className="whitespace-pre-wrap" style={{ color: C.textSecondary, fontStyle: 'italic', fontFamily: READABLE_FONT, fontSize: 14.5, lineHeight: 1.85 }}>
           {text}
         </p>
       )}

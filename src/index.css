@@ -187,6 +187,10 @@ html.dashboard-active #root::after {
   width: 1px;
   background: linear-gradient(to bottom, transparent 0%, rgba(180,150,120,0.1) 10%, rgba(180,150,120,0.1) 90%, transparent 100%);
 }
+/* Mobile: hide spine — it collides with text at narrow widths */
+@media (max-width: 767px) {
+  .conv-spine::before { display: none; }
+}
 
 /* Book-page message animations */
 @keyframes roomEmerge {
@@ -218,6 +222,19 @@ html.dashboard-active #root::after {
   background: linear-gradient(to top, #F8F4EE 30%, transparent);
   pointer-events: none;
   z-index: 40;
+}
+
+/* Header fade gradient — keeps nav buttons readable when messages scroll underneath */
+.header-fade-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: calc(72px + env(safe-area-inset-top));
+  background: linear-gradient(to bottom, #F8F4EE 55%, transparent);
+  pointer-events: none;
+  z-index: 25;
+}
+body.night-mode .header-fade-overlay {
+  background: linear-gradient(to bottom, #171411 55%, transparent);
 }
 
 /* Date mark in conversation */
@@ -301,5 +318,24 @@ body.night-mode .user-bubble {
   border-color: rgba(180,150,120,0.08);
   box-shadow: 0 2px 16px rgba(0,0,0,0.2);
   color: #E0D5C8;
+}
+
+/* ── User margin-note style (book annotation) ─────────────────────────────── */
+.user-margin-note {
+  color: #5a4a3a;
+  border-right: 1px solid rgba(180,150,120,0.25);
+}
+body.night-mode .user-margin-note {
+  color: rgba(224,213,200,0.82);
+  border-right-color: rgba(196,154,120,0.22);
+}
+
+/* ── Event bubble (status pills in message flow) ──────────────────────────── */
+.event-bubble-label {
+  color: rgba(160,120,90,0.55);
+  opacity: 1;
+}
+body.night-mode .event-bubble-label {
+  color: rgba(196,154,120,0.55);
 }
 

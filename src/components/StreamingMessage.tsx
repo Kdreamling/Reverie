@@ -116,6 +116,7 @@ function StreamingTextBlock({ text }: { text: string }) {
 }
 
 const ROOM_FONT = "'EB Garamond', 'Noto Serif SC', 'Cormorant Garamond', Georgia, serif"
+const READABLE_FONT = "'Iowan Old Style', 'Charter', 'Palatino Linotype', 'Palatino', 'Noto Serif SC', Georgia, serif"
 
 // ─── Live thinking block with elapsed timer
 
@@ -127,14 +128,14 @@ function LiveThinkingBlock({ text, startTime, elapsed }: { text: string; startTi
 
   return (
     <div className="mb-3 cursor-pointer" onClick={() => setOpen(o => !o)}
-      style={{ padding: '10px 16px', borderLeft: '2px solid rgba(196,154,120,0.25)', fontFamily: ROOM_FONT, fontSize: 12, color: C.textMuted, lineHeight: 1.6 }}>
-      <div className="flex items-center gap-2" style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase' as const, marginBottom: open ? 6 : 0 }}>
+      style={{ padding: '12px 18px', borderLeft: '2px solid rgba(196,154,120,0.25)', fontFamily: READABLE_FONT, fontSize: 14.5, color: C.textMuted, lineHeight: 1.8 }}>
+      <div className="flex items-center gap-2" style={{ fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase' as const, marginBottom: open ? 8 : 0 }}>
         {isActive ? <span className="tool-spinner" style={{ width: 10, height: 10 }} /> :
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(196,154,120,0.5)" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>}
         thinking{displayTime != null && displayTime > 0 ? ` · ${formatElapsed(displayTime)}` : ''}
-        {open ? <ChevronDown size={9} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={9} strokeWidth={2} style={{ marginLeft: 'auto' }} />}
+        {open ? <ChevronDown size={10} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={10} strokeWidth={2} style={{ marginLeft: 'auto' }} />}
       </div>
-      {open && <p className="whitespace-pre-wrap" style={{ fontStyle: 'italic', fontFamily: ROOM_FONT, fontSize: 12, lineHeight: 1.7, color: C.textSecondary }}>{text}</p>}
+      {open && <p className="whitespace-pre-wrap" style={{ fontStyle: 'italic', fontFamily: READABLE_FONT, fontSize: 14.5, lineHeight: 1.85, color: C.textSecondary }}>{text}</p>}
     </div>
   )
 }
