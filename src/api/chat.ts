@@ -92,6 +92,7 @@ export interface ReadingContextPayload {
 export interface StreamChatOptions {
   readingContext?: ReadingContextPayload
   attachmentIds?: string[]
+  thinking?: boolean  // 覆盖通道默认 thinking 开关（true/false 显式；缺省 = 跟随通道默认）
 }
 
 export async function fetchMessagesAPI(sessionId: string): Promise<ChatMessage[]> {
@@ -133,6 +134,7 @@ export function streamChat(
       stream: true,
       ...(options?.readingContext ? { reading_context: options.readingContext } : {}),
       ...(options?.attachmentIds?.length ? { attachment_ids: options.attachmentIds } : {}),
+      ...(typeof options?.thinking === 'boolean' ? { thinking: options.thinking } : {}),
     }),
     signal,
   })

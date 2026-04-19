@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
-import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square, MapPin, Image, DoorClosed, DoorOpen } from 'lucide-react'
+import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square, MapPin, Image, DoorClosed, DoorOpen, Brain } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
@@ -156,6 +156,8 @@ export default function ChatPage() {
   const swipeStartY = useRef<number | null>(null)
   const [locating, setLocating] = useState(false)
   const [showPlusMenu, setShowPlusMenu] = useState(false)
+  // thinking 开关：null = 跟随当前模型默认，true/false = 用户显式覆盖
+  const [thinkingOn, setThinkingOn] = useState<boolean | null>(null)
   const plusMenuRef = useRef<HTMLDivElement>(null)
   const [lockInfo, setLockInfo] = useState<{ chen_locked_dream: any; dream_locked_chen: any } | null>(null)
   const [knockMsg, setKnockMsg] = useState('')
@@ -696,6 +698,7 @@ export default function ChatPage() {
     const options = {
       ...(attachmentIds.length > 0 ? { attachmentIds } : {}),
       ...(msgAttachments.length > 0 ? { attachments: msgAttachments } : {}),
+      ...(thinkingOn !== null ? { thinking: thinkingOn } : {}),
     }
     await sendMessage(currentSession.id, model, text || '(附件)', Object.keys(options).length > 0 ? options : undefined)
   }
@@ -1315,25 +1318,41 @@ export default function ChatPage() {
                     borderTop: `1px dashed ${isNight ? 'rgba(180,150,120,0.1)' : 'rgba(180,150,120,0.15)'}`,
                   }}
                 >
-                  {[
-                    { icon: Image, title: '图片', tone: 'normal' as const, action: () => {
-                      const inp = document.createElement('input')
-                      inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true
-                      inp.onchange = () => { handleFileSelect(inp.files); setShowPlusMenu(false) }
-                      inp.click()
-                    }},
-                    { icon: FileText, title: '文件', tone: 'normal' as const, action: () => { fileInputRef.current?.click(); setShowPlusMenu(false) }},
-                    { icon: MapPin, title: '位置', tone: 'normal' as const, action: () => { handleShareLocation(); setShowPlusMenu(false) }},
-                    {
-                      icon: dreamLockedChen ? DoorOpen : DoorClosed,
-                      title: dreamLockedChen ? '开门（解除封锁）' : '关门（封锁 2 小时）',
-                      tone: dreamLockedChen ? ('warn' as const) : ('normal' as const),
-                      action: () => { handleToggleDreamLock(); setShowPlusMenu(false) },
-                    },
-                  ].map(item => {
+                  {(() => {
+                    // thinking 默认：模型名含 thinking/reasoner/r1 才推断为支持
+                    const modelDefaultThinking = /thinking|reasoner|r1/i.test(model)
+                    const effectiveThinking = thinkingOn !== null ? thinkingOn : modelDefaultThinking
+                    return [
+                      { icon: Image, title: '图片', tone: 'normal' as const, active: false, action: () => {
+                        const inp = document.createElement('input')
+                        inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true
+                        inp.onchange = () => { handleFileSelect(inp.files); setShowPlusMenu(false) }
+                        inp.click()
+                      }},
+                      { icon: FileText, title: '文件', tone: 'normal' as const, active: false, action: () => { fileInputRef.current?.click(); setShowPlusMenu(false) }},
+                      { icon: MapPin, title: '位置', tone: 'normal' as const, active: false, action: () => { handleShareLocation(); setShowPlusMenu(false) }},
+                      {
+                        icon: Brain,
+                        title: effectiveThinking ? '思考模式：开（点击关闭）' : '思考模式：关（点击开启）',
+                        tone: 'normal' as const,
+                        active: effectiveThinking,
+                        action: () => setThinkingOn(!effectiveThinking),
+                      },
+                      {
+                        icon: dreamLockedChen ? DoorOpen : DoorClosed,
+                        title: dreamLockedChen ? '开门（解除封锁）' : '关门（封锁 2 小时）',
+                        tone: dreamLockedChen ? ('warn' as const) : ('normal' as const),
+                        active: false,
+                        action: () => { handleToggleDreamLock(); setShowPlusMenu(false) },
+                      },
+                    ]
+                  })().map(item => {
                     const isWarn = item.tone === 'warn'
+                    const isActive = item.active
                     const baseColor = isWarn
                       ? 'rgba(229,57,53,0.7)'
+                      : isActive
+                      ? C.accent
                       : (isNight ? 'rgba(224,213,200,0.75)' : C.textSecondary)
                     return (
                       <button
@@ -1342,9 +1361,9 @@ export default function ChatPage() {
                         disabled={isUploading && !isWarn}
                         title={item.title}
                         className="flex items-center justify-center rounded-xl transition-colors cursor-pointer disabled:opacity-40"
-                        style={{ width: 44, height: 44, color: baseColor }}
-                        onMouseEnter={e => (e.currentTarget.style.background = isWarn ? 'rgba(229,57,53,0.06)' : (isNight ? 'rgba(224,213,200,0.06)' : 'rgba(160,120,90,0.06)'))}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        style={{ width: 44, height: 44, color: baseColor, background: isActive ? (isNight ? 'rgba(196,154,120,0.08)' : 'rgba(196,154,120,0.08)') : 'transparent' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = isWarn ? 'rgba(229,57,53,0.06)' : isActive ? (isNight ? 'rgba(196,154,120,0.14)' : 'rgba(196,154,120,0.14)') : (isNight ? 'rgba(224,213,200,0.06)' : 'rgba(160,120,90,0.06)'))}
+                        onMouseLeave={e => (e.currentTarget.style.background = isActive ? (isNight ? 'rgba(196,154,120,0.08)' : 'rgba(196,154,120,0.08)') : 'transparent')}
                       >
                         <item.icon size={20} strokeWidth={1.5} />
                       </button>
