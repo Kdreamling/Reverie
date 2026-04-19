@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ChevronLeft, Plus, Pencil, Trash2, Loader, Check, X, Search } from 'lucide-react'
+import { ChevronLeft, Plus, Pencil, Trash2, Loader, Check, X, Search, Star } from 'lucide-react'
 import { fetchMemoriesAPI, createMemoryAPI, updateMemoryAPI, deleteMemoryAPI, type Memory } from '../api/memories'
 import { C } from '../theme'
 import { toast } from '../stores/toastStore'
