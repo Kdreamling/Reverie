@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Droplet, Scissors } from 'lucide-react'
 import PixelGarden from '../components/garden/PixelGarden'
@@ -49,6 +49,14 @@ export default function GardenPage() {
     const t = setInterval(load, 60_000)
     return () => clearInterval(t)
   }, [load])
+
+  // 复用 dashboard-active 解锁滚动（全局 html/body 被 position:fixed 锁死）
+  useLayoutEffect(() => {
+    document.documentElement.classList.add('dashboard-active')
+    return () => {
+      document.documentElement.classList.remove('dashboard-active')
+    }
+  }, [])
 
   const handleCellClick = (plot: GardenPlot, crop: GardenCrop | null) => {
     setSelected({ plot, crop })
@@ -126,7 +134,7 @@ export default function GardenPage() {
       background: C.bgGradient,
       fontFamily: FONT,
       color: C.text,
-      padding: '24px 20px',
+      padding: '20px 14px 40px',
       boxSizing: 'border-box',
     }}>
       {/* 顶栏 */}
@@ -152,18 +160,26 @@ export default function GardenPage() {
         maxWidth: 700, margin: '0 auto',
         display: 'flex', flexDirection: 'column', gap: 20,
       }}>
-        {/* 菜园画布 */}
+        {/* 菜园画布：给它一块"户外"背景 */}
         <div style={{
-          background: C.roomBgDeep,
-          padding: 20,
+          background: 'linear-gradient(180deg, #E8F0D8 0%, #D6E6C0 100%)',
+          padding: '28px 16px 20px',
           borderRadius: 16,
           display: 'flex', justifyContent: 'center',
-          boxShadow: '0 4px 24px rgba(180,150,120,0.08)',
+          boxShadow: '0 6px 24px rgba(150,170,120,0.18)',
+          position: 'relative',
+          overflow: 'hidden',
         }}>
+          {/* 远处山 */}
+          <div style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0, height: 30,
+            background: 'linear-gradient(180deg, transparent 0%, rgba(180,200,140,0.25) 100%)',
+            pointerEvents: 'none',
+          }} />
           <PixelGarden data={data} onCellClick={handleCellClick} />
         </div>
 
-        {/* 种子库存 */}
+        {/* 种子库存：布袋风 */}
         <div style={{
           background: C.surface,
           border: `1px solid ${C.border}`,
@@ -172,24 +188,65 @@ export default function GardenPage() {
         }}>
           <div style={{
             fontSize: 11, color: C.textMuted, letterSpacing: '0.08em',
-            marginBottom: 10, textTransform: 'uppercase',
+            marginBottom: 12, textTransform: 'uppercase',
           }}>种子库存</div>
           {hasStarter ? (
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{
+              display: 'flex', gap: 14,
+              overflowX: 'auto',
+              paddingBottom: 4,
+              scrollbarWidth: 'thin',
+            }}>
               {data.seeds.map(s => {
                 const def = data.crop_defs[s.species]
                 if (!def) return null
+                const active = s.count > 0
                 return (
                   <div key={s.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '6px 12px',
-                    background: s.count > 0 ? 'rgba(196,154,120,0.12)' : 'rgba(0,0,0,0.04)',
-                    borderRadius: 20, fontSize: 13,
-                    color: s.count > 0 ? C.text : C.textMuted,
+                    flexShrink: 0,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center',
+                    gap: 4,
+                    opacity: active ? 1 : 0.4,
                   }}>
-                    <span style={{ fontSize: 18 }}>{def.emoji}</span>
-                    <span>{def.label}</span>
-                    <span style={{ color: C.textSecondary }}>×{s.count}</span>
+                    {/* 布袋：圆底 + 束口 */}
+                    <div style={{
+                      position: 'relative',
+                      width: 56, height: 60,
+                    }}>
+                      {/* 袋口束带 */}
+                      <div style={{
+                        position: 'absolute', top: 0, left: '50%',
+                        transform: 'translateX(-50%)',
+                        width: 22, height: 6,
+                        background: '#9C7A5A',
+                        borderRadius: '3px 3px 0 0',
+                        zIndex: 2,
+                      }} />
+                      {/* 袋身 */}
+                      <div style={{
+                        position: 'absolute', top: 4,
+                        width: 56, height: 56,
+                        background: active
+                          ? 'linear-gradient(180deg, #E8D5B5 0%, #CBB188 100%)'
+                          : 'linear-gradient(180deg, #D8D0C5 0%, #B8B0A5 100%)',
+                        borderRadius: '40% 40% 48% 48% / 30% 30% 60% 60%',
+                        border: '1px solid rgba(120,90,60,0.25)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 26,
+                        boxShadow: active
+                          ? '0 3px 8px rgba(140,110,70,0.25), inset 0 -6px 8px rgba(120,90,60,0.12)'
+                          : '0 2px 4px rgba(100,100,100,0.15)',
+                      }}>
+                        {def.emoji}
+                      </div>
+                    </div>
+                    <div style={{
+                      fontSize: 12, color: active ? C.text : C.textMuted,
+                      fontWeight: 500,
+                    }}>{def.label}</div>
+                    <div style={{
+                      fontSize: 11, color: C.textMuted,
+                    }}>×{s.count}</div>
                   </div>
                 )
               })}
@@ -199,7 +256,7 @@ export default function GardenPage() {
           )}
         </div>
 
-        {/* 晨的留言 / 最近动作 */}
+        {/* 田间日志：字条风 */}
         <div style={{
           background: C.surface,
           border: `1px solid ${C.border}`,
@@ -208,12 +265,12 @@ export default function GardenPage() {
         }}>
           <div style={{
             fontSize: 11, color: C.textMuted, letterSpacing: '0.08em',
-            marginBottom: 10, textTransform: 'uppercase',
+            marginBottom: 12, textTransform: 'uppercase',
           }}>田间日志</div>
           {data.recent_actions.length === 0 ? (
             <div style={{ color: C.textMuted, fontSize: 13 }}>还没有任何活动</div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {data.recent_actions.slice(0, 8).map(a => {
                 const speciesLabel = a.species ? data.crop_defs[a.species]?.label ?? a.species : ''
                 const actorLabel = a.actor === 'chen' ? '晨' : '你'
@@ -224,31 +281,44 @@ export default function GardenPage() {
                   gift_seed: '送来了种子',
                   visit: '来看了一下',
                 }[a.action] || a.action
+                const isChen = a.actor === 'chen'
                 return (
                   <div key={a.id} style={{
-                    display: 'flex', alignItems: 'flex-start', gap: 10,
-                    fontSize: 13, color: C.textSecondary,
-                    padding: '4px 0',
+                    position: 'relative',
+                    padding: '10px 14px 10px 14px',
+                    background: isChen ? 'rgba(255,245,210,0.55)' : 'rgba(245,240,230,0.55)',
+                    border: `1px solid ${isChen ? 'rgba(200,170,100,0.25)' : 'rgba(180,160,130,0.2)'}`,
+                    borderRadius: 8,
+                    boxShadow: isChen
+                      ? '0 2px 6px rgba(200,170,100,0.15)'
+                      : '0 1px 3px rgba(0,0,0,0.04)',
+                    transform: isChen ? 'rotate(-0.3deg)' : 'rotate(0.2deg)',
                   }}>
                     <div style={{
-                      padding: '2px 8px',
-                      background: a.actor === 'chen' ? 'rgba(196,154,120,0.15)' : 'rgba(0,0,0,0.04)',
-                      borderRadius: 4,
-                      fontSize: 11,
-                      color: a.actor === 'chen' ? C.accent : C.textMuted,
-                      flexShrink: 0,
-                    }}>{actorLabel}</div>
-                    <div style={{ flex: 1 }}>
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      fontSize: 12, color: C.textSecondary,
+                    }}>
+                      <span style={{
+                        fontWeight: 600,
+                        color: isChen ? C.accent : C.text,
+                      }}>{actorLabel}</span>
                       <span>{actionLabel}{speciesLabel && ` ${speciesLabel}`}</span>
-                      {a.note && (
-                        <div style={{ color: C.text, marginTop: 2, fontStyle: 'italic' }}>
-                          "{a.note}"
-                        </div>
-                      )}
+                      <span style={{
+                        marginLeft: 'auto',
+                        fontSize: 11, color: C.textMuted,
+                      }}>{fmtTime(a.created_at)}</span>
                     </div>
-                    <div style={{ fontSize: 11, color: C.textMuted, flexShrink: 0 }}>
-                      {fmtTime(a.created_at)}
-                    </div>
+                    {a.note && (
+                      <div style={{
+                        marginTop: 6,
+                        fontSize: 13,
+                        color: C.text,
+                        fontStyle: 'italic',
+                        lineHeight: 1.5,
+                      }}>
+                        "{a.note}"
+                      </div>
+                    )}
                   </div>
                 )
               })}
