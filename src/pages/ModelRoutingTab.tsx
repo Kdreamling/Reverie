@@ -17,6 +17,7 @@ interface ChannelInfo {
   channel_tag?: string | null
   note?: string | null
   proxy_url?: string | null
+  provider_group?: string | null
   source: 'hardcoded' | 'hardcoded_override' | 'db'
 }
 
@@ -574,6 +575,7 @@ function ProviderConfigTab({ ch, onSaved }: {
   const [enabled, setEnabled] = useState(ch.enabled)
   const [note, setNote] = useState(ch.note ?? '')
   const [proxyUrl, setProxyUrl] = useState(ch.proxy_url ?? '')
+  const [providerGroup, setProviderGroup] = useState(ch.provider_group ?? '')
   const [saving, setSaving] = useState(false)
 
   const buildData = () => {
@@ -585,6 +587,7 @@ function ProviderConfigTab({ ch, onSaved }: {
       thinking_format: ch.thinking_format,
       channel_tag: channelTag, note,
       proxy_url: proxyUrl,
+      provider_group: providerGroup,
     }
     if (apiKey) data.api_key = apiKey
     return data
@@ -641,6 +644,15 @@ function ProviderConfigTab({ ch, onSaved }: {
           <span style={{ fontSize: 14, color: C.text }}>渠道标签</span>
           <input value={channelTag} onChange={e => setChannelTag(e.target.value)}
             placeholder="如：官方直出"
+            style={{ fontSize: 13, color: C.textSecondary, background: 'none', border: 'none', textAlign: 'right', outline: 'none', width: 160 }} />
+        </div>
+        <div style={settingRow}>
+          <div>
+            <div style={{ fontSize: 14, color: C.text }}>供应商分组</div>
+            <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>同组在列表里折叠</div>
+          </div>
+          <input value={providerGroup} onChange={e => setProviderGroup(e.target.value)}
+            placeholder="如：guagua"
             style={{ fontSize: 13, color: C.textSecondary, background: 'none', border: 'none', textAlign: 'right', outline: 'none', width: 160 }} />
         </div>
         <div style={settingRow}>
@@ -1356,6 +1368,7 @@ function AddProviderForm({ onCreated, onCancel }: {
   const [apiKey, setApiKey] = useState('')
   const [modelsText, setModelsText] = useState('')
   const [channelTag, setChannelTag] = useState('')
+  const [providerGroup, setProviderGroup] = useState('')
 
   const submit = async () => {
     if (!name || !baseUrl || !apiKey || !modelsText.trim()) {
@@ -1371,6 +1384,7 @@ function AddProviderForm({ onCreated, onCancel }: {
           models: parsed.models, model_overrides: parsed.model_overrides,
           supports_thinking: true, thinking_format: 'openai',
           channel_tag: channelTag, note: '',
+          provider_group: providerGroup,
         }),
       })
       toast.success(`供应商 ${name} 已添加`)
@@ -1399,10 +1413,15 @@ function AddProviderForm({ onCreated, onCancel }: {
             <option value="zenmux">ZenMux</option>
           </select>
         </div>
-        <div style={{ padding: '14px 16px', borderBottom: 'none' }}>
+        <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}` }}>
           <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>渠道标签</div>
           <input value={channelTag} onChange={e => setChannelTag(e.target.value)}
             placeholder="官方直出 / 中转 / ..." style={inputField} />
+        </div>
+        <div style={{ padding: '14px 16px', borderBottom: 'none' }}>
+          <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>供应商分组（列表折叠用）</div>
+          <input value={providerGroup} onChange={e => setProviderGroup(e.target.value)}
+            placeholder="如 guagua（同组在列表里合并）" style={inputField} />
         </div>
       </div>
 
@@ -1459,6 +1478,7 @@ export default function ModelRoutingTab() {
   const [subTab, setSubTab] = useState<'config' | 'models'>('config')
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState('')
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   const loadChannels = useCallback(async () => {
@@ -1570,69 +1590,190 @@ export default function ModelRoutingTab() {
             <div style={{ padding: 40, textAlign: 'center', color: C.textMuted, fontSize: 13 }}>
               {search ? '没有匹配的供应商' : '还没有供应商'}
             </div>
-          ) : filtered.map((c, i) => {
-            const modelCount = models?.filter(m => m.channel_name === c.name).length ?? 0
-            return (
-              <div
-                key={c.name}
-                onClick={() => { setSelected(c.name); setSubTab('config') }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '14px 16px',
-                  borderBottom: i < filtered.length - 1 ? `1px solid ${C.border}` : 'none',
-                  cursor: 'pointer',
-                  opacity: c.enabled ? 1 : 0.5,
-                }}
-              >
-                {/* 状态灯 */}
-                <div style={{
-                  width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                  background: c.enabled ? C.success : C.textMuted,
-                  boxShadow: c.enabled ? `0 0 6px ${C.success}40` : 'none',
-                }} />
+          ) : (() => {
+            type Row = { kind: 'group'; name: string; children: ChannelInfo[] } | { kind: 'single'; channel: ChannelInfo }
+            const rows: Row[] = []
+            const groupMap = new Map<string, ChannelInfo[]>()
+            for (const c of filtered) {
+              const g = (c.provider_group ?? '').trim()
+              if (g) {
+                let children = groupMap.get(g)
+                if (!children) {
+                  children = []
+                  groupMap.set(g, children)
+                  rows.push({ kind: 'group', name: g, children })
+                }
+                children.push(c)
+              } else {
+                rows.push({ kind: 'single', channel: c })
+              }
+            }
 
-                {/* 图标 */}
-                <div style={{
-                  width: 34, height: 34, borderRadius: 10,
-                  background: `${C.accent}10`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: C.accent, fontSize: 16, flexShrink: 0,
-                  fontWeight: 600,
-                }}>
-                  {guessProviderIcon(c.provider, c.name)}
-                </div>
-
-                {/* 名称 + 标签 */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 15, fontWeight: 500, color: C.text }}>{c.name}</span>
-                    {c.channel_tag && (
-                      <span style={{
-                        fontSize: 10, padding: '2px 8px', borderRadius: 10,
-                        border: `1px solid ${C.accent}40`, color: C.accent,
-                      }}>{c.channel_tag}</span>
+            const renderChild = (c: ChannelInfo, isLast: boolean) => {
+              const modelCount = models?.filter(m => m.channel_name === c.name).length ?? 0
+              return (
+                <div
+                  key={c.name}
+                  onClick={() => { setSelected(c.name); setSubTab('config') }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '12px 16px 12px 44px',
+                    borderBottom: isLast ? 'none' : `1px solid ${C.border}`,
+                    background: `${C.surface}80`,
+                    cursor: 'pointer',
+                    opacity: c.enabled ? 1 : 0.5,
+                  }}
+                >
+                  <div style={{
+                    width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                    background: c.enabled ? C.success : C.textMuted,
+                  }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 14, color: C.text }}>{c.name}</span>
+                      {c.channel_tag && (
+                        <span style={{
+                          fontSize: 10, padding: '2px 8px', borderRadius: 10,
+                          border: `1px solid ${C.accent}40`, color: C.accent,
+                        }}>{c.channel_tag}</span>
+                      )}
+                    </div>
+                    {modelCount > 0 && (
+                      <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
+                        {modelCount} 个模型
+                      </div>
                     )}
                   </div>
-                  {modelCount > 0 && (
-                    <div style={{ fontSize: 11, color: C.textMuted, marginTop: 3 }}>
-                      {modelCount} 个模型
+                  <span style={{
+                    fontSize: 10, padding: '2px 8px', borderRadius: 10, flexShrink: 0,
+                    color: c.enabled ? '#4a8c5c' : C.textMuted,
+                    background: c.enabled ? 'rgba(34,197,94,0.08)' : C.surface,
+                  }}>
+                    {c.enabled ? '启用' : '禁用'}
+                  </span>
+                  <span style={{ color: C.textMuted, fontSize: 14, flexShrink: 0 }}>›</span>
+                </div>
+              )
+            }
+
+            const renderSingle = (c: ChannelInfo, isLast: boolean) => {
+              const modelCount = models?.filter(m => m.channel_name === c.name).length ?? 0
+              return (
+                <div
+                  key={c.name}
+                  onClick={() => { setSelected(c.name); setSubTab('config') }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '14px 16px',
+                    borderBottom: isLast ? 'none' : `1px solid ${C.border}`,
+                    cursor: 'pointer',
+                    opacity: c.enabled ? 1 : 0.5,
+                  }}
+                >
+                  <div style={{
+                    width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                    background: c.enabled ? C.success : C.textMuted,
+                    boxShadow: c.enabled ? `0 0 6px ${C.success}40` : 'none',
+                  }} />
+                  <div style={{
+                    width: 34, height: 34, borderRadius: 10,
+                    background: `${C.accent}10`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: C.accent, fontSize: 16, flexShrink: 0,
+                    fontWeight: 600,
+                  }}>
+                    {guessProviderIcon(c.provider, c.name)}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 15, fontWeight: 500, color: C.text }}>{c.name}</span>
+                      {c.channel_tag && (
+                        <span style={{
+                          fontSize: 10, padding: '2px 8px', borderRadius: 10,
+                          border: `1px solid ${C.accent}40`, color: C.accent,
+                        }}>{c.channel_tag}</span>
+                      )}
                     </div>
+                    {modelCount > 0 && (
+                      <div style={{ fontSize: 11, color: C.textMuted, marginTop: 3 }}>
+                        {modelCount} 个模型
+                      </div>
+                    )}
+                  </div>
+                  <span style={{
+                    fontSize: 11, padding: '3px 10px', borderRadius: 10, flexShrink: 0,
+                    color: c.enabled ? '#4a8c5c' : C.textMuted,
+                    background: c.enabled ? 'rgba(34,197,94,0.08)' : C.surface,
+                  }}>
+                    {c.enabled ? '启用' : '禁用'}
+                  </span>
+                  <span style={{ color: C.textMuted, fontSize: 16, flexShrink: 0 }}>›</span>
+                </div>
+              )
+            }
+
+            return rows.map((row, i) => {
+              const isLast = i === rows.length - 1
+              if (row.kind === 'single') return renderSingle(row.channel, isLast)
+              const expanded = expandedGroups.has(row.name) || !!search
+              const enabledCount = row.children.filter(c => c.enabled).length
+              const totalModels = row.children.reduce(
+                (s, c) => s + (models?.filter(m => m.channel_name === c.name).length ?? 0), 0,
+              )
+              return (
+                <div key={`g-${row.name}`}>
+                  <div
+                    onClick={() => setExpandedGroups(prev => {
+                      const next = new Set(prev)
+                      if (next.has(row.name)) next.delete(row.name); else next.add(row.name)
+                      return next
+                    })}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '14px 16px',
+                      borderBottom: (isLast && !expanded) ? 'none' : `1px solid ${C.border}`,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{
+                      width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                      background: enabledCount > 0 ? C.success : C.textMuted,
+                      boxShadow: enabledCount > 0 ? `0 0 6px ${C.success}40` : 'none',
+                    }} />
+                    <div style={{
+                      width: 34, height: 34, borderRadius: 10,
+                      background: `${C.accent}10`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: C.accent, fontSize: 16, flexShrink: 0,
+                      fontWeight: 600,
+                    }}>
+                      {row.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 15, fontWeight: 500, color: C.text }}>{row.name}</span>
+                        <span style={{
+                          fontSize: 10, padding: '2px 8px', borderRadius: 10,
+                          border: `1px solid ${C.textMuted}40`, color: C.textMuted,
+                        }}>分组</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: C.textMuted, marginTop: 3 }}>
+                        {row.children.length} 个渠道 · {totalModels} 个模型 · {enabledCount}/{row.children.length} 启用
+                      </div>
+                    </div>
+                    <span style={{
+                      color: C.textMuted, fontSize: 14, flexShrink: 0,
+                      transition: 'transform 0.2s',
+                      transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                    }}>›</span>
+                  </div>
+                  {expanded && row.children.map((c, ci) =>
+                    renderChild(c, isLast && ci === row.children.length - 1),
                   )}
                 </div>
-
-                {/* 启用 badge */}
-                <span style={{
-                  fontSize: 11, padding: '3px 10px', borderRadius: 10, flexShrink: 0,
-                  color: c.enabled ? '#4a8c5c' : C.textMuted,
-                  background: c.enabled ? 'rgba(34,197,94,0.08)' : C.surface,
-                }}>
-                  {c.enabled ? '启用' : '禁用'}
-                </span>
-
-                <span style={{ color: C.textMuted, fontSize: 16, flexShrink: 0 }}>›</span>
-              </div>
-            )
-          })}
+              )
+            })
+          })()}
         </div>
       </div>
     )
