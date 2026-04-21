@@ -16,6 +16,7 @@ interface ChannelInfo {
   enabled: boolean
   channel_tag?: string | null
   note?: string | null
+  proxy_url?: string | null
   source: 'hardcoded' | 'hardcoded_override' | 'db'
 }
 
@@ -572,6 +573,7 @@ function ProviderConfigTab({ ch, onSaved }: {
   const [modelsText, setModelsText] = useState(encodeModelsText(ch.models, ch.model_overrides))
   const [enabled, setEnabled] = useState(ch.enabled)
   const [note, setNote] = useState(ch.note ?? '')
+  const [proxyUrl, setProxyUrl] = useState(ch.proxy_url ?? '')
   const [saving, setSaving] = useState(false)
 
   const buildData = () => {
@@ -582,6 +584,7 @@ function ProviderConfigTab({ ch, onSaved }: {
       supports_thinking: ch.supports_thinking, // 保留：模型级切到 advanced tab 后此处不动
       thinking_format: ch.thinking_format,
       channel_tag: channelTag, note,
+      proxy_url: proxyUrl,
     }
     if (apiKey) data.api_key = apiKey
     return data
@@ -658,12 +661,14 @@ function ProviderConfigTab({ ch, onSaved }: {
           </div>
           <Toggle checked={false} onChange={() => { }} disabled />
         </div>
-        <div style={{ ...settingRow, borderBottom: 'none', cursor: 'not-allowed', opacity: 0.55 }}>
-          <div>
+        <div style={{ ...settingRow, borderBottom: 'none' }}>
+          <div style={{ flexShrink: 0, marginRight: 12 }}>
             <div style={{ fontSize: 14, color: C.text }}>网络代理</div>
-            <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>暂未实现</div>
+            <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>留空=全局策略 · 填 http(s)://host:port</div>
           </div>
-          <span style={{ color: C.textMuted }}>›</span>
+          <input value={proxyUrl} onChange={e => setProxyUrl(e.target.value)}
+            placeholder="（跟随全局）"
+            style={{ fontSize: 13, color: C.textSecondary, background: 'none', border: 'none', textAlign: 'right', outline: 'none', flex: 1, minWidth: 0 }} />
         </div>
       </div>
 
@@ -769,6 +774,26 @@ function ProviderModelsTab({ ch, models, onReload }: {
   const [deleteMode, setDeleteMode] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [tests, setTests] = useState<Record<string, ModelTestInfo>>({})
+  const [syncing, setSyncing] = useState(false)
+  const [syncSheet, setSyncSheet] = useState<{ fetched: string[]; current: string[] } | null>(null)
+
+  const handleFetchUpstream = async () => {
+    setSyncing(true)
+    try {
+      const r = await apiFetch<{ success: boolean; models?: string[]; current_models?: string[]; message?: string }>(
+        `/admin/channels/${encodeURIComponent(ch.name)}/sync-models`,
+        { method: 'POST' },
+      )
+      if (r.success && r.models) {
+        setSyncSheet({ fetched: r.models, current: r.current_models ?? ch.models })
+      } else {
+        toast.error(r.message ?? '获取失败')
+      }
+    } catch (err) {
+      toast.error(`获取失败: ${err instanceof Error ? err.message : '未知错误'}`)
+    }
+    setSyncing(false)
+  }
 
   const handleTestModel = async (m: ModelInfo, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -982,10 +1007,11 @@ function ProviderModelsTab({ ch, models, onReload }: {
         <button style={{
           padding: '8px 16px', borderRadius: 10,
           border: `1px solid ${C.accent}`, color: C.accent,
-          background: 'none', fontSize: 13, cursor: 'pointer',
+          background: 'none', fontSize: 13, cursor: syncing ? 'wait' : 'pointer',
           display: 'flex', alignItems: 'center', gap: 5,
-        }} onClick={() => toast.info('获取功能待实现')}>
-          <span>◉</span> 获取
+          opacity: syncing ? 0.6 : 1,
+        }} disabled={syncing} onClick={handleFetchUpstream}>
+          <span>◉</span> {syncing ? '获取中…' : '获取'}
         </button>
         <button onClick={() => setAdding(true)} style={{
           flex: 1,
@@ -1039,7 +1065,159 @@ function ProviderModelsTab({ ch, models, onReload }: {
           onSaved={onReload}
         />
       )}
+
+      {syncSheet && (
+        <SyncModelsSheet
+          channelName={ch.name}
+          channel={ch}
+          fetched={syncSheet.fetched}
+          current={syncSheet.current}
+          onClose={() => setSyncSheet(null)}
+          onDone={() => { setSyncSheet(null); onReload() }}
+        />
+      )}
     </>
+  )
+}
+
+// ─── Sync Upstream Models Sheet ───────────────────────────────────────────
+
+function SyncModelsSheet({ channelName, channel, fetched, current, onClose, onDone }: {
+  channelName: string
+  channel: ChannelInfo
+  fetched: string[]
+  current: string[]
+  onClose: () => void
+  onDone: () => void
+}) {
+  const currentSet = new Set(current)
+  const newOnes = fetched.filter(m => !currentSet.has(m))
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(newOnes))
+  const [saving, setSaving] = useState(false)
+
+  const toggle = (m: string) => {
+    setPicked(prev => {
+      const next = new Set(prev)
+      if (next.has(m)) next.delete(m); else next.add(m)
+      return next
+    })
+  }
+  const selectAllNew = () => setPicked(new Set(newOnes))
+  const clearAll = () => setPicked(new Set())
+
+  const merge = async () => {
+    if (picked.size === 0) { toast.warning('没有选中要添加的模型'); return }
+    setSaving(true)
+    const merged = Array.from(new Set([...current, ...Array.from(picked)]))
+    try {
+      const resp = await apiFetch<{ success: boolean; message: string }>(
+        `/admin/channels/${encodeURIComponent(channelName)}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            models: merged,
+            model_overrides: channel.model_overrides ?? {},
+          }),
+        },
+      )
+      if (resp.success) { toast.success(`已添加 ${picked.size} 个模型到渠道池`); onDone() }
+      else toast.error(resp.message)
+    } catch (e) {
+      toast.error(`保存失败: ${e instanceof Error ? e.message : '未知错误'}`)
+    }
+    setSaving(false)
+  }
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 100,
+      background: 'rgba(0,0,0,0.28)',
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+      animation: 'sheetFadeIn 0.18s ease-out',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', maxWidth: 560,
+        background: C.bg, borderRadius: '20px 20px 0 0',
+        maxHeight: '88vh',
+        display: 'flex', flexDirection: 'column',
+        animation: 'sheetSlideUp 0.22s ease-out',
+        boxShadow: '0 -6px 30px rgba(0,0,0,0.12)',
+      }}>
+        <div style={{ padding: '10px 0 4px', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ width: 38, height: 4, borderRadius: 2, background: C.borderStrong }} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '4px 18px 12px' }}>
+          <button onClick={onClose} style={{
+            background: 'none', border: 'none', fontSize: 20, color: C.textSecondary,
+            cursor: 'pointer', padding: 4, lineHeight: 1,
+          }}>×</button>
+          <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 600, color: C.text }}>
+            上游可用模型
+          </div>
+          <div style={{ width: 28 }} />
+        </div>
+
+        <div style={{ padding: '0 18px 10px', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ fontSize: 12, color: C.textMuted, flex: 1 }}>
+            共 {fetched.length} 个 · 新增 {newOnes.length} 个 · 已选 {picked.size}
+          </div>
+          <button onClick={selectAllNew} style={tinyBtn}>全选新增</button>
+          <button onClick={clearAll} style={tinyBtn}>清空</button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '4px 18px 16px' }}>
+          <div style={card}>
+            {fetched.map(m => {
+              const already = currentSet.has(m)
+              const sel = picked.has(m)
+              return (
+                <div key={m} onClick={() => !already && toggle(m)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '11px 14px',
+                    borderBottom: `1px solid ${C.border}`,
+                    cursor: already ? 'not-allowed' : 'pointer',
+                    opacity: already ? 0.45 : 1,
+                  }}>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: 5,
+                    border: `1.5px solid ${sel ? C.accent : C.border}`,
+                    background: sel ? C.accent : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#fff', fontSize: 12, flexShrink: 0,
+                  }}>{sel ? '✓' : ''}</div>
+                  <div style={{ flex: 1, fontFamily: 'monospace', fontSize: 13, color: C.text, wordBreak: 'break-all' }}>
+                    {m}
+                  </div>
+                  {already && (
+                    <div style={{ fontSize: 11, color: C.textMuted, flexShrink: 0 }}>已有</div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        <div style={{ padding: '10px 18px 18px', display: 'flex', gap: 10, borderTop: `1px solid ${C.border}`, background: C.bg }}>
+          <button onClick={onClose} style={{
+            flex: 1, padding: '12px 0',
+            background: 'none', border: `1px solid ${C.border}`,
+            borderRadius: 12, color: C.textSecondary, cursor: 'pointer',
+            fontSize: 14, fontWeight: 500,
+          }}>取消</button>
+          <button onClick={merge} disabled={saving || picked.size === 0} style={{
+            flex: 1, padding: '12px 0',
+            background: `${C.accent}14`, border: 'none',
+            borderRadius: 12, color: C.accent,
+            cursor: (saving || picked.size === 0) ? 'not-allowed' : 'pointer',
+            opacity: (saving || picked.size === 0) ? 0.5 : 1,
+            fontSize: 14, fontWeight: 600,
+          }}>
+            {saving ? '添加中…' : `添加 ${picked.size} 个到渠道`}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
