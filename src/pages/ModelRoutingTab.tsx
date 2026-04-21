@@ -756,6 +756,9 @@ function ProviderConfigTab({ ch, onSaved }: {
 
 // ─── Provider Models Tab ──────────────────────────────────────────────────
 
+type ModelTestState = 'idle' | 'testing' | 'success' | 'fail'
+type ModelTestInfo = { state: ModelTestState; latency?: number; error?: string; statusCode?: number }
+
 function ProviderModelsTab({ ch, models, onReload }: {
   ch: ChannelInfo
   models: ModelInfo[]
@@ -765,6 +768,25 @@ function ProviderModelsTab({ ch, models, onReload }: {
   const [adding, setAdding] = useState(false)
   const [deleteMode, setDeleteMode] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [tests, setTests] = useState<Record<string, ModelTestInfo>>({})
+
+  const handleTestModel = async (m: ModelInfo, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setTests(prev => ({ ...prev, [m.name]: { state: 'testing' } }))
+    try {
+      const r = await apiFetch<{ success: boolean; latency_ms?: number; error?: string; status_code?: number }>(
+        '/admin/channels/test_model',
+        { method: 'POST', body: JSON.stringify({ channel_name: m.channel_name, model: m.upstream_model }) },
+      )
+      if (r.success) {
+        setTests(prev => ({ ...prev, [m.name]: { state: 'success', latency: r.latency_ms } }))
+      } else {
+        setTests(prev => ({ ...prev, [m.name]: { state: 'fail', error: r.error, statusCode: r.status_code, latency: r.latency_ms } }))
+      }
+    } catch (err) {
+      setTests(prev => ({ ...prev, [m.name]: { state: 'fail', error: err instanceof Error ? err.message : '未知错误' } }))
+    }
+  }
 
   const handleToggle = async (m: ModelInfo, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -884,6 +906,42 @@ function ProviderModelsTab({ ch, models, onReload }: {
                   </div>
                 )}
               </div>
+
+              {/* 连通测试 */}
+              {!deleteMode && (() => {
+                const t = tests[m.name] ?? { state: 'idle' as ModelTestState }
+                const color = t.state === 'success' ? C.success
+                  : t.state === 'fail' ? '#e53935'
+                  : t.state === 'testing' ? C.textMuted : C.textSecondary
+                const tip = t.state === 'success' ? `连通正常 · ${t.latency}ms`
+                  : t.state === 'fail' ? `失败${t.statusCode ? ` (${t.statusCode})` : ''}: ${t.error ?? ''}`
+                  : t.state === 'testing' ? '测试中...' : '测试这个模型能否实际调用'
+                return (
+                  <button
+                    onClick={e => handleTestModel(m, e)}
+                    disabled={t.state === 'testing'}
+                    title={tip}
+                    style={{
+                      background: 'none', border: `1px solid ${color}40`,
+                      color, cursor: t.state === 'testing' ? 'default' : 'pointer',
+                      fontSize: 10, padding: '4px 8px', flexShrink: 0,
+                      lineHeight: 1, borderRadius: 8,
+                      minWidth: 34, fontFamily: 'inherit',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+                    }}
+                  >
+                    {t.state === 'idle' && <span>测试</span>}
+                    {t.state === 'testing' && <span>⋯</span>}
+                    {t.state === 'success' && (
+                      <>
+                        <span>✓</span>
+                        <span style={{ opacity: 0.75, fontSize: 9 }}>{t.latency}ms</span>
+                      </>
+                    )}
+                    {t.state === 'fail' && <span>✗</span>}
+                  </button>
+                )
+              })()}
 
               {/* 续命目标切换 ⚡ */}
               {!deleteMode && (
