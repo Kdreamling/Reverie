@@ -228,9 +228,10 @@ function SceneTagEditor({ scenes, setScenes }: {
 
 // ─── 模型编辑 Bottom Sheet ─────────────────────────────────────────────────
 
-function ModelEditSheet({ m, channelModels, onClose, onSaved }: {
+function ModelEditSheet({ m, channelModels, channelSupportsImageInput, onClose, onSaved }: {
   m: ModelInfo
   channelModels: string[]
+  channelSupportsImageInput: boolean
   onClose: () => void
   onSaved: () => void
 }) {
@@ -238,7 +239,9 @@ function ModelEditSheet({ m, channelModels, onClose, onSaved }: {
   const [upstream, setUpstream] = useState(m.upstream_model)
   const [label, setLabel] = useState(m.label)
   const [modelType, setModelType] = useState<'chat' | 'embedding'>('chat')
-  const [inputModes, setInputModes] = useState<string[]>(['text'])
+  const [inputModes, setInputModes] = useState<string[]>(
+    channelSupportsImageInput ? ['text', 'image'] : ['text']
+  )
   const [outputModes, setOutputModes] = useState<string[]>(['text'])
   const [capTool, setCapTool] = useState(true)
   const [capReason, setCapReason] = useState(/thinking|reasoner|r1/.test(m.upstream_model.toLowerCase()))
@@ -363,6 +366,9 @@ function ModelEditSheet({ m, channelModels, onClose, onSaved }: {
                   onToggle={toggleIn}
                   disabled
                 />
+                <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>
+                  图片能力由所属通道决定。去「通道编辑 → 支持图片输入」修改。
+                </div>
               </div>
 
               <div>
@@ -1083,6 +1089,7 @@ function ProviderModelsTab({ ch, models, onReload }: {
         <ModelEditSheet
           m={editing}
           channelModels={ch.models}
+          channelSupportsImageInput={!!ch.supports_image_input}
           onClose={() => setEditing(null)}
           onSaved={onReload}
         />
