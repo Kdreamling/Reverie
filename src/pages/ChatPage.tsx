@@ -657,6 +657,23 @@ export default function ChatPage() {
     })
   }
 
+  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const items = e.clipboardData?.items
+    if (!items) return
+    const imageFiles: File[] = []
+    for (const item of Array.from(items)) {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        const f = item.getAsFile()
+        if (f) imageFiles.push(f)
+      }
+    }
+    if (imageFiles.length === 0) return
+    e.preventDefault()
+    const dt = new DataTransfer()
+    imageFiles.forEach(f => dt.items.add(f))
+    handleFileSelect(dt.files)
+  }
+
   async function handleSend() {
     const text = input.trim()
     if ((!text && attachments.length === 0) || isStreaming || !currentSession || sessionEnded) return
@@ -1258,6 +1275,7 @@ export default function ChatPage() {
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
+                  onPaste={handlePaste}
                   onFocus={() => { setIsFocused(true); setShowPlusMenu(false) }}
                   onBlur={() => setIsFocused(false)}
                   disabled={isStreaming || !currentSession || sessionEnded || isLockedByChen}

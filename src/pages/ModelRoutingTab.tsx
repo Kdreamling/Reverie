@@ -18,6 +18,7 @@ interface ChannelInfo {
   note?: string | null
   proxy_url?: string | null
   provider_group?: string | null
+  supports_image_input?: boolean
   source: 'hardcoded' | 'hardcoded_override' | 'db'
 }
 
@@ -576,6 +577,7 @@ function ProviderConfigTab({ ch, onSaved }: {
   const [note, setNote] = useState(ch.note ?? '')
   const [proxyUrl, setProxyUrl] = useState(ch.proxy_url ?? '')
   const [providerGroup, setProviderGroup] = useState(ch.provider_group ?? '')
+  const [supportsImageInput, setSupportsImageInput] = useState(!!ch.supports_image_input)
   const [saving, setSaving] = useState(false)
 
   const buildData = () => {
@@ -588,6 +590,7 @@ function ProviderConfigTab({ ch, onSaved }: {
       channel_tag: channelTag, note,
       proxy_url: proxyUrl,
       provider_group: providerGroup,
+      supports_image_input: supportsImageInput,
     }
     if (apiKey) data.api_key = apiKey
     return data
@@ -658,6 +661,13 @@ function ProviderConfigTab({ ch, onSaved }: {
         <div style={settingRow}>
           <span style={{ fontSize: 14, color: C.text }}>是否启用</span>
           <Toggle checked={enabled} onChange={() => setEnabled(!enabled)} />
+        </div>
+        <div style={settingRow}>
+          <div>
+            <div style={{ fontSize: 14, color: C.text }}>支持图片输入</div>
+            <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>该通道下的模型能否识图</div>
+          </div>
+          <Toggle checked={supportsImageInput} onChange={() => setSupportsImageInput(!supportsImageInput)} />
         </div>
         <div style={settingRow}>
           <div>
