@@ -29,9 +29,9 @@ const MemoryRefBlock = memo(function MemoryRefBlock({ query, found, content, ela
   const [open, setOpen] = useState(false)
   const isActive = found === undefined || found === null
   return (
-    <div className="mb-3" style={{ padding: '8px 14px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, borderRadius: 20, border: '1px dashed rgba(196,154,120,0.25)', background: 'rgba(196,154,120,0.04)', cursor: 'pointer', maxWidth: '100%', minWidth: 0 }} onClick={() => setOpen(o => !o)}>
-      {isActive ? <span className="tool-spinner" /> : <Search size={11} strokeWidth={1.8} style={{ color: C.memoryRefAccent, opacity: 0.8, flexShrink: 0 }} />}
-      <span style={{ fontSize: 11, color: C.textSecondary, fontFamily: ROOM_FONT, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+    <div className="mb-3" style={{ padding: '8px 14px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, borderRadius: 20, border: '1px dashed rgba(196,154,120,0.2)', borderLeft: `2px solid ${C.memoryRefAccent}`, background: 'rgba(122,142,152,0.04)', cursor: 'pointer', maxWidth: '100%', minWidth: 0 }} onClick={() => setOpen(o => !o)}>
+      {isActive ? <span className="tool-spinner" /> : <Search size={13} strokeWidth={1.8} style={{ color: C.memoryRefAccent, flexShrink: 0 }} />}
+      <span style={{ fontSize: 11, color: C.memoryRefAccent, fontFamily: ROOM_FONT, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
         {query || 'Memory search'}{found != null && ` · ${found} found`}
         {elapsed != null && <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
       </span>
@@ -51,9 +51,9 @@ const MemoryOpsBlock = memo(function MemoryOpsBlock({ ops, elapsed }: { ops: Mem
   const labels: Record<string, string> = { saved: 'saved', updated: 'updated', deleted: 'deleted' }
   const colors: Record<string, string> = { saved: C.textSecondary, updated: C.textSecondary, deleted: '#c05050' }
   return (
-    <div className="mb-3" style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 14px', borderRadius: 12, border: '1px dashed rgba(196,154,120,0.2)', background: 'rgba(196,154,120,0.03)', cursor: 'pointer', maxWidth: '100%', minWidth: 0 }} onClick={() => setOpen(o => !o)}>
-      <div className="flex items-center gap-2" style={{ color: C.textSecondary }}>
-        <BookOpen size={11} strokeWidth={1.8} style={{ color: C.memoryOpsAccent, opacity: 0.8, flexShrink: 0 }} />
+    <div className="mb-3" style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 14px', borderRadius: 12, border: '1px dashed rgba(196,154,120,0.18)', borderLeft: `2px solid ${C.memoryOpsAccent}`, background: 'rgba(138,150,119,0.04)', cursor: 'pointer', maxWidth: '100%', minWidth: 0 }} onClick={() => setOpen(o => !o)}>
+      <div className="flex items-center gap-2" style={{ color: C.memoryOpsAccent }}>
+        <BookOpen size={13} strokeWidth={1.8} style={{ color: C.memoryOpsAccent, flexShrink: 0 }} />
         <span style={{ fontSize: 11, fontFamily: ROOM_FONT }}>
           Memory · {ops.length}
           {elapsed != null && <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
@@ -132,14 +132,15 @@ const DevToolOpsBlock = memo(function DevToolOpsBlock({ ops }: { ops: DevToolOp[
       style={{
         display: 'flex', flexDirection: 'column', gap: 4,
         padding: '8px 14px', borderRadius: 12,
-        border: '1px dashed rgba(196,154,120,0.2)',
-        background: 'rgba(196,154,120,0.03)',
+        border: '1px dashed rgba(196,154,120,0.18)',
+        borderLeft: `2px solid ${C.toolsAccent}`,
+        background: 'rgba(160,120,90,0.04)',
         cursor: 'pointer', maxWidth: '100%', minWidth: 0,
       }}
       onClick={() => setOpen(o => !o)}
     >
-      <div className="flex items-center gap-2" style={{ color: C.textSecondary }}>
-        <Wrench size={11} strokeWidth={1.8} style={{ color: C.toolsAccent, opacity: 0.85, flexShrink: 0 }} />
+      <div className="flex items-center gap-2" style={{ color: C.toolsAccent }}>
+        <Wrench size={13} strokeWidth={1.8} style={{ color: C.toolsAccent, flexShrink: 0 }} />
         <span style={{ fontSize: 11, fontFamily: ROOM_FONT }}>
           Tools · {ops.length}
         </span>
@@ -162,7 +163,7 @@ const ThinkingBlock = memo(function ThinkingBlock({ text, thinkingTime }: { text
     <div className="mb-3 cursor-pointer" onClick={() => setOpen(o => !o)}
       style={{
         padding: '12px 18px',
-        borderLeft: '2px solid rgba(139,130,148,0.3)',
+        borderLeft: '3px solid rgba(139,130,148,0.55)',
         fontFamily: READABLE_FONT,
         fontSize: 14.5,
         fontStyle: 'italic',
@@ -170,11 +171,11 @@ const ThinkingBlock = memo(function ThinkingBlock({ text, thinkingTime }: { text
         lineHeight: 1.8,
         transition: 'border-color 0.3s',
       }}
-      onMouseEnter={e => (e.currentTarget.style.borderLeftColor = 'rgba(139,130,148,0.55)')}
-      onMouseLeave={e => (e.currentTarget.style.borderLeftColor = 'rgba(139,130,148,0.3)')}
+      onMouseEnter={e => (e.currentTarget.style.borderLeftColor = 'rgba(139,130,148,0.8)')}
+      onMouseLeave={e => (e.currentTarget.style.borderLeftColor = 'rgba(139,130,148,0.55)')}
     >
-      <div className="flex items-center gap-2" style={{ fontStyle: 'normal', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: C.textMuted, marginBottom: open ? 8 : 0 }}>
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(139,130,148,0.7)" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <div className="flex items-center gap-2" style={{ fontStyle: 'normal', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: C.thinkingAccent, marginBottom: open ? 8 : 0 }}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.thinkingAccent} strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         thought{thinkingTime != null && thinkingTime > 0 ? ` · ${formatElapsed(thinkingTime)}` : ''}
         {open ? <ChevronDown size={10} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={10} strokeWidth={2} style={{ marginLeft: 'auto' }} />}
       </div>
