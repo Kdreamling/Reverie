@@ -125,7 +125,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
           scene_type?: string
           source?: string | null
           created_at: string
+          attachments?: Array<{
+            id: string
+            file_type: 'image' | 'pdf' | 'text'
+            mime_type: string
+            original_filename: string
+            file_size: number
+            preview?: string | null
+          }> | null
         }
+        const attachments = Array.isArray(r.attachments) && r.attachments.length > 0
+          ? r.attachments.map(a => ({
+              id: a.id,
+              file_type: a.file_type,
+              mime_type: a.mime_type,
+              original_filename: a.original_filename,
+              file_size: a.file_size,
+              preview: a.preview ?? undefined,
+            }))
+          : null
         // Event messages (from Dream's device status)
         if (r.scene_type === 'event' && r.user_msg) {
           messages.push({
@@ -147,6 +165,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             created_at: r.created_at,
             conversationId: r.id,
             silentRead: isSilentRead,
+            attachments,
           })
         }
         if (r.assistant_msg && !isSilentRead) {
