@@ -1,4 +1,5 @@
-import { memo, useState, useCallback, useRef as useReactRef, useSyncExternalStore } from 'react'
+import { memo, useState, useCallback, useEffect, useRef as useReactRef, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronDown, ChevronRight, Copy, Trash2, Check, RotateCcw, Brain, FileText, File as FileIcon, Search, BookOpen, Wrench, Sparkles } from 'lucide-react'
 import type { ChatMessage, MessageAttachment, MemoryOperation, DevToolOp } from '../api/chat'
 // ContextDebugPanel import removed (unused)
@@ -286,7 +287,101 @@ function CodeBlock({ children, ...props }: React.HTMLAttributes<HTMLPreElement>)
   )
 }
 
-const mdComponents: Components = { pre: CodeBlock }
+// ─── ChatImage: markdown img renderer with lightbox + load-in fade ──────────
+
+function ChatImage(props: React.ImgHTMLAttributes<HTMLImageElement>) {
+  const { src, alt } = props
+  const [loaded, setLoaded] = useState(false)
+  const [errored, setErrored] = useState(false)
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('keydown', onKey)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [open])
+
+  if (!src) return null
+
+  if (errored) {
+    return (
+      <span className="inline-block my-2 rounded-xl px-3 py-2 text-xs" style={{ border: `1px dashed ${C.borderStrong}`, color: C.textMuted, background: 'rgba(196,154,120,0.04)' }}>
+        图片加载失败 · {alt || 'image'}
+      </span>
+    )
+  }
+
+  return (
+    <>
+      <span
+        className="block my-3"
+        style={{
+          position: 'relative',
+          borderRadius: 14,
+          overflow: 'hidden',
+          maxWidth: 'min(520px, 100%)',
+          background: loaded ? 'transparent' : 'rgba(196,154,120,0.06)',
+          border: loaded ? `1px solid ${C.border}` : `1px dashed ${C.borderStrong}`,
+          cursor: 'zoom-in',
+          transition: 'background 300ms ease, border-color 300ms ease',
+        }}
+        onClick={() => loaded && setOpen(true)}
+      >
+        {!loaded && (
+          <span
+            className="flex items-center justify-center"
+            style={{ width: '100%', aspectRatio: '1 / 1', color: C.textMuted, fontSize: 11, letterSpacing: '0.12em', fontFamily: ROOM_FONT }}
+          >
+            <span className="tool-spinner" style={{ marginRight: 8 }} />
+            载入中
+          </span>
+        )}
+        <img
+          src={src}
+          alt={alt || ''}
+          loading="lazy"
+          onLoad={() => setLoaded(true)}
+          onError={() => setErrored(true)}
+          style={{
+            display: loaded ? 'block' : 'none',
+            width: '100%',
+            height: 'auto',
+            objectFit: 'contain',
+          }}
+        />
+      </span>
+      {open && createPortal(
+        <div
+          onClick={() => setOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(20,15,10,0.82)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 24, cursor: 'zoom-out',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+          }}
+        >
+          <img
+            src={src}
+            alt={alt || ''}
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8, boxShadow: '0 12px 48px rgba(0,0,0,0.4)' }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>,
+        document.body
+      )}
+    </>
+  )
+}
+
+const mdComponents: Components = { pre: CodeBlock, img: ChatImage as Components['img'] }
 
 const MarkdownContent = memo(function MarkdownContent({ content }: { content: string }) {
   // 将 HTML <br/> / <br> 替换为 Markdown 换行
@@ -509,4 +604,4 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
 })
 
 export default MessageItem
-export { MarkdownContent, AiAvatar, UserAvatar }
+export { MarkdownContent, AiAvatar, UserAvatar, ChatImage }

@@ -4,9 +4,13 @@ import { useState } from 'react'
 import { useChatStore, type StreamBlock } from '../stores/chatStore'
 import type { MemoryOperation } from '../api/chat'
 import ReactMarkdown from 'react-markdown'
+import type { Components } from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 import { C } from '../theme'
+import { ChatImage } from './MessageItem'
+
+const streamMdComponents: Components = { img: ChatImage as Components['img'] }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -106,7 +110,7 @@ function StreamingTextBlock({ text }: { text: string }) {
   return (
     <div>
       <div className="md-content">
-        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={streamMdComponents}>
           {displayText}
         </ReactMarkdown>
       </div>
@@ -140,10 +144,82 @@ function LiveThinkingBlock({ text, startTime, elapsed }: { text: string; startTi
   )
 }
 
+// ─── Image generating placeholder (细线方框 · 呼吸点 · "绘制中") ──
+
+function ImageGeneratingCard({ prompt, startTime }: { prompt: string; startTime: number }) {
+  const liveElapsed = useElapsedTimer(startTime)
+  return (
+    <div
+      className="my-3"
+      style={{
+        position: 'relative',
+        maxWidth: 'min(420px, 100%)',
+        aspectRatio: '1 / 1',
+        borderRadius: 14,
+        border: `1px dashed ${C.borderStrong}`,
+        background: 'rgba(196,154,120,0.03)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 14,
+      }}
+    >
+      <span
+        style={{
+          fontFamily: ROOM_FONT,
+          fontSize: 11,
+          letterSpacing: '0.28em',
+          color: C.textSecondary,
+          textTransform: 'uppercase' as const,
+        }}
+      >
+        绘制中
+      </span>
+      <span aria-hidden="true" style={{ display: 'inline-flex', gap: 6 }}>
+        {[0, 1, 2].map(i => (
+          <span
+            key={i}
+            style={{
+              width: 4, height: 4, borderRadius: '50%',
+              background: C.textMuted,
+              animation: 'image-breath 1.6s ease-in-out infinite',
+              animationDelay: `${i * 0.22}s`,
+            }}
+          />
+        ))}
+      </span>
+      {prompt && (
+        <span
+          style={{
+            fontFamily: ROOM_FONT,
+            fontSize: 10.5,
+            color: C.textMuted,
+            maxWidth: '80%',
+            textAlign: 'center' as const,
+            lineHeight: 1.6,
+            padding: '0 16px',
+          }}
+        >
+          {prompt}
+        </span>
+      )}
+      <span style={{ fontSize: 10, color: C.textFaint, fontFamily: ROOM_FONT, letterSpacing: '0.08em' }}>
+        {formatElapsed(liveElapsed)}
+      </span>
+      <style>{`@keyframes image-breath { 0%, 100% { opacity: 0.2; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1); } }`}</style>
+    </div>
+  )
+}
+
 // ─── Live tool searching block
 
 function LiveToolSearchBlock({ query, startTime }: { query: string; startTime: number }) {
   const liveElapsed = useElapsedTimer(startTime)
+  // generate_image 专用占位：后端 SSE 用 "绘制 · <prompt>" 前缀识别
+  if (query && query.startsWith('绘制 · ')) {
+    return <ImageGeneratingCard prompt={query.slice('绘制 · '.length)} startTime={startTime} />
+  }
   return (
     <div className="mb-3" style={{ padding: '8px 14px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, borderRadius: 20, border: '1px dashed rgba(196,154,120,0.25)', background: 'rgba(196,154,120,0.04)', maxWidth: '100%', minWidth: 0 }}>
       <span className="tool-spinner" style={{ width: 10, height: 10, flexShrink: 0 }} />
