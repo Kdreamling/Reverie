@@ -58,6 +58,12 @@ export const C = {
   memoryAccent: '#B8956E',
   memoryBg: 'rgba(212,184,150,0.08)',
 
+  // 消息块功能色（低饱和灰调，色温区分）
+  thinkingAccent: '#8B8294',    // 紫灰 — 内省
+  memoryRefAccent: '#7A8E98',   // 青灰 — 检索
+  memoryOpsAccent: '#8A9677',   // 橄榄灰 — 记录
+  toolsAccent: '#A0785A',       // 茶色 — 工具（主调）
+
   // 侧边栏
   sidebarBg: '#FAF7F2',
   sidebarActive: 'rgba(160,120,90,0.08)',
