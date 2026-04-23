@@ -1,6 +1,6 @@
 import { memo, useState, useCallback, useRef as useReactRef, useSyncExternalStore } from 'react'
 import { ChevronDown, ChevronRight, Copy, Trash2, Check, RotateCcw, Brain, FileText, File as FileIcon } from 'lucide-react'
-import type { ChatMessage, MessageAttachment, MemoryOperation } from '../api/chat'
+import type { ChatMessage, MessageAttachment, MemoryOperation, DevToolOp } from '../api/chat'
 // ContextDebugPanel import removed (unused)
 import { C } from '../theme'
 
@@ -72,6 +72,82 @@ const MemoryOpsBlock = memo(function MemoryOpsBlock({ ops, elapsed }: { ops: Mem
               </span>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  )
+})
+
+const DevToolItem = memo(function DevToolItem({ op }: { op: DevToolOp }) {
+  const [showResult, setShowResult] = useState(false)
+  const hasResult = !!(op.result && op.result.trim())
+  const argsText = op.args ? op.args.trim() : ''
+  const argsTruncated = argsText.length > 80 ? argsText.slice(0, 80) + '…' : argsText
+  return (
+    <div style={{ fontFamily: ROOM_FONT, fontSize: 11, color: C.textSecondary }}>
+      <div
+        className={hasResult ? 'flex items-start gap-2 cursor-pointer' : 'flex items-start gap-2'}
+        onClick={e => { if (hasResult) { e.stopPropagation(); setShowResult(r => !r) } }}
+      >
+        <span style={{ color: C.accent, opacity: 0.7, flexShrink: 0, fontSize: 10 }}>
+          {hasResult ? (showResult ? '▾' : '▸') : '·'}
+        </span>
+        <span className="flex-1 min-w-0" style={{ wordBreak: 'break-word' }}>
+          <span style={{ color: C.textSecondary, fontWeight: 500 }}>{op.tool || '?'}</span>
+          {argsText && (
+            <span style={{ color: C.textMuted, marginLeft: 6 }}>
+              ({argsTruncated})
+            </span>
+          )}
+        </span>
+      </div>
+      {showResult && hasResult && (
+        <pre
+          className="whitespace-pre-wrap mt-1 ml-5"
+          style={{
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+            fontSize: 10.5,
+            color: C.textMuted,
+            background: 'rgba(196,154,120,0.05)',
+            padding: '6px 10px',
+            borderRadius: 6,
+            maxHeight: 320,
+            overflowY: 'auto',
+            wordBreak: 'break-word',
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          {op.result}
+        </pre>
+      )}
+    </div>
+  )
+})
+
+const DevToolOpsBlock = memo(function DevToolOpsBlock({ ops }: { ops: DevToolOp[] }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div
+      className="mb-3"
+      style={{
+        display: 'flex', flexDirection: 'column', gap: 4,
+        padding: '8px 14px', borderRadius: 12,
+        border: '1px dashed rgba(196,154,120,0.2)',
+        background: 'rgba(196,154,120,0.03)',
+        cursor: 'pointer', maxWidth: '100%', minWidth: 0,
+      }}
+      onClick={() => setOpen(o => !o)}
+    >
+      <div className="flex items-center gap-2" style={{ color: C.textSecondary }}>
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.accent, opacity: 0.4 }} />
+        <span style={{ fontSize: 11, fontFamily: ROOM_FONT }}>
+          Tools · {ops.length}
+        </span>
+        {open ? <ChevronDown size={10} strokeWidth={2} style={{ color: C.textMuted }} /> : <ChevronRight size={10} strokeWidth={2} style={{ color: C.textMuted }} />}
+      </div>
+      {open && (
+        <div className="mt-1" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {ops.map((op, i) => <DevToolItem key={i} op={op} />)}
         </div>
       )}
     </div>
@@ -369,6 +445,9 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
       ) : null}
       {msg.memoryOps && msg.memoryOps.length > 0 && (
         <MemoryOpsBlock ops={msg.memoryOps} />
+      )}
+      {msg.devToolOps && msg.devToolOps.length > 0 && (
+        <DevToolOpsBlock ops={msg.devToolOps} />
       )}
 
       {/* Body — serif book paragraph */}

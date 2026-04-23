@@ -170,18 +170,31 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
         if (r.assistant_msg && !isSilentRead) {
           let parsedOps: MemoryOperation[] | null = null
+          let parsedDevOps: Array<{ tool: string; args?: string; result?: string }> | null = null
           let parsedMemoryRef: { query: string; found: number; content: string } | null = null
           let parsedMemoryRefs: Array<{ query: string; found: number; content: string }> | null = null
           if (r.memory_ops) {
             try {
               const raw = typeof r.memory_ops === 'string' ? JSON.parse(r.memory_ops) : r.memory_ops
-              const allOps = raw as Array<{type?: string; content?: string; mem_type?: string; layer?: string; memory_id?: string; new_content?: string; reason?: string; query?: string; found?: number}>
+              const allOps = raw as Array<{type?: string; content?: string; mem_type?: string; layer?: string; memory_id?: string; new_content?: string; reason?: string; query?: string; found?: number; tool?: string; args?: string; result?: string}>
               const searchOps = allOps.filter(op => op.type === 'tool_result')
               if (searchOps.length > 0) {
                 parsedMemoryRef = { query: searchOps[0].query ?? '', found: searchOps[0].found ?? 0, content: searchOps[0].content ?? '' }
                 parsedMemoryRefs = searchOps.map(op => ({ query: op.query ?? '', found: op.found ?? 0, content: op.content ?? '' }))
               }
-              const memOps = allOps.filter(op => op.type !== 'tool_result' && op.type !== 'tool_searching')
+              const devOps = allOps.filter(op => op.type === 'dev_tool_op')
+              if (devOps.length > 0) {
+                parsedDevOps = devOps.map(op => ({
+                  tool: op.tool ?? '?',
+                  args: op.args,
+                  result: op.result,
+                }))
+              }
+              const memOps = allOps.filter(op =>
+                op.type !== 'tool_result'
+                && op.type !== 'tool_searching'
+                && op.type !== 'dev_tool_op'
+              )
               if (memOps.length > 0) {
                 parsedOps = memOps.map(op => ({
                   type: op.type === 'memory_saved' ? 'saved' : op.type === 'memory_updated' ? 'updated' : op.type === 'memory_deleted' ? 'deleted' : (op.type as 'saved'),
@@ -205,6 +218,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             memoryRef: parsedMemoryRef,
             memoryRefs: parsedMemoryRefs,
             memoryOps: parsedOps,
+            devToolOps: parsedDevOps,
             thinkingTime: r.thinking_time ?? null,
             tokens: (r.input_tokens || r.output_tokens) ? { input: r.input_tokens ?? 0, output: r.output_tokens ?? 0, cached: r.cached_tokens ?? 0 } : null,
             source: r.source ?? null,

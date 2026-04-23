@@ -10,6 +10,12 @@ export interface MemoryOperation {
   timestamp: string
 }
 
+export interface DevToolOp {
+  tool: string
+  args?: string
+  result?: string
+}
+
 export interface DebugInfo {
   memories: {
     core_base: { id: string; content: string; importance: number }[]
@@ -75,6 +81,7 @@ export interface ChatMessage {
   memoryRefs?: Array<{ query: string; found: number; content: string }> | null
   silentRead?: boolean
   memoryOps?: MemoryOperation[] | null
+  devToolOps?: DevToolOp[] | null
   conversationId?: string
   tokens?: { input: number; output: number; cached?: number } | null
   thinkingTime?: number | null
