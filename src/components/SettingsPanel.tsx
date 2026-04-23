@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Brain, Settings, LogOut, Camera, Download, FileText, Server, BookOpen, Terminal } from 'lucide-react'
+import { ChevronLeft, Brain, Settings, LogOut, Camera, Download, FileText, Server, BookOpen, Terminal, Plug } from 'lucide-react'
 import { C } from '../theme'
 import { useAuthStore } from '../stores/authStore'
 import { useSessionStore } from '../stores/sessionStore'
@@ -8,8 +8,9 @@ import { exportSession, downloadText } from '../api/export'
 import MemoryPanel from './MemoryPanel'
 import FeaturesPanel from './FeaturesPanel'
 import PromptPanel from './PromptPanel'
+import ExternalToolsPanel from './ExternalToolsPanel'
 
-type Page = 'menu' | 'memory' | 'features' | 'prompt'
+type Page = 'menu' | 'memory' | 'features' | 'prompt' | 'ext-tools'
 
 interface Props {
   page: Page
@@ -140,6 +141,7 @@ export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
     { key: 'memory' as Page, icon: Brain, label: 'Memory', desc: '查看和管理记忆' },
     { key: 'features' as Page, icon: Settings, label: 'Features', desc: '功能开关' },
     { key: 'prompt' as Page, icon: FileText, label: 'Prompt', desc: '编辑晨的提示词' },
+    { key: 'ext-tools' as Page, icon: Plug, label: '外部工具', desc: 'Webhook + MCP 工具接入' },
   ]
 
   if (page === 'memory') {
@@ -162,6 +164,14 @@ export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
     return (
       <div className="fixed md:absolute inset-0 z-50 md:z-10">
         <PromptPanel onBack={() => onPageChange('menu')} />
+      </div>
+    )
+  }
+
+  if (page === 'ext-tools') {
+    return (
+      <div className="fixed md:absolute inset-0 z-50 md:z-10">
+        <ExternalToolsPanel onBack={() => onPageChange('menu')} />
       </div>
     )
   }

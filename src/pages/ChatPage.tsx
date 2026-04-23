@@ -115,7 +115,7 @@ export default function ChatPage() {
   const model = currentSession?.model ?? models[0]?.value ?? FALLBACK_MODELS[0].value
   const sessionEnded = streamSessionEnded || !!currentSession?.closed_by_ai
   const [showSettings, setShowSettings] = useState(false)
-  const [settingsPage, setSettingsPage] = useState<'menu' | 'memory' | 'features' | 'prompt'>('menu')
+  const [settingsPage, setSettingsPage] = useState<'menu' | 'memory' | 'features' | 'prompt' | 'ext-tools'>('menu')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [pcHover, setPcHover] = useState(false)
   const pcHoverTimer = useRef<ReturnType<typeof setTimeout>>()
