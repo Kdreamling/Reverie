@@ -328,15 +328,20 @@ function ChatImage(props: React.ImgHTMLAttributes<HTMLImageElement>) {
           maxWidth: 'min(520px, 100%)',
           background: loaded ? 'transparent' : 'rgba(196,154,120,0.06)',
           border: loaded ? `1px solid ${C.border}` : `1px dashed ${C.borderStrong}`,
-          cursor: 'zoom-in',
-          transition: 'background 300ms ease, border-color 300ms ease',
+          cursor: loaded ? 'zoom-in' : 'default',
+          transition: 'background 400ms ease, border-color 400ms ease',
+          minHeight: loaded ? undefined : 120,
         }}
         onClick={() => loaded && setOpen(true)}
       >
         {!loaded && (
           <span
             className="flex items-center justify-center"
-            style={{ width: '100%', aspectRatio: '1 / 1', color: C.textMuted, fontSize: 11, letterSpacing: '0.12em', fontFamily: ROOM_FONT }}
+            style={{
+              position: 'absolute', inset: 0,
+              color: C.textMuted, fontSize: 11, letterSpacing: '0.12em', fontFamily: ROOM_FONT,
+              pointerEvents: 'none',
+            }}
           >
             <span className="tool-spinner" style={{ marginRight: 8 }} />
             载入中
@@ -345,14 +350,15 @@ function ChatImage(props: React.ImgHTMLAttributes<HTMLImageElement>) {
         <img
           src={src}
           alt={alt || ''}
-          loading="lazy"
           onLoad={() => setLoaded(true)}
           onError={() => setErrored(true)}
           style={{
-            display: loaded ? 'block' : 'none',
+            display: 'block',
             width: '100%',
             height: 'auto',
             objectFit: 'contain',
+            opacity: loaded ? 1 : 0,
+            transition: 'opacity 400ms ease',
           }}
         />
       </span>
