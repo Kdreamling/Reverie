@@ -962,6 +962,7 @@ export default function ChatPage() {
               { label: '共读', action: () => { setSidebarOpen(false); navigate('/bookshelf') } },
               { label: '学习', action: () => { setSidebarOpen(false); navigate('/study') } },
               { label: '日记', action: () => { setSidebarOpen(false); navigate(`/diary/${new Date().toISOString().slice(0, 10)}`) } },
+              { label: '时光册', action: () => { setSidebarOpen(false); navigate('/timeline') } },
               { label: '记忆', action: () => { setShowSettings(true); setSettingsPage('memory') } },
               { label: isNight ? '☀️ 日间' : '🌙 夜间', action: toggleNight },
             ].map(n => (
@@ -1469,6 +1470,11 @@ export default function ChatPage() {
               key: 'calendar', label: '回忆日历',
               icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>,
               action: () => navigate('/calendar'),
+            },
+            {
+              key: 'timeline', label: '时光册',
+              icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>,
+              action: () => navigate('/timeline'),
             },
             {
               key: 'night', label: isNight ? '切换日间' : '切换夜间',
