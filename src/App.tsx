@@ -15,6 +15,7 @@ import AdminPage from './pages/AdminPage'
 import DevPage from './pages/DevPage'
 import XiaokeDiaryPage from './pages/XiaokeDiaryPage'
 import GardenPage from './pages/GardenPage'
+import TimelinePage from './pages/TimelinePage'
 import AuthGuard from './components/AuthGuard'
 import ToastContainer from './components/ToastContainer'
 import { useAuthStore } from './stores/authStore'
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="/dev" element={<DevPage />} />
           <Route path="/xiaoke-diary" element={<XiaokeDiaryPage />} />
           <Route path="/garden" element={<GardenPage />} />
+          <Route path="/timeline" element={<TimelinePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

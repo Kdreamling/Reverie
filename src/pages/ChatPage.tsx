@@ -9,6 +9,8 @@ import { uploadAttachment, type AttachmentInfo } from '../api/attachments'
 import type { MessageAttachment, DreamEvent } from '../api/chat'
 import { fetchDreamEvents } from '../api/chat'
 import { fetchSelectableModels, sceneTypeToScene, type SelectableModel } from '../api/models'
+import { createAnchor } from '../api/anchors'
+import { toast as toastFn } from '../stores/toastStore'
 import SettingsPanel from '../components/SettingsPanel'
 import EventBubble from '../components/EventBubble'
 import MessageItem from '../components/MessageItem'
@@ -345,6 +347,23 @@ export default function ChatPage() {
 
   const handleRetry = useCallback((_msgId: string) => {
     // TODO: implement retry
+  }, [])
+
+  // 锚点：留住这一刻。打包当前 conversation，后端走 LLM 抽取
+  const handleSaveAnchor = useCallback(async (conversationId: string): Promise<boolean> => {
+    const session = useSessionStore.getState().currentSession
+    try {
+      await createAnchor({
+        created_by: 'dream',
+        session_id: session?.id ?? null,
+        conversation_ids: [conversationId],
+      })
+      toastFn.success('收进时光册了')
+      return true
+    } catch (e) {
+      toastFn.error('收藏失败，稍后再试')
+      return false
+    }
   }, [])
 
   // Window-level swipe gesture
@@ -1122,6 +1141,7 @@ export default function ChatPage() {
                     onCopy={handleCopyMsg}
                     onDelete={handleDeleteConv}
                     onRetry={handleRetry}
+                    onSaveAnchor={handleSaveAnchor}
                   />
                 )
               })}

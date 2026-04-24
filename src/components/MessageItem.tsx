@@ -1,6 +1,6 @@
 import { memo, useState, useCallback, useEffect, useRef as useReactRef, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, ChevronRight, Copy, Trash2, Check, RotateCcw, Brain, FileText, File as FileIcon, Search, BookOpen, Wrench, Sparkles } from 'lucide-react'
+import { ChevronDown, ChevronRight, Copy, Trash2, Check, RotateCcw, Brain, FileText, File as FileIcon, Search, BookOpen, Wrench, Sparkles, Bookmark, BookmarkCheck, Loader2 } from 'lucide-react'
 import type { ChatMessage, MessageAttachment, MemoryOperation, DevToolOp } from '../api/chat'
 // ContextDebugPanel import removed (unused)
 import { C } from '../theme'
@@ -490,9 +490,53 @@ interface MessageItemProps {
   onCopy: (id: string, content: string) => void
   onDelete: (conversationId: string) => void
   onRetry: (id: string) => void
+  onSaveAnchor?: (conversationId: string) => Promise<boolean>
+  isAnchored?: boolean
 }
 
-const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, isCopied, onToggleDebug, onCopy, onDelete, onRetry }: MessageItemProps) {
+// ─── 锚点按钮 ────────────────────────────────────────────────────────────────
+// 点一下把这段对话存入时光册。视觉上和其他 action 按钮一致（线条、strokeWidth 1.8）
+const AnchorButton = memo(function AnchorButton({
+  conversationId,
+  size = 13,
+  onSave,
+  initiallySaved,
+}: {
+  conversationId: string
+  size?: number
+  onSave: (conversationId: string) => Promise<boolean>
+  initiallySaved?: boolean
+}) {
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>(initiallySaved ? 'saved' : 'idle')
+
+  const handleClick = useCallback(async () => {
+    if (status !== 'idle') return
+    setStatus('saving')
+    const ok = await onSave(conversationId)
+    setStatus(ok ? 'saved' : 'idle')
+  }, [status, onSave, conversationId])
+
+  const color = status === 'saved' ? C.accent : C.btnDefault
+  const title = status === 'saved' ? '已收入时光册' : status === 'saving' ? '正在收藏…' : '留住这一刻'
+
+  return (
+    <button
+      onClick={handleClick}
+      className="p-1 cursor-pointer transition-colors"
+      style={{ color }}
+      onMouseEnter={e => { if (status === 'idle') (e.currentTarget.style.color = C.accent) }}
+      onMouseLeave={e => { if (status === 'idle') (e.currentTarget.style.color = C.btnDefault) }}
+      title={title}
+      disabled={status !== 'idle'}
+    >
+      {status === 'saving' ? <Loader2 size={size} strokeWidth={1.8} className="animate-spin" />
+       : status === 'saved' ? <BookmarkCheck size={size} strokeWidth={1.8} />
+       : <Bookmark size={size} strokeWidth={1.8} />}
+    </button>
+  )
+})
+
+const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, isCopied, onToggleDebug, onCopy, onDelete, onRetry, onSaveAnchor, isAnchored }: MessageItemProps) {
   if (msg.role === 'user') {
     // 用户消息：右侧轻气泡（书页旁注风格）
     return (
@@ -527,6 +571,9 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
               <button onClick={() => onCopy(msg.id, msg.content)} className="p-1 cursor-pointer transition-colors" style={{ color: isCopied ? C.success : C.btnDefault }} title="复制">
                 {isCopied ? <Check size={12} strokeWidth={2} /> : <Copy size={12} strokeWidth={1.8} />}
               </button>
+              {msg.conversationId && onSaveAnchor && (
+                <AnchorButton conversationId={msg.conversationId} size={12} onSave={onSaveAnchor} initiallySaved={isAnchored} />
+              )}
               {msg.conversationId && (
                 <button onClick={() => onDelete(msg.conversationId!)} className="p-1 cursor-pointer transition-colors" style={{ color: C.btnDefault }} onMouseEnter={e => (e.currentTarget.style.color = C.btnDanger)} onMouseLeave={e => (e.currentTarget.style.color = C.btnDefault)} title="删除">
                   <Trash2 size={12} strokeWidth={1.8} />
@@ -613,6 +660,9 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
           <button onClick={() => onRetry(msg.id)} className="p-1 cursor-pointer transition-colors" style={{ color: C.btnDefault }} onMouseEnter={e => (e.currentTarget.style.color = C.accent)} onMouseLeave={e => (e.currentTarget.style.color = C.btnDefault)} title="重发">
             <RotateCcw size={13} strokeWidth={1.8} />
           </button>
+          {msg.conversationId && onSaveAnchor && (
+            <AnchorButton conversationId={msg.conversationId} size={13} onSave={onSaveAnchor} initiallySaved={isAnchored} />
+          )}
           {msg.conversationId && (
             <button onClick={() => onDelete(msg.conversationId!)} className="p-1 cursor-pointer transition-colors" style={{ color: C.btnDefault }} onMouseEnter={e => (e.currentTarget.style.color = C.btnDanger)} onMouseLeave={e => (e.currentTarget.style.color = C.btnDefault)} title="删除">
               <Trash2 size={13} strokeWidth={1.8} />
