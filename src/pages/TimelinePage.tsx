@@ -344,7 +344,10 @@ export default function TimelinePage() {
 
   return (
     <div style={{
-      minHeight: '100vh',
+      height: '100vh',
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch',
+      touchAction: 'pan-y',
       background: C.bgGradient,
       color: C.text,
     }}>
