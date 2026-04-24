@@ -38,7 +38,7 @@ export default function ArtifactListDrawer({ open, onClose, sessionId }: Artifac
     if (!open || !sessionId) return
     setLoading(true)
     listSessionArtifacts(sessionId)
-      .then(res => setItems(res.data.artifacts || []))
+      .then(res => setItems(res.artifacts || []))
       .catch(() => setItems([]))
       .finally(() => setLoading(false))
   }, [open, sessionId])

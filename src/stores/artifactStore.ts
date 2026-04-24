@@ -57,7 +57,7 @@ export const useArtifactStore = create<ArtifactState>((set, get) => ({
     if (isPersistedId(artifact.id)) {
       getArtifactVersions(artifact.id)
         .then(res => {
-          const versions = res.data?.versions || []
+          const versions = res?.versions || []
           if (versions.length < 1) return
           // 后端按 version asc 返回；面板历史需要 newest first
           const sorted = [...versions].sort((a, b) => b.version - a.version)
