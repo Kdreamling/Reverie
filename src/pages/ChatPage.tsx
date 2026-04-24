@@ -349,49 +349,16 @@ export default function ChatPage() {
     // TODO: implement retry
   }, [])
 
-  // 锚点：留住这一刻。打包当前 conversation 前后 2 轮（同 session，10 分钟边界）
+  // 锚点：留住这一刻。只传点击的这一对 conversation；后端拉前后上下文给 LLM 看，但不存
   const handleSaveAnchor = useCallback(async (conversationId: string): Promise<boolean> => {
     const session = useSessionStore.getState().currentSession
-    const msgs = useChatStore.getState().messages
-
-    // 按出现顺序收集 unique conversationIds（同一 conversation 的 user/assistant 合并）
-    // event 类型消息跳过——那是 Dream 感知层的事件记录，不是对话
-    const seen = new Set<string>()
-    const ordered: { id: string; ts: number }[] = []
-    for (const m of msgs) {
-      if (m.role === 'event') continue
-      if (!m.conversationId || seen.has(m.conversationId)) continue
-      seen.add(m.conversationId)
-      ordered.push({ id: m.conversationId, ts: new Date(m.created_at).getTime() })
-    }
-
-    const centerIdx = ordered.findIndex(o => o.id === conversationId)
-    const TEN_MIN = 10 * 60 * 1000
-
-    const pack: string[] = []
-    if (centerIdx >= 0) {
-      pack.push(ordered[centerIdx].id)
-      // 向前最多 2 轮，跨越 10 分钟 gap 则截断
-      for (let i = centerIdx - 1; i >= Math.max(0, centerIdx - 2); i--) {
-        if (Math.abs(ordered[i + 1].ts - ordered[i].ts) > TEN_MIN) break
-        pack.unshift(ordered[i].id)
-      }
-      // 向后最多 2 轮
-      for (let i = centerIdx + 1; i <= Math.min(ordered.length - 1, centerIdx + 2); i++) {
-        if (Math.abs(ordered[i].ts - ordered[i - 1].ts) > TEN_MIN) break
-        pack.push(ordered[i].id)
-      }
-    } else {
-      pack.push(conversationId)
-    }
-
     try {
       await createAnchor({
         created_by: 'dream',
         session_id: session?.id ?? null,
-        conversation_ids: pack,
+        conversation_ids: [conversationId],
       })
-      toastFn.success(pack.length > 1 ? `收进时光册了（${pack.length} 轮）` : '收进时光册了')
+      toastFn.success('收进时光册了')
       return true
     } catch (e) {
       toastFn.error('收藏失败，稍后再试')
