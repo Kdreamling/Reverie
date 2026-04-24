@@ -355,9 +355,11 @@ export default function ChatPage() {
     const msgs = useChatStore.getState().messages
 
     // 按出现顺序收集 unique conversationIds（同一 conversation 的 user/assistant 合并）
+    // event 类型消息跳过——那是 Dream 感知层的事件记录，不是对话
     const seen = new Set<string>()
     const ordered: { id: string; ts: number }[] = []
     for (const m of msgs) {
+      if (m.role === 'event') continue
       if (!m.conversationId || seen.has(m.conversationId)) continue
       seen.add(m.conversationId)
       ordered.push({ id: m.conversationId, ts: new Date(m.created_at).getTime() })
