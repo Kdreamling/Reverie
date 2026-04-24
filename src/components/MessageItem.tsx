@@ -389,7 +389,12 @@ function ChatImage(props: React.ImgHTMLAttributes<HTMLImageElement>) {
 
 const mdComponents: Components = { pre: CodeBlock, img: ChatImage as Components['img'] }
 
-const MarkdownContent = memo(function MarkdownContent({ content }: { content: string }) {
+interface MarkdownContentProps {
+  content: string
+  savedArtifacts?: Array<{ index: number; id: string; version: number; title: string; type: string }> | null
+}
+
+const MarkdownContent = memo(function MarkdownContent({ content, savedArtifacts }: MarkdownContentProps) {
   // 将 HTML <br/> / <br> 替换为 Markdown 换行
   const normalized = content.replace(/<br\s*\/?>/gi, '\n')
   const { artifacts, cleanContent } = parseArtifacts(normalized)
@@ -418,7 +423,17 @@ const MarkdownContent = memo(function MarkdownContent({ content }: { content: st
         // Artifact placeholder
         const artIndex = parseInt(part)
         const artifact = artifacts[artIndex]
-        return artifact ? <ArtifactCard key={`art-${i}`} artifact={artifact} index={artIndex} /> : null
+        if (!artifact) return null
+        const saved = savedArtifacts?.find(a => a.index === artIndex)
+        return (
+          <ArtifactCard
+            key={`art-${i}`}
+            artifact={artifact}
+            index={artIndex}
+            savedId={saved?.id}
+            savedVersion={saved?.version}
+          />
+        )
       })}
     </div>
   )
@@ -568,7 +583,7 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
         color: C.text,
         letterSpacing: '0.01em',
       }}>
-        <MarkdownContent content={msg.content} />
+        <MarkdownContent content={msg.content} savedArtifacts={msg.artifacts} />
       </div>
 
       {/* Action row — only on hover */}

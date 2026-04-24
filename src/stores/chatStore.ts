@@ -25,6 +25,7 @@ interface SseEvent {
   reason?: string
   usage?: { input_tokens?: number; output_tokens?: number; prompt_tokens?: number; completion_tokens?: number; cached_tokens?: number }
   debug_info?: DebugInfo
+  artifacts?: Array<{ index: number; id: string; version: number; title: string; type: string }>
 }
 
 interface MemorySearchResult {
@@ -590,6 +591,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     tokens,
                     thinkingTime: thinkingElapsedTime,
                     debugInfo: event.debug_info ?? null,
+                    artifacts: event.artifacts ?? null,
                   }
                   set(s => ({
                     messages: [...s.messages, assistantMsg],

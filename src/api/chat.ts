@@ -88,6 +88,7 @@ export interface ChatMessage {
   debugInfo?: DebugInfo | null
   attachments?: MessageAttachment[] | null
   source?: string | null
+  artifacts?: Array<{ index: number; id: string; version: number; title: string; type: string }> | null
 }
 
 export interface ReadingContextPayload {

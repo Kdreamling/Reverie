@@ -15,22 +15,26 @@ const typeConfig: Record<string, { label: string; color: string; iconD: string; 
 interface ArtifactCardProps {
   artifact: ParsedArtifact
   index: number
+  /** 真 id（后端 SSE done.artifacts 回带），有就走 /versions 拉跨轮历史 */
+  savedId?: string
+  savedVersion?: number
 }
 
-const ArtifactCard = memo(function ArtifactCard({ artifact, index }: ArtifactCardProps) {
+const ArtifactCard = memo(function ArtifactCard({ artifact, index, savedId, savedVersion }: ArtifactCardProps) {
   const openArtifact = useArtifactStore(s => s.openArtifact)
   const registerArtifact = useArtifactStore(s => s.registerArtifact)
   const config = typeConfig[artifact.type] || typeConfig.code
-  const isUpdate = !!artifact.ref || (artifact.version && artifact.version > 1)
+  const effectiveVersion = savedVersion || artifact.version || 1
+  const isUpdate = !!artifact.ref || effectiveVersion > 1
 
   const artObj = {
-    id: `inline-${index}-${artifact.title}`,
+    id: savedId || `inline-${index}-${artifact.title}`,
     session_id: '',
     type: artifact.type as any,
     title: artifact.title,
     language: artifact.language,
     content: artifact.content,
-    version: artifact.version || 1,
+    version: effectiveVersion,
     created_at: new Date().toISOString(),
   }
 
@@ -111,7 +115,7 @@ const ArtifactCard = memo(function ArtifactCard({ artifact, index }: ArtifactCar
               fontSize: 10, padding: '2px 7px', borderRadius: 5,
               background: config.color + '15', color: config.color, fontWeight: 600,
             }}>
-              v{artifact.version}
+              v{effectiveVersion}
             </span>
           )}
           <span style={{ fontSize: 11, color: C.textMuted }}>{config.label}</span>

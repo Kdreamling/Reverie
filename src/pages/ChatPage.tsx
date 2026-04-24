@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
-import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square, MapPin, Image, DoorClosed, DoorOpen, Brain } from 'lucide-react'
+import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square, MapPin, Image, DoorClosed, DoorOpen, Brain, Files } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
@@ -14,6 +14,7 @@ import EventBubble from '../components/EventBubble'
 import MessageItem from '../components/MessageItem'
 import StreamingMessage from '../components/StreamingMessage'
 import ArtifactPanel from '../components/artifact/ArtifactPanel'
+import ArtifactListDrawer from '../components/artifact/ArtifactListDrawer'
 import MemorySheetPanel from '../components/MemorySheetPanel'
 import PushNotification from '../components/PushNotification'
 import { C, getModelColor } from '../theme'
@@ -115,6 +116,7 @@ export default function ChatPage() {
   const model = currentSession?.model ?? models[0]?.value ?? FALLBACK_MODELS[0].value
   const sessionEnded = streamSessionEnded || !!currentSession?.closed_by_ai
   const [showSettings, setShowSettings] = useState(false)
+  const [showArtifactList, setShowArtifactList] = useState(false)
   const [settingsPage, setSettingsPage] = useState<'menu' | 'memory' | 'features' | 'prompt' | 'ext-tools'>('menu')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [pcHover, setPcHover] = useState(false)
@@ -1055,18 +1057,39 @@ export default function ChatPage() {
               )}
             </div>
 
-            {/* Right: new chat */}
-            <button
-              onClick={() => { if (!isLockedByChen) handleCreateWithScene(currentSession?.scene_type || 'daily') }}
-              className="flex items-center justify-center rounded-xl cursor-pointer transition-all"
-              style={{ width: 36, height: 36, color: nTextMuted, background: 'transparent', border: 'none', opacity: isLockedByChen ? 0.3 : 1 }}
-              onMouseEnter={e => { e.currentTarget.style.background = nGlassHover; e.currentTarget.style.color = nAccent }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = nTextMuted }}
-            >
-              <Plus size={17} strokeWidth={1.5} />
-            </button>
+            {/* Right: artifact list + new chat */}
+            <div className="flex items-center gap-1">
+              {currentSession?.id && (
+                <button
+                  onClick={() => setShowArtifactList(true)}
+                  className="flex items-center justify-center rounded-xl cursor-pointer transition-all"
+                  style={{ width: 36, height: 36, color: nTextMuted, background: 'transparent', border: 'none' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = nGlassHover; e.currentTarget.style.color = nAccent }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = nTextMuted }}
+                  title="本次会话的 Artifacts"
+                >
+                  <Files size={16} strokeWidth={1.5} />
+                </button>
+              )}
+              <button
+                onClick={() => { if (!isLockedByChen) handleCreateWithScene(currentSession?.scene_type || 'daily') }}
+                className="flex items-center justify-center rounded-xl cursor-pointer transition-all"
+                style={{ width: 36, height: 36, color: nTextMuted, background: 'transparent', border: 'none', opacity: isLockedByChen ? 0.3 : 1 }}
+                onMouseEnter={e => { e.currentTarget.style.background = nGlassHover; e.currentTarget.style.color = nAccent }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = nTextMuted }}
+              >
+                <Plus size={17} strokeWidth={1.5} />
+              </button>
+            </div>
           </div>
         </div>
+        {currentSession?.id && (
+          <ArtifactListDrawer
+            open={showArtifactList}
+            onClose={() => setShowArtifactList(false)}
+            sessionId={currentSession.id}
+          />
+        )}
 
         {/* Messages — full room scroll */}
         <main ref={mainRef} className="flex-1 overflow-y-auto flex flex-col" style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>

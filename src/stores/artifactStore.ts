@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Artifact } from '../api/artifacts'
+import { getArtifactVersions } from '../api/artifacts'
 
 export interface InlineArtifact extends Artifact {
   /** Previous versions of this artifact (newest first) */
@@ -20,6 +21,11 @@ interface ArtifactState {
   viewVersion: (index: number) => void
 }
 
+function isPersistedId(id: string): boolean {
+  // 后端 UUID：36 位带 -，前端假 id：inline-N-title
+  return !id.startsWith('inline-')
+}
+
 export const useArtifactStore = create<ArtifactState>((set, get) => ({
   registry: new Map(),
   currentArtifact: null,
@@ -38,15 +44,34 @@ export const useArtifactStore = create<ArtifactState>((set, get) => ({
   openArtifact: (artifact) => {
     const { registry } = get()
     const key = artifact.title.toLowerCase()
-    const versions = registry.get(key) || []
+    const memoryVersions = registry.get(key) || []
 
-    // Build history from all versions with the same title
+    // 先用内存 Map 的 history 兜底，保证面板立刻有内容
     const withHistory: InlineArtifact = {
       ...artifact,
-      history: versions.length > 1 ? [...versions].reverse() : [],
+      history: memoryVersions.length > 1 ? [...memoryVersions].reverse() : [],
     }
-
     set({ currentArtifact: withHistory, isOpen: true, viewingVersionIndex: 0 })
+
+    // 真 id 时异步拉 DB 里的完整版本链，替换掉内存 history
+    if (isPersistedId(artifact.id)) {
+      getArtifactVersions(artifact.id)
+        .then(res => {
+          const versions = res.data?.versions || []
+          if (versions.length < 1) return
+          // 后端按 version asc 返回；面板历史需要 newest first
+          const sorted = [...versions].sort((a, b) => b.version - a.version)
+          // 找到当前 artifact 对应的版本；拿不到就用后端最新
+          const current = get().currentArtifact
+          if (!current || current.id !== artifact.id) return
+          const newest = sorted[0]
+          set({
+            currentArtifact: { ...newest, history: sorted.length > 1 ? sorted : [] },
+            viewingVersionIndex: 0,
+          })
+        })
+        .catch(() => { /* 接口失败保持内存兜底 */ })
+    }
   },
 
   closePanel: () => set({ isOpen: false }),
