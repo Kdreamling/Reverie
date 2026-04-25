@@ -246,8 +246,6 @@ function ModelEditSheet({ m, channelModels, channelSupportsImageInput, onClose, 
   const [capTool, setCapTool] = useState(true)
   const [capReason, setCapReason] = useState(/thinking|reasoner|r1/.test(m.upstream_model.toLowerCase()))
   const [scenes, setScenes] = useState<string[]>(m.scene_tags)
-  const [thinkingOn, setThinkingOn] = useState(capReason)
-  const [thinkingFmt, setThinkingFmt] = useState('openai')
   const [sortOrder, setSortOrder] = useState(m.sort_order)
   const [note, setNote] = useState(m.note ?? '')
 
@@ -408,24 +406,13 @@ function ModelEditSheet({ m, channelModels, channelSupportsImageInput, onClose, 
               </div>
 
               <div style={{ ...card, padding: 0 }}>
-                <div style={{ ...settingRow, padding: '12px 14px' }}>
+                <div style={{ ...settingRow, padding: '12px 14px', borderBottom: 'none' }}>
                   <div>
                     <div style={{ fontSize: 13, color: C.text }}>Thinking</div>
-                    <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>开启后，晨可以展示思考过程</div>
+                    <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>跟随供应商设置，在供应商配置页修改</div>
                   </div>
-                  <Toggle checked={thinkingOn} onChange={() => setThinkingOn(!thinkingOn)} />
+                  <span style={{ fontSize: 12, color: C.textMuted }}>通道级</span>
                 </div>
-                {thinkingOn && (
-                  <div style={{ ...settingRow, padding: '12px 14px', borderBottom: 'none' }}>
-                    <span style={{ fontSize: 13, color: C.text }}>Thinking 格式</span>
-                    <select value={thinkingFmt} onChange={e => setThinkingFmt(e.target.value)}
-                      style={{ fontSize: 13, color: C.textSecondary, background: 'none', border: `1px solid ${C.border}`, padding: '4px 8px', borderRadius: 8, cursor: 'pointer', outline: 'none' }}>
-                      <option value="openai">openai (reasoning_content)</option>
-                      <option value="openai_xml">openai_xml (&lt;thinking&gt;)</option>
-                      <option value="native">native (Anthropic)</option>
-                    </select>
-                  </div>
-                )}
               </div>
 
               <div>
@@ -584,15 +571,23 @@ function ProviderConfigTab({ ch, onSaved }: {
   const [proxyUrl, setProxyUrl] = useState(ch.proxy_url ?? '')
   const [providerGroup, setProviderGroup] = useState(ch.provider_group ?? '')
   const [supportsImageInput, setSupportsImageInput] = useState(!!ch.supports_image_input)
+  const [thinkingOn, setThinkingOn] = useState(ch.supports_thinking)
+  const [thinkingFmt, setThinkingFmt] = useState(ch.thinking_format || 'openai')
   const [saving, setSaving] = useState(false)
+
+  const handleProviderChange = (v: string) => {
+    setProvider(v)
+    if (v === 'anthropic') setThinkingFmt('native')
+    else if (thinkingFmt === 'native') setThinkingFmt('openai')
+  }
 
   const buildData = () => {
     const parsed = parseModelsText(modelsText)
     const data: Record<string, unknown> = {
       provider, base_url: baseUrl,
       models: parsed.models, model_overrides: parsed.model_overrides,
-      supports_thinking: ch.supports_thinking, // 保留：模型级切到 advanced tab 后此处不动
-      thinking_format: ch.thinking_format,
+      supports_thinking: thinkingOn,
+      thinking_format: thinkingFmt,
       channel_tag: channelTag, note,
       proxy_url: proxyUrl,
       provider_group: providerGroup,
@@ -641,7 +636,7 @@ function ProviderConfigTab({ ch, onSaved }: {
       <div style={card}>
         <div style={settingRow}>
           <span style={{ fontSize: 14, color: C.text }}>供应商类型</span>
-          <select value={provider} onChange={e => setProvider(e.target.value)}
+          <select value={provider} onChange={e => handleProviderChange(e.target.value)}
             style={{ fontSize: 13, color: C.textSecondary, background: 'none', border: 'none', textAlign: 'right', cursor: 'pointer', outline: 'none' }}>
             <option value="openai_compatible">OpenAI Compatible</option>
             <option value="anthropic">Anthropic</option>
@@ -675,6 +670,24 @@ function ProviderConfigTab({ ch, onSaved }: {
           </div>
           <Toggle checked={supportsImageInput} onChange={() => setSupportsImageInput(!supportsImageInput)} />
         </div>
+        <div style={settingRow}>
+          <div>
+            <div style={{ fontSize: 14, color: C.text }}>Thinking</div>
+            <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>该通道是否支持思考过程</div>
+          </div>
+          <Toggle checked={thinkingOn} onChange={() => setThinkingOn(!thinkingOn)} />
+        </div>
+        {thinkingOn && (
+          <div style={settingRow}>
+            <span style={{ fontSize: 14, color: C.text }}>Thinking 格式</span>
+            <select value={thinkingFmt} onChange={e => setThinkingFmt(e.target.value)}
+              style={{ fontSize: 13, color: C.textSecondary, background: 'none', border: `1px solid ${C.border}`, padding: '4px 8px', borderRadius: 8, cursor: 'pointer', outline: 'none' }}>
+              <option value="openai">openai (reasoning_content)</option>
+              <option value="openai_xml">openai_xml (&lt;thinking&gt;)</option>
+              <option value="native">native (Anthropic)</option>
+            </select>
+          </div>
+        )}
         <div style={settingRow}>
           <div>
             <div style={{ fontSize: 14, color: C.text }}>多 Key 模式</div>
