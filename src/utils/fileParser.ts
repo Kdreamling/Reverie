@@ -22,29 +22,97 @@ export function getBaseName(filename: string): string {
   return i >= 0 ? filename.slice(0, i) : filename
 }
 
+function isCJK(ch: string): boolean {
+  if (!ch) return false
+  const code = ch.charCodeAt(0)
+  return (code >= 0x3000 && code <= 0x9FFF) || (code >= 0xFF00 && code <= 0xFFEF)
+}
+
+// Join two visual lines from the same paragraph into one continuous string.
+// CJK: no separator. English hyphenated word break: drop the hyphen. Otherwise: single space.
+function joinLines(prev: string, next: string): string {
+  if (!prev) return next
+  if (!next) return prev
+  const last = prev[prev.length - 1]
+  const first = next[0]
+  if (last === '-' && /[a-zA-Z]/.test(first)) return prev.slice(0, -1) + next
+  if (isCJK(last) || isCJK(first)) return prev + next
+  return prev + ' ' + next
+}
+
 async function parsePdf(file: File): Promise<string> {
-  // Use the legacy build — compiled to ES2017, works on older Safari / iOS
-  // versions that don't have Promise.withResolvers etc.
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-  // Worker is served from public/ as .js (NOT .mjs) so nginx returns the
-  // correct application/javascript MIME — Safari refuses module workers
-  // served as application/octet-stream (the default for .mjs).
   pdfjs.GlobalWorkerOptions.workerSrc = '/chat/pdf.worker.js'
 
   const buffer = await file.arrayBuffer()
   const pdf = await pdfjs.getDocument({ data: buffer }).promise
-  const parts: string[] = []
+  const pageTexts: string[] = []
+
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i)
     const content = await page.getTextContent()
-    const text = content.items
-      .map((item: any) => ('str' in item ? item.str : ''))
-      .join(' ')
-      .replace(/\s+\n/g, '\n')
-      .trim()
-    if (text) parts.push(text)
+
+    // Stage 1 — aggregate items into visual lines.
+    // pdfjs flags line ends with `hasEOL`; for older builds we also detect
+    // line breaks by y-coordinate changes in the transform matrix.
+    type Line = { y: number; text: string; height: number }
+    const lines: Line[] = []
+    let buf = ''
+    let lineY = 0
+    let lineH = 0
+    let prevY: number | null = null
+
+    const flushLine = () => {
+      if (buf.trim()) lines.push({ y: lineY, text: buf, height: lineH || 12 })
+      buf = ''
+      lineY = 0
+      lineH = 0
+      prevY = null
+    }
+
+    for (const raw of content.items) {
+      const item = raw as { str?: string; hasEOL?: boolean; transform?: number[]; height?: number }
+      const str = item.str ?? ''
+      const y = item.transform ? item.transform[5] : null
+      const h = item.height ?? 0
+
+      // Detect implicit line break by y-jump (fallback when hasEOL missing)
+      if (y !== null && prevY !== null && Math.abs(y - prevY) > 2 && buf) {
+        flushLine()
+      }
+
+      buf += str
+      if (y !== null) {
+        lineY = y
+        prevY = y
+      }
+      if (h) lineH = Math.max(lineH, h)
+
+      if (item.hasEOL) flushLine()
+    }
+    flushLine()
+
+    // Stage 2 — merge consecutive lines into paragraphs by vertical gap.
+    // Gap > 1.5 × line height ⇒ paragraph break.
+    const paragraphs: string[] = []
+    let para = ''
+    for (let j = 0; j < lines.length; j++) {
+      const line = lines[j]
+      const next = lines[j + 1]
+      para = joinLines(para, line.text.trim())
+      const gap = next ? line.y - next.y : Infinity
+      const refH = next ? Math.max(line.height, next.height) : line.height
+      if (gap > refH * 1.5) {
+        if (para.trim()) paragraphs.push(para.trim())
+        para = ''
+      }
+    }
+    if (para.trim()) paragraphs.push(para.trim())
+
+    if (paragraphs.length) pageTexts.push(paragraphs.join('\n\n'))
   }
-  return parts.join('\n\n')
+
+  return pageTexts.join('\n\n')
 }
 
 async function parseDocx(file: File): Promise<string> {
