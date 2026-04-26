@@ -5,15 +5,13 @@ import { useReadingStore } from '../../stores/readingStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { C, getModelColor } from '../../theme'
+import { client } from '../../api/client'
 
-const MODELS = [
-  { value: 'deepseek-chat', label: 'DeepSeek Chat' },
-  { value: '[0.1]claude-opus-4-6-thinking', label: 'Claude Opus 4.6' },
-  { value: 'claude-opus-4-6', label: 'Claude Opus (闲鱼)' },
-  { value: 'anthropic/claude-opus-4.6', label: 'Claude Opus (OR)' },
-  { value: 'claude-opus-4.6-zenmux', label: 'Claude Opus (ZM)' },
-  { value: 'claude-opus-4.6-guagua', label: 'Claude Opus (呱呱)' },
-]
+interface SelectableModel {
+  value: string
+  label: string
+  channel?: string
+}
 
 interface ReadingChatViewProps {
   sessionId: string
@@ -34,10 +32,19 @@ export default function ReadingChatView({ sessionId, onClose }: ReadingChatViewP
 
   const [input, setInput] = useState('')
   const [showModelPicker, setShowModelPicker] = useState(false)
+  const [models, setModels] = useState<SelectableModel[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const model = currentSession?.model ?? MODELS[0].value
-  const modelLabel = MODELS.find(m => m.value === model)?.label ?? model
+  const model = currentSession?.model ?? models[0]?.value ?? ''
+  const modelLabel = models.find(m => m.value === model)?.label ?? (model || '加载中…')
+
+  useEffect(() => {
+    let cancelled = false
+    client.get<{ models: SelectableModel[] }>('/models/selectable?scene=reading')
+      .then(resp => { if (!cancelled) setModels(resp.models ?? []) })
+      .catch(err => console.error('[ReadingChatView] failed to load models', err))
+    return () => { cancelled = true }
+  }, [])
 
   // Always reload messages when panel opens
   useEffect(() => {
@@ -150,7 +157,7 @@ export default function ReadingChatView({ sessionId, onClose }: ReadingChatViewP
                     boxShadow: '0 8px 32px rgba(100,80,50,0.12)',
                     overflow: 'hidden',
                   }}>
-                    {MODELS.map(m => (
+                    {models.map(m => (
                       <div
                         key={m.value}
                         onClick={() => { updateSessionModel(m.value); setShowModelPicker(false) }}
