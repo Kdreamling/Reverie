@@ -19,6 +19,7 @@ interface ChannelInfo {
   proxy_url?: string | null
   provider_group?: string | null
   supports_image_input?: boolean
+  supports_cache?: boolean
   source: 'hardcoded' | 'hardcoded_override' | 'db'
 }
 
@@ -571,6 +572,7 @@ function ProviderConfigTab({ ch, onSaved }: {
   const [proxyUrl, setProxyUrl] = useState(ch.proxy_url ?? '')
   const [providerGroup, setProviderGroup] = useState(ch.provider_group ?? '')
   const [supportsImageInput, setSupportsImageInput] = useState(!!ch.supports_image_input)
+  const [supportsCache, setSupportsCache] = useState(!!ch.supports_cache)
   const [thinkingOn, setThinkingOn] = useState(ch.supports_thinking)
   const [thinkingFmt, setThinkingFmt] = useState(ch.thinking_format || 'openai')
   const [saving, setSaving] = useState(false)
@@ -592,6 +594,7 @@ function ProviderConfigTab({ ch, onSaved }: {
       proxy_url: proxyUrl,
       provider_group: providerGroup,
       supports_image_input: supportsImageInput,
+      supports_cache: supportsCache,
     }
     if (apiKey) data.api_key = apiKey
     return data
@@ -669,6 +672,13 @@ function ProviderConfigTab({ ch, onSaved }: {
             <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>该通道下的模型能否识图</div>
           </div>
           <Toggle checked={supportsImageInput} onChange={() => setSupportsImageInput(!supportsImageInput)} />
+        </div>
+        <div style={settingRow}>
+          <div>
+            <div style={{ fontSize: 14, color: C.text }}>支持缓存</div>
+            <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>对该通道请求加 cache_control 断点（节省重复 prompt 成本）</div>
+          </div>
+          <Toggle checked={supportsCache} onChange={() => setSupportsCache(!supportsCache)} />
         </div>
         <div style={settingRow}>
           <div>
