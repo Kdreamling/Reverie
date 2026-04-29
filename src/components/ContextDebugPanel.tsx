@@ -71,7 +71,7 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
   const { token_usage } = debugInfo
   const usageRatio = token_usage.budget > 0 ? token_usage.total / token_usage.budget : 0
 
-  const hasSessionSummary = debugInfo.session_summary?.exists ?? false
+  const hasSessionSummary = (debugInfo.session_summary?.exists ?? false) || !!debugInfo.previous_session_tail?.content
   const sessionMemCount = debugInfo.session_memories?.length ?? 0
   const graphTotal = (debugInfo.graph?.seed_nodes?.length ?? 0) + (debugInfo.graph?.expanded_nodes?.length ?? 0)
   const lifeItemCount = debugInfo.life_items?.length ?? 0
@@ -369,19 +369,39 @@ function SummaryDetail({ debugInfo }: { debugInfo: DebugInfo }) {
 
 function SessionSummaryDetail({ debugInfo }: { debugInfo: DebugInfo }) {
   const content = debugInfo.session_summary?.content || ''
+  const tail = debugInfo.previous_session_tail
   return (
-    <div
-      className="rounded-lg px-2.5 py-2 text-xs"
-      style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${C.border}` }}
-    >
-      <span
-        className="px-1.5 py-0.5 rounded text-xs font-medium mb-1 inline-block"
-        style={{ background: C.sidebarActive, color: C.accent, fontSize: 10 }}
+    <>
+      {tail?.content && (
+        <div
+          className="rounded-lg px-2.5 py-2 text-xs"
+          style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${C.border}` }}
+        >
+          <div className="flex items-center gap-1.5 mb-1">
+            <span
+              className="px-1.5 py-0.5 rounded text-xs font-medium"
+              style={{ background: '#e8d5c4', color: '#8b6914', fontSize: 10 }}
+            >
+              昨日对话尾巴
+            </span>
+            <span style={{ color: C.textMuted, fontSize: 10 }}>{tail.rounds}轮 · {tail.tokens} tokens</span>
+          </div>
+          <div className="leading-relaxed mt-1 whitespace-pre-wrap" style={{ color: C.text, wordBreak: 'break-word', fontSize: 12 }}>{tail.content}</div>
+        </div>
+      )}
+      <div
+        className="rounded-lg px-2.5 py-2 text-xs"
+        style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${C.border}` }}
       >
-        前情概要
-      </span>
-      <div className="leading-relaxed mt-1 md-content" style={{ color: C.text, wordBreak: 'break-word', fontSize: 12 }}><ReactMarkdown>{content}</ReactMarkdown></div>
-    </div>
+        <span
+          className="px-1.5 py-0.5 rounded text-xs font-medium mb-1 inline-block"
+          style={{ background: C.sidebarActive, color: C.accent, fontSize: 10 }}
+        >
+          前情概要
+        </span>
+        <div className="leading-relaxed mt-1 md-content" style={{ color: C.text, wordBreak: 'break-word', fontSize: 12 }}><ReactMarkdown>{content}</ReactMarkdown></div>
+      </div>
+    </>
   )
 }
 

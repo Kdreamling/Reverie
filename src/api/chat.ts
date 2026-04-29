@@ -31,6 +31,7 @@ export interface DebugInfo {
   summaries: { dimension: string; content: string }[]
   token_usage: { budget: number; memories: number; search: number; summaries: number; total: number; graph?: number }
   session_summary?: { content: string; exists: boolean }
+  previous_session_tail?: { rounds: number; tokens: number; content: string }
   session_memories?: { id: string; content: string; mem_type: string }[]
   graph?: {
     seed_nodes: {
