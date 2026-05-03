@@ -214,9 +214,9 @@ html.dashboard-active #root::after {
   animation: blink 1.2s ease-in-out infinite;
 }
 
-/* Input fade gradient */
+/* Input fade gradient. absolute (not fixed) so it tracks #root on iOS keyboard open */
 .input-fade-overlay {
-  position: fixed;
+  position: absolute;
   bottom: 0; left: 0; right: 0;
   height: 200px;
   background: linear-gradient(to top, #F8F4EE 30%, transparent);
@@ -224,9 +224,9 @@ html.dashboard-active #root::after {
   z-index: 40;
 }
 
-/* Header fade gradient — keeps nav buttons readable when messages scroll underneath */
+/* Header fade gradient — keeps nav buttons readable when messages scroll underneath. absolute so it tracks #root */
 .header-fade-overlay {
-  position: fixed;
+  position: absolute;
   top: 0; left: 0; right: 0;
   height: calc(72px + env(safe-area-inset-top));
   background: linear-gradient(to bottom, #F8F4EE 55%, transparent);

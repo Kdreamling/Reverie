@@ -996,8 +996,8 @@ export default function ChatPage() {
         {/* Header fade overlay — keeps nav buttons readable when messages scroll underneath */}
         <div className="header-fade-overlay" />
 
-        {/* Floating header — minimal */}
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 30, pointerEvents: 'none', paddingTop: 'env(safe-area-inset-top)' }}>
+        {/* Floating header — minimal. absolute (not fixed) so it stays inside #root, which tracks visualViewport on iOS keyboard open */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30, pointerEvents: 'none', paddingTop: 'env(safe-area-inset-top)' }}>
           <div className="flex items-center justify-between px-4 py-3" style={{ pointerEvents: 'auto' }}>
             {/* Left: menu button (mobile) / sidebar trigger (pc) */}
             <button
@@ -1218,9 +1218,9 @@ export default function ChatPage() {
         {/* Input fade overlay */}
         <div className="input-fade-overlay" />
 
-        {/* Input area — floating paper */}
+        {/* Input area — floating paper. absolute (not fixed) so iOS keyboard pushes it up with the visual viewport */}
         <div style={{
-            position: 'fixed', bottom: 'calc(24px + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)',
+            position: 'absolute', bottom: 'calc(24px + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)',
             width: 580, maxWidth: 'calc(100% - 32px)',
             zIndex: 50,
           }}>
