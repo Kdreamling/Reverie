@@ -1,14 +1,13 @@
 import { memo, useEffect, useSyncExternalStore } from 'react'
-import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { useChatStore, type StreamBlock } from '../stores/chatStore'
-import type { MemoryOperation } from '../api/chat'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 import { C } from '../theme'
 import { ChatImage } from './MessageItem'
+import ProcessTrace, { type TraceItem } from './ProcessTrace'
 
 const streamMdComponents: Components = { img: ChatImage as Components['img'] }
 
@@ -27,6 +26,35 @@ function useElapsedTimer(startTime: number | null): number {
     return () => clearInterval(id)
   }, [startTime])
   return elapsed
+}
+
+function blockToTraceItem(block: StreamBlock, idx: number): TraceItem | null {
+  switch (block.kind) {
+    case 'thinking':
+      return {
+        kind: 'thinking', id: `thinking-${idx}`,
+        text: block.text, elapsed: block.elapsed,
+        live: block.elapsed === null, startTime: block.startTime,
+      }
+    case 'tool_searching':
+      return {
+        kind: 'memory_search', id: `search-${idx}`,
+        query: block.query, live: true, startTime: block.startTime,
+      }
+    case 'tool_result':
+      return {
+        kind: 'memory_search', id: `search-${idx}`,
+        query: block.query, found: block.found, content: block.content,
+        elapsed: block.elapsed, live: false,
+      }
+    case 'memory_op':
+      return {
+        kind: 'memory_op', id: `op-${idx}`,
+        op: block.op, elapsed: block.elapsed,
+      }
+    default:
+      return null
+  }
 }
 
 // ─── Artifact streaming helpers ──────────────────────────────────────────────
@@ -120,29 +148,6 @@ function StreamingTextBlock({ text }: { text: string }) {
 }
 
 const ROOM_FONT = "'EB Garamond', 'Noto Serif SC', 'Cormorant Garamond', Georgia, serif"
-const READABLE_FONT = "'Iowan Old Style', 'Charter', 'Palatino Linotype', 'Palatino', 'Noto Serif SC', Georgia, serif"
-
-// ─── Live thinking block with elapsed timer
-
-function LiveThinkingBlock({ text, startTime, elapsed }: { text: string; startTime: number; elapsed: number | null }) {
-  const [open, setOpen] = useState(true)
-  const isActive = elapsed === null
-  const liveElapsed = useElapsedTimer(isActive ? startTime : null)
-  const displayTime = elapsed ?? liveElapsed
-
-  return (
-    <div className="mb-3 cursor-pointer" onClick={() => setOpen(o => !o)}
-      style={{ padding: '12px 18px', borderLeft: '2px solid rgba(196,154,120,0.25)', fontFamily: READABLE_FONT, fontSize: 14.5, color: C.textMuted, lineHeight: 1.8 }}>
-      <div className="flex items-center gap-2" style={{ fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase' as const, marginBottom: open ? 8 : 0 }}>
-        {isActive ? <span className="tool-spinner" style={{ width: 10, height: 10 }} /> :
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(196,154,120,0.5)" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>}
-        thinking{displayTime != null && displayTime > 0 ? ` · ${formatElapsed(displayTime)}` : ''}
-        {open ? <ChevronDown size={10} strokeWidth={2} style={{ marginLeft: 'auto' }} /> : <ChevronRight size={10} strokeWidth={2} style={{ marginLeft: 'auto' }} />}
-      </div>
-      {open && <p className="whitespace-pre-wrap" style={{ fontStyle: 'italic', fontFamily: READABLE_FONT, fontSize: 14.5, lineHeight: 1.85, color: C.textSecondary }}>{text}</p>}
-    </div>
-  )
-}
 
 // ─── Image generating placeholder (细线方框 · 呼吸点 · "绘制中") ──
 
@@ -212,77 +217,6 @@ function ImageGeneratingCard({ prompt, startTime }: { prompt: string; startTime:
   )
 }
 
-// ─── Live tool searching block
-
-function LiveToolSearchBlock({ query, startTime }: { query: string; startTime: number }) {
-  const liveElapsed = useElapsedTimer(startTime)
-  // generate_image 专用占位：后端 SSE 用 "绘制 · <prompt>" 前缀识别
-  if (query && query.startsWith('绘制 · ')) {
-    return <ImageGeneratingCard prompt={query.slice('绘制 · '.length)} startTime={startTime} />
-  }
-  return (
-    <div className="mb-3" style={{ padding: '8px 14px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, borderRadius: 20, border: '1px dashed rgba(196,154,120,0.25)', background: 'rgba(196,154,120,0.04)', maxWidth: '100%', minWidth: 0 }}>
-      <span className="tool-spinner" style={{ width: 10, height: 10, flexShrink: 0 }} />
-      <span style={{ fontSize: 11, color: C.textSecondary, fontFamily: ROOM_FONT, overflowWrap: 'break-word', minWidth: 0 }}>
-        {query || 'searching'} <span style={{ color: C.textMuted }}>({formatElapsed(liveElapsed)})</span>
-      </span>
-    </div>
-  )
-}
-
-// ─── Tool result block (collapsed)
-
-function ToolResultBlock({ query, found, content, elapsed }: { query: string; found: number; content: string; elapsed: number | null }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="mb-3 cursor-pointer" onClick={() => setOpen(o => !o)}
-      style={{ display: 'flex', flexDirection: 'column' as const, padding: '8px 14px', borderRadius: 20, border: '1px dashed rgba(196,154,120,0.25)', background: 'rgba(196,154,120,0.04)', maxWidth: '100%', minWidth: 0 }}>
-      <div className="flex items-center gap-2 flex-wrap" style={{ minWidth: 0 }}>
-        <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.accent, opacity: 0.5, flexShrink: 0 }} />
-        <span style={{ fontSize: 11, color: C.textSecondary, fontFamily: ROOM_FONT, overflowWrap: 'break-word', minWidth: 0, flex: '1 1 auto' }}>
-          {query || 'search'} · {found} found
-          {elapsed != null && <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
-        </span>
-        {open ? <ChevronDown size={9} strokeWidth={2} style={{ color: C.textMuted, flexShrink: 0 }} /> : <ChevronRight size={9} strokeWidth={2} style={{ color: C.textMuted, flexShrink: 0 }} />}
-      </div>
-      {open && content && <p className="text-xs leading-relaxed whitespace-pre-wrap mt-2" style={{ color: C.textMuted, fontFamily: ROOM_FONT, overflowWrap: 'break-word' }}>{content}</p>}
-    </div>
-  )
-}
-
-// ─── Memory op block
-
-function MemoryOpBlock({ op, elapsed }: { op: MemoryOperation; elapsed: number | null }) {
-  return (
-    <div className="mb-3" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 20, border: '1px dashed rgba(196,154,120,0.2)', background: 'rgba(196,154,120,0.03)', maxWidth: '100%', minWidth: 0 }}>
-      <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.accent, opacity: 0.4, flexShrink: 0 }} />
-      <span style={{ fontSize: 11, color: C.textSecondary, fontFamily: ROOM_FONT, overflowWrap: 'break-word', minWidth: 0 }}>
-        memory {op.type}
-        {elapsed != null && <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
-      </span>
-    </div>
-  )
-}
-
-// ─── Individual block renderer (memo'd to prevent re-rendering stable blocks)
-
-const StreamBlockRenderer = memo(function StreamBlockRenderer({ block }: { block: StreamBlock }) {
-  switch (block.kind) {
-    case 'thinking':
-      return <LiveThinkingBlock text={block.text} startTime={block.startTime} elapsed={block.elapsed} />
-    case 'text':
-      return <StreamingTextBlock text={block.text} />
-    case 'tool_searching':
-      return <LiveToolSearchBlock query={block.query} startTime={block.startTime} />
-    case 'tool_result':
-      return <ToolResultBlock query={block.query} found={block.found} content={block.content} elapsed={block.elapsed} />
-    case 'memory_op':
-      return <MemoryOpBlock op={block.op} elapsed={block.elapsed} />
-    default:
-      return null
-  }
-})
-
 // ─── AiAvatar (duplicated to avoid circular import)
 let _avVer = 0
 function _subAv(cb: () => void) {
@@ -309,6 +243,36 @@ function AiAvatar() {
 
 // ─── Main StreamingMessage ───────────────────────────────────────────────────
 
+function renderStreamBlocks(blocks: StreamBlock[]): React.ReactNode[] {
+  const out: React.ReactNode[] = []
+  let traceBuffer: TraceItem[] = []
+  let traceKey = 0
+
+  const flushTrace = () => {
+    if (traceBuffer.length > 0) {
+      out.push(<ProcessTrace key={`trace-${traceKey}`} items={traceBuffer} defaultOpenLast />)
+      traceBuffer = []
+      traceKey += 1
+    }
+  }
+
+  blocks.forEach((block, i) => {
+    if (block.kind === 'text') {
+      flushTrace()
+      if (block.text) out.push(<StreamingTextBlock key={`text-${i}`} text={block.text} />)
+    } else if (block.kind === 'tool_searching' && block.query.startsWith('绘制 · ')) {
+      flushTrace()
+      out.push(<ImageGeneratingCard key={`img-${i}`} prompt={block.query.slice('绘制 · '.length)} startTime={block.startTime} />)
+    } else {
+      const item = blockToTraceItem(block, i)
+      if (item) traceBuffer.push(item)
+    }
+  })
+  flushTrace()
+
+  return out
+}
+
 export default function StreamingMessage() {
   const isStreaming = useChatStore(s => s.isStreaming)
   const streamBlocks = useChatStore(s => s.streamBlocks)
@@ -327,13 +291,12 @@ export default function StreamingMessage() {
       <div style={{
         fontFamily: "'EB Garamond', 'Noto Serif SC', 'Cormorant Garamond', Georgia, serif",
         fontSize: 16.5,
+        fontWeight: 500,
         lineHeight: 2,
         color: C.text,
         letterSpacing: '0.01em',
       }}>
-        {streamBlocks.map((block, i) => (
-          <StreamBlockRenderer key={`sb-${i}`} block={block} />
-        ))}
+        {renderStreamBlocks(streamBlocks)}
       </div>
     </div>
   )

@@ -1,9 +1,10 @@
 import { memo, useState, useCallback, useEffect, useRef as useReactRef, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, ChevronRight, Copy, Trash2, Check, RotateCcw, Brain, FileText, File as FileIcon, Search, BookOpen, Wrench, Sparkles, Bookmark, BookmarkCheck, Loader2 } from 'lucide-react'
-import type { ChatMessage, MessageAttachment, MemoryOperation, DevToolOp } from '../api/chat'
+import { Copy, Trash2, Check, RotateCcw, Brain, FileText, File as FileIcon, Bookmark, BookmarkCheck, Loader2 } from 'lucide-react'
+import type { ChatMessage, MessageAttachment } from '../api/chat'
 // ContextDebugPanel import removed (unused)
 import { C } from '../theme'
+import ProcessTrace, { type TraceItem } from './ProcessTrace'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -18,184 +19,9 @@ function formatMsgTime(iso: string) {
   return `${month}/${day} ${time}`
 }
 
-function formatElapsed(seconds: number): string {
-  return seconds.toFixed(1) + 's'
-}
-
 // ─── Sub-components (all memo'd) ─────────────────────────────────────────────
 
 const ROOM_FONT = "'EB Garamond', 'Noto Serif SC', 'Cormorant Garamond', Georgia, serif"
-
-const MemoryRefBlock = memo(function MemoryRefBlock({ query, found, content, elapsed }: { query: string; found: number; content: string; elapsed?: number | null }) {
-  const [open, setOpen] = useState(false)
-  const isActive = found === undefined || found === null
-  return (
-    <div className="mb-3" style={{ padding: '8px 14px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, borderRadius: 12, border: '1px dashed rgba(196,154,120,0.22)', background: 'rgba(122,142,152,0.04)', cursor: 'pointer', maxWidth: '100%', minWidth: 0 }} onClick={() => setOpen(o => !o)}>
-      {isActive ? <span className="tool-spinner" /> : <Search size={13} strokeWidth={1.8} style={{ color: C.memoryRefAccent, flexShrink: 0 }} />}
-      <span style={{ fontSize: 11, color: C.memoryRefAccent, fontFamily: ROOM_FONT, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-        {query || 'Memory search'}{found != null && ` · ${found} found`}
-        {elapsed != null && <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
-      </span>
-      {!isActive && (open ? <ChevronDown size={10} strokeWidth={2} style={{ marginLeft: 4, color: C.textMuted }} /> : <ChevronRight size={10} strokeWidth={2} style={{ marginLeft: 4, color: C.textMuted }} />)}
-      {open && content && (
-        <p className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: C.textMuted, wordBreak: 'break-word', overflowWrap: 'anywhere', marginTop: 4, fontFamily: ROOM_FONT }}>
-          {content || '（无内容）'}
-        </p>
-      )}
-    </div>
-  )
-})
-
-const MemoryOpsBlock = memo(function MemoryOpsBlock({ ops, elapsed }: { ops: MemoryOperation[]; elapsed?: number | null }) {
-  const [open, setOpen] = useState(false)
-  const symbols: Record<string, string> = { saved: '◉', updated: '◎', deleted: '⊗' }
-  const labels: Record<string, string> = { saved: 'saved', updated: 'updated', deleted: 'deleted' }
-  const colors: Record<string, string> = { saved: C.textSecondary, updated: C.textSecondary, deleted: '#c05050' }
-  return (
-    <div className="mb-3" style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 14px', borderRadius: 12, border: '1px dashed rgba(196,154,120,0.22)', background: 'rgba(138,150,119,0.04)', cursor: 'pointer', maxWidth: '100%', minWidth: 0 }} onClick={() => setOpen(o => !o)}>
-      <div className="flex items-center gap-2" style={{ color: C.memoryOpsAccent }}>
-        <BookOpen size={13} strokeWidth={1.8} style={{ color: C.memoryOpsAccent, flexShrink: 0 }} />
-        <span style={{ fontSize: 11, fontFamily: ROOM_FONT }}>
-          Memory · {ops.length}
-          {elapsed != null && <span style={{ color: C.textMuted, marginLeft: 4 }}>({formatElapsed(elapsed)})</span>}
-        </span>
-        {open ? <ChevronDown size={10} strokeWidth={2} style={{ color: C.textMuted }} /> : <ChevronRight size={10} strokeWidth={2} style={{ color: C.textMuted }} />}
-      </div>
-      {open && (
-        <div className="space-y-1.5 mt-1">
-          {ops.map((op, i) => (
-            <div key={i} className="flex items-start gap-2" style={{ fontSize: 11, color: C.textSecondary, fontFamily: ROOM_FONT }}>
-              <span className="flex-shrink-0" style={{ color: colors[op.type], fontSize: 10 }}>
-                {symbols[op.type]} {labels[op.type]}
-              </span>
-              <span className="leading-relaxed" style={{ color: C.textMuted }}>
-                {op.type === 'deleted' ? `ID: ${op.memory_id?.slice(0, 8)}...` : (op.content || '（内容为空）')}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-})
-
-const DevToolItem = memo(function DevToolItem({ op }: { op: DevToolOp }) {
-  const [showResult, setShowResult] = useState(false)
-  const hasResult = !!(op.result && op.result.trim())
-  const argsText = op.args ? op.args.trim() : ''
-  const argsTruncated = argsText.length > 80 ? argsText.slice(0, 80) + '…' : argsText
-  return (
-    <div style={{ fontFamily: ROOM_FONT, fontSize: 11, color: C.textSecondary }}>
-      <div
-        className={hasResult ? 'flex items-start gap-2 cursor-pointer' : 'flex items-start gap-2'}
-        onClick={e => { if (hasResult) { e.stopPropagation(); setShowResult(r => !r) } }}
-      >
-        <span style={{ color: C.accent, opacity: 0.7, flexShrink: 0, fontSize: 10 }}>
-          {hasResult ? (showResult ? '▾' : '▸') : '·'}
-        </span>
-        <span className="flex-1 min-w-0" style={{ wordBreak: 'break-word' }}>
-          <span style={{ color: C.textSecondary, fontWeight: 500 }}>{op.tool || '?'}</span>
-          {argsText && (
-            <span style={{ color: C.textMuted, marginLeft: 6 }}>
-              ({argsTruncated})
-            </span>
-          )}
-        </span>
-      </div>
-      {showResult && hasResult && (
-        <pre
-          className="whitespace-pre-wrap mt-1 ml-5"
-          style={{
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-            fontSize: 10.5,
-            color: C.textMuted,
-            background: 'rgba(196,154,120,0.05)',
-            padding: '6px 10px',
-            borderRadius: 6,
-            maxHeight: 320,
-            overflowY: 'auto',
-            wordBreak: 'break-word',
-          }}
-          onClick={e => e.stopPropagation()}
-        >
-          {op.result}
-        </pre>
-      )}
-    </div>
-  )
-})
-
-const DevToolOpsBlock = memo(function DevToolOpsBlock({ ops }: { ops: DevToolOp[] }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div
-      className="mb-3"
-      style={{
-        display: 'flex', flexDirection: 'column', gap: 4,
-        padding: '8px 14px', borderRadius: 12,
-        border: '1px dashed rgba(196,154,120,0.22)',
-        background: 'rgba(160,120,90,0.04)',
-        cursor: 'pointer', maxWidth: '100%', minWidth: 0,
-      }}
-      onClick={() => setOpen(o => !o)}
-    >
-      <div className="flex items-center gap-2" style={{ color: C.toolsAccent }}>
-        <Wrench size={13} strokeWidth={1.8} style={{ color: C.toolsAccent, flexShrink: 0 }} />
-        <span style={{ fontSize: 11, fontFamily: ROOM_FONT }}>
-          Tools · {ops.length}
-        </span>
-        {open ? <ChevronDown size={10} strokeWidth={2} style={{ color: C.textMuted }} /> : <ChevronRight size={10} strokeWidth={2} style={{ color: C.textMuted }} />}
-      </div>
-      {open && (
-        <div className="mt-1" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {ops.map((op, i) => <DevToolItem key={i} op={op} />)}
-        </div>
-      )}
-    </div>
-  )
-})
-
-const READABLE_FONT = "'Iowan Old Style', 'Charter', 'Palatino Linotype', 'Palatino', 'Noto Serif SC', Georgia, serif"
-
-const ThinkingBlock = memo(function ThinkingBlock({ text, thinkingTime }: { text: string; thinkingTime?: number | null }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div
-      className="mb-3"
-      style={{
-        display: 'flex', flexDirection: 'column', gap: 4,
-        padding: '8px 14px', borderRadius: 12,
-        border: '1px dashed rgba(196,154,120,0.22)',
-        background: 'rgba(139,130,148,0.04)',
-        cursor: 'pointer', maxWidth: '100%', minWidth: 0,
-      }}
-      onClick={() => setOpen(o => !o)}
-    >
-      <div className="flex items-center gap-2" style={{ color: C.thinkingAccent }}>
-        <Sparkles size={13} strokeWidth={1.8} style={{ color: C.thinkingAccent, flexShrink: 0 }} />
-        <span style={{ fontSize: 11, fontFamily: ROOM_FONT }}>
-          Thought{thinkingTime != null && thinkingTime > 0 ? ` · ${formatElapsed(thinkingTime)}` : ''}
-        </span>
-        {open ? <ChevronDown size={10} strokeWidth={2} style={{ color: C.textMuted, marginLeft: 'auto' }} /> : <ChevronRight size={10} strokeWidth={2} style={{ color: C.textMuted, marginLeft: 'auto' }} />}
-      </div>
-      {open && (
-        <p
-          className="whitespace-pre-wrap"
-          style={{
-            color: C.textSecondary,
-            fontStyle: 'italic',
-            fontFamily: READABLE_FONT,
-            fontSize: 14,
-            lineHeight: 1.85,
-            marginTop: 4,
-          }}
-        >
-          {text}
-        </p>
-      )}
-    </div>
-  )
-})
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return bytes + 'B'
@@ -602,30 +428,38 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
         <span style={{ fontSize: 11, color: C.textMuted }}>{formatMsgTime(msg.created_at)}</span>
       </div>
 
-      {/* Thinking — margin note style */}
-      {(msg.thinking || msg.thinking_summary) && (
-        <ThinkingBlock text={(msg.thinking ?? msg.thinking_summary)!} thinkingTime={msg.thinkingTime} />
-      )}
-
-      {/* Memory refs */}
-      {msg.memoryRefs && msg.memoryRefs.length > 0 ? (
-        msg.memoryRefs.map((ref, i) => (
-          <MemoryRefBlock key={i} query={ref.query} found={ref.found} content={ref.content} />
-        ))
-      ) : msg.memoryRef ? (
-        <MemoryRefBlock query={msg.memoryRef.query} found={msg.memoryRef.found} content={msg.memoryRef.content} />
-      ) : null}
-      {msg.memoryOps && msg.memoryOps.length > 0 && (
-        <MemoryOpsBlock ops={msg.memoryOps} />
-      )}
-      {msg.devToolOps && msg.devToolOps.length > 0 && (
-        <DevToolOpsBlock ops={msg.devToolOps} />
-      )}
+      {/* Process trace — thinking + memory + tool, kelivo-style stacked card */}
+      {(() => {
+        const items: TraceItem[] = []
+        const thinkingText = msg.thinking ?? msg.thinking_summary
+        if (thinkingText) {
+          items.push({ kind: 'thinking', id: 'thinking', text: thinkingText, elapsed: msg.thinkingTime })
+        }
+        if (msg.memoryRefs && msg.memoryRefs.length > 0) {
+          msg.memoryRefs.forEach((ref, i) => items.push({
+            kind: 'memory_search', id: `mref-${i}`, query: ref.query, found: ref.found, content: ref.content,
+          }))
+        } else if (msg.memoryRef) {
+          items.push({
+            kind: 'memory_search', id: 'mref', query: msg.memoryRef.query, found: msg.memoryRef.found, content: msg.memoryRef.content,
+          })
+        }
+        if (msg.memoryOps && msg.memoryOps.length > 0) {
+          msg.memoryOps.forEach((op, i) => items.push({ kind: 'memory_op', id: `mop-${i}`, op }))
+        }
+        if (msg.devToolOps && msg.devToolOps.length > 0) {
+          msg.devToolOps.forEach((op, i) => items.push({
+            kind: 'tool', id: `tool-${i}`, tool: op.tool, args: op.args, result: op.result,
+          }))
+        }
+        return items.length > 0 ? <ProcessTrace items={items} /> : null
+      })()}
 
       {/* Body — serif book paragraph */}
       <div style={{
         fontFamily: "'EB Garamond', 'Noto Serif SC', 'Cormorant Garamond', Georgia, serif",
         fontSize: 16.5,
+        fontWeight: 500,
         lineHeight: 2,
         color: C.text,
         letterSpacing: '0.01em',
