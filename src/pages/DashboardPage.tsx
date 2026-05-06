@@ -5,7 +5,6 @@ import { fetchUsageStats, fetchCalendarDates, fetchCalendarDetail } from '../api
 import type { UsageStats, CalendarDates, CalendarDetail, KeepaliveLog } from '../api/dashboard'
 import { fetchLifeItemsCalendar, fetchLifeItems, toggleLifeItemComplete, fetchHabitsCalendar, logHabitAPI, type LifeItem, type HabitLog, type HabitInfo } from '../api/lifeItems'
 import { fetchDiaryDates, fetchDiariesByDate, type DiaryDates, type Diary } from '../api/diary'
-import PeriodCard from '../components/PeriodCard'
 
 // === Dual Theme Tokens ===
 const THEMES = {
@@ -496,9 +495,6 @@ export default function DashboardPage() {
         <StatCard icon={TrendingUp} label="Avg/msg" value={`$${(todayStats?.totals.avg_cost ?? 0).toFixed(3)}`} sub="Opus 4.6" C={C} />
         <StatCard icon={Clock} label="Month" value={`$${(monthStats?.totals.cost ?? 0).toFixed(2)}`} sub={`已省 $${(monthStats?.totals.saved ?? 0).toFixed(1)}`} C={C} />
       </div>
-
-      {/* Period card */}
-      <PeriodCard C={C} />
 
       {/* Trend */}
       {sparkData.length >= 2 && (
