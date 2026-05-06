@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
 import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square, MapPin, Image, DoorClosed, DoorOpen, Brain, Files } from 'lucide-react'
+import StatusBar from '../components/StatusBar'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
@@ -1236,6 +1237,9 @@ export default function ChatPage() {
               />
 
               {/* 敲门弹窗已移至最外层 */}
+
+              {/* Status bar */}
+              <StatusBar isNight={isNight} />
 
               {/* Streaming hint */}
               {isStreaming && (
