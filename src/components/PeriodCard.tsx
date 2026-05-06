@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Droplet } from 'lucide-react'
-import { getLatestPeriod, createPeriod, type PeriodLatest } from '../api/period'
+import { getLatestPeriod, createPeriod, deletePeriod, type PeriodLatest } from '../api/period'
 
 interface ThemeC {
   bgCard: string
@@ -56,6 +56,28 @@ export default function PeriodCard({ C }: Props) {
     }
   }
 
+  async function undoLatest() {
+    if (submitting || !data?.latest) return
+    if (!confirm(`撤销 ${data.latest.start_date} 的记录？`)) return
+    setSubmitting(true)
+    try {
+      await deletePeriod(data.latest.id)
+      await load()
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      alert(`撤销失败: ${msg}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // 今天（北京时区）字符串
+  const bjToday = (() => {
+    const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }))
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })()
+  const isLatestToday = data?.latest?.start_date === bjToday
+
   const cardStyle: React.CSSProperties = {
     margin: '0 20px 20px',
     padding: 16,
@@ -87,24 +109,49 @@ export default function PeriodCard({ C }: Props) {
             Period
           </span>
         </div>
-        <button
-          onClick={logToday}
-          disabled={submitting}
-          style={{
-            background: 'transparent',
-            color: C.amber,
-            border: `1px solid ${C.border}`,
-            borderRadius: 8,
-            padding: '5px 12px',
-            fontSize: 11,
-            fontFamily: "'Noto Sans SC'",
-            cursor: submitting ? 'wait' : 'pointer',
-            opacity: submitting ? 0.6 : 1,
-            transition: 'all 0.2s',
-          }}
-        >
-          {submitting ? '...' : '今天来了'}
-        </button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {!isLatestToday && (
+            <button
+              onClick={logToday}
+              disabled={submitting}
+              style={{
+                background: 'transparent',
+                color: C.amber,
+                border: `1px solid ${C.border}`,
+                borderRadius: 8,
+                padding: '5px 12px',
+                fontSize: 11,
+                fontFamily: "'Noto Sans SC'",
+                cursor: submitting ? 'wait' : 'pointer',
+                opacity: submitting ? 0.6 : 1,
+                transition: 'all 0.2s',
+              }}
+            >
+              {submitting ? '...' : '今天来了'}
+            </button>
+          )}
+          {data?.latest && (
+            <button
+              onClick={undoLatest}
+              disabled={submitting}
+              title={`撤销 ${data.latest.start_date} 的记录`}
+              style={{
+                background: 'transparent',
+                color: C.textMuted,
+                border: `1px solid ${C.border}`,
+                borderRadius: 8,
+                padding: '5px 10px',
+                fontSize: 11,
+                fontFamily: "'Noto Sans SC'",
+                cursor: submitting ? 'wait' : 'pointer',
+                opacity: submitting ? 0.6 : 1,
+                transition: 'all 0.2s',
+              }}
+            >
+              {isLatestToday ? '撤销今天' : '撤销上次'}
+            </button>
+          )}
+        </div>
       </div>
 
       {data?.latest ? (
