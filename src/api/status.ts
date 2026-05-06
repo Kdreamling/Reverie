@@ -29,3 +29,7 @@ export async function getTodayStatus(): Promise<DayStatus> {
 export async function updateTodayStatus(fields: Partial<DayStatus>): Promise<DayStatus> {
   return client.put<DayStatus>('/status/today', fields)
 }
+
+export async function fetchWeather(): Promise<DayStatus> {
+  return client.post<DayStatus>('/status/weather', {})
+}

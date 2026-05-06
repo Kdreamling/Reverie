@@ -6,7 +6,7 @@ import {
   Utensils, CloudSun, Heart, Droplet, BedDouble,
 } from 'lucide-react'
 import { C } from '../theme'
-import { getTodayStatus, updateTodayStatus, type DayStatus } from '../api/status'
+import { getTodayStatus, updateTodayStatus, fetchWeather, type DayStatus } from '../api/status'
 import { getLatestPeriod, createPeriod, deletePeriod, type PeriodLatest } from '../api/period'
 
 const MOODS = [
@@ -41,6 +41,18 @@ export default function StatusBar({ isNight }: Props) {
     getTodayStatus().then(setStatus).catch(() => {})
     getLatestPeriod().then(setPeriod).catch(() => {})
   }, [])
+
+  const [weatherLoading, setWeatherLoading] = useState(false)
+
+  const refreshWeather = async () => {
+    if (weatherLoading) return
+    setWeatherLoading(true)
+    try {
+      const updated = await fetchWeather()
+      setStatus(updated)
+    } catch { /* silent */ }
+    setWeatherLoading(false)
+  }
 
   const save = useCallback((fields: Partial<DayStatus>) => {
     setStatus(prev => prev ? { ...prev, ...fields } : prev)
@@ -190,9 +202,10 @@ export default function StatusBar({ isNight }: Props) {
 
       {/* expanded panel */}
       <div style={{
-        maxHeight: expanded ? 520 : 0,
+        maxHeight: expanded ? '60vh' : 0,
         opacity: expanded ? 1 : 0,
-        overflow: 'hidden',
+        overflowX: 'hidden',
+        overflowY: expanded ? 'auto' : 'hidden',
         transition: 'max-height 0.35s ease, opacity 0.25s ease',
         background: nSurface,
         backdropFilter: 'blur(30px)',
@@ -200,6 +213,7 @@ export default function StatusBar({ isNight }: Props) {
         borderRadius: '0 0 14px 14px',
         border: expanded ? `1px solid ${nBorder}` : '1px solid transparent',
         borderTop: 'none',
+        scrollbarWidth: 'none',
       }}>
         <div style={{ padding: '12px 14px 14px', display: 'flex', flexDirection: 'column', gap: 2 }}>
 
@@ -270,43 +284,49 @@ export default function StatusBar({ isNight }: Props) {
             <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 4 }}>
               <CloudSun size={9} strokeWidth={2} />
               weather
+              <button
+                onClick={refreshWeather}
+                disabled={weatherLoading}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: weatherLoading ? 'wait' : 'pointer',
+                  padding: 0,
+                  marginLeft: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <RefreshCw
+                  size={9}
+                  strokeWidth={2}
+                  color={nAccent}
+                  style={{
+                    animation: weatherLoading ? 'spin 1s linear infinite' : 'none',
+                    opacity: weatherLoading ? 0.5 : 0.8,
+                  }}
+                />
+              </button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input
-                type="text"
-                placeholder="晴 / 多云 / 雨..."
-                value={status?.weather_text ?? ''}
-                onChange={e => save({ weather_text: e.target.value || null } as Partial<DayStatus>)}
-                style={{
-                  flex: 1,
-                  background: 'transparent',
-                  border: `1px solid ${nBorder}`,
-                  borderRadius: 10,
-                  padding: '6px 10px',
-                  fontSize: 12,
+              {status?.weather_text ? (
+                <span style={{
+                  fontSize: 13,
                   color: nText,
                   fontFamily: "'Noto Sans SC'",
-                  outline: 'none',
-                }}
-              />
-              <input
-                type="number"
-                placeholder="°C"
-                value={status?.weather_temp ?? ''}
-                onChange={e => save({ weather_temp: e.target.value ? parseFloat(e.target.value) : null } as Partial<DayStatus>)}
-                style={{
-                  width: 56,
-                  background: 'transparent',
-                  border: `1px solid ${nBorder}`,
-                  borderRadius: 10,
-                  padding: '6px 8px',
-                  fontSize: 12,
-                  color: nText,
-                  fontFamily: "'Space Grotesk'",
-                  outline: 'none',
-                  textAlign: 'center',
-                }}
-              />
+                }}>
+                  {status.weather_text}
+                  {status.weather_temp != null && (
+                    <span style={{ fontFamily: "'Space Grotesk'", fontWeight: 600, marginLeft: 6 }}>
+                      {status.weather_temp}°C
+                    </span>
+                  )}
+                </span>
+              ) : (
+                <span style={{ fontSize: 11, color: nTextSec, fontFamily: "'Noto Sans SC'" }}>
+                  点击刷新自动获取
+                </span>
+              )}
             </div>
           </div>
 
