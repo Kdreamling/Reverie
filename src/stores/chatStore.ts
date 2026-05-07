@@ -4,6 +4,7 @@ import {
   fetchMessagesAPI,
   deleteConversationAPI,
   streamChat,
+  switchBranch as switchBranchAPI,
   type ChatMessage,
   type MessageAttachment,
   type MemoryOperation,
@@ -58,8 +59,6 @@ interface ChatState {
   pendingMemoryResults: MemorySearchResult[]
   pendingMemoryOps: MemoryOperation[]
   lastError: string | null
-  retryContent: string | null
-  retryOptions: SendMessageOptions | null
   thinkingStartTime: number | null
   thinkingElapsedTime: number | null
   toolStartTime: number | null
@@ -73,7 +72,9 @@ interface ChatState {
   stopStreaming: () => void
   deleteConversation: (sessionId: string, conversationId: string) => Promise<void>
   clearMessages: () => void
-  retryLast: (sessionId: string, model: string) => void
+  regenerate: (sessionId: string, model: string, conversationId: string) => Promise<void>
+  switchBranch: (sessionId: string, conversationId: string, branchIndex: number) => Promise<void>
+  retryFailed: (sessionId: string, model: string) => void
   clearError: () => void
 }
 
@@ -93,10 +94,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sessionEnded: false,
   ...EMPTY_STREAM,
   lastError: null,
-  retryContent: null,
   _abortController: null,
   _reader: null,
-  retryOptions: null,
 
   async loadMessages(sessionId) {
     try {
@@ -126,6 +125,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
           scene_type?: string
           source?: string | null
           created_at: string
+          branch_group?: string | null
+          branch_index?: number | null
+          branch_total?: number | null
           attachments?: Array<{
             id: string
             file_type: 'image' | 'pdf' | 'text'
@@ -223,6 +225,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
             thinkingTime: r.thinking_time ?? null,
             tokens: (r.input_tokens || r.output_tokens) ? { input: r.input_tokens ?? 0, output: r.output_tokens ?? 0, cached: r.cached_tokens ?? 0 } : null,
             source: r.source ?? null,
+            branchGroup: r.branch_group ?? null,
+            branchIndex: r.branch_index ?? null,
+            branchTotal: r.branch_total ?? null,
           })
         }
       }
@@ -257,8 +262,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       isStreaming: true,
       ...EMPTY_STREAM,
       lastError: null,
-      retryContent: content,
-      retryOptions: options ?? null,
     }))
 
     // 自动命名
@@ -283,8 +286,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         return
       }
       if (!res.ok || !res.body) {
-        set({ isStreaming: false, _abortController: null, lastError: `请求失败 (${res.status})` })
-        toast.error(`请求失败 (${res.status})`)
+        set(s => ({
+          isStreaming: false, _abortController: null,
+          messages: s.messages.map((m, i) => i === s.messages.length - 1 && m.role === 'user' ? { ...m, failed: true } : m),
+        }))
         return
       }
 
@@ -346,11 +351,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
       }
 
+      const markFailed = () => set(s => ({
+        isStreaming: false, ...EMPTY_STREAM, _abortController: null, _reader: null,
+        messages: s.messages.map((m, i) => i === s.messages.length - 1 && m.role === 'user' ? { ...m, failed: true } : m),
+      }))
+
       const timeoutId = setTimeout(() => {
         if (!gotFirstChunk && get().isStreaming) {
           reader.cancel()
-          set({ isStreaming: false, ...EMPTY_STREAM, lastError: '连接超时，请重试' })
-          toast.error('连接超时，请重试')
+          markFailed()
         }
       }, 120000)
 
@@ -533,9 +542,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
               }
               case 'error': {
                 flushDeltas()
-                const errMsg = event.message ?? '上游服务异常'
-                set({ isStreaming: false, ...EMPTY_STREAM, lastError: errMsg })
-                toast.error(errMsg)
+                markFailed()
                 return
               }
               case 'session_ended': {
@@ -599,8 +606,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     ...EMPTY_STREAM,
                   }))
                 } else {
-                  set({ isStreaming: false, ...EMPTY_STREAM, lastError: '未收到回复' })
-                  toast.warning('未收到回复，请重试')
+                  markFailed()
                 }
                 break
               }
@@ -614,13 +620,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch (e) {
       // 如果是用户主动停止（abort），不显示错误
       if (e instanceof DOMException && e.name === 'AbortError') return
-      set({ isStreaming: false, ...EMPTY_STREAM, _abortController: null, _reader: null, lastError: '发送失败，请重试' })
-      toast.error('发送失败，请重试')
+      markFailed()
       return
     } finally {
       if (get().isStreaming) {
-        set({ isStreaming: false, ...EMPTY_STREAM, _abortController: null, _reader: null, lastError: '连接中断，请重试' })
-        toast.warning('连接中断，请重试')
+        set(s => ({
+          isStreaming: false, ...EMPTY_STREAM, _abortController: null, _reader: null,
+          messages: s.messages.map((m, i) => i === s.messages.length - 1 && m.role === 'user' ? { ...m, failed: true } : m),
+        }))
       }
     }
   },
@@ -655,11 +662,146 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  retryLast(sessionId, model) {
-    const { retryContent, retryOptions } = get()
-    if (!retryContent) return
-    set(s => ({ messages: s.messages.slice(0, -1), lastError: null }))
-    get().sendMessage(sessionId, model, retryContent, retryOptions ?? undefined)
+  async regenerate(sessionId, model, conversationId) {
+    const msgs = get().messages
+    const assistantIdx = msgs.findIndex(m => m.conversationId === conversationId && m.role === 'assistant')
+    if (assistantIdx === -1) return
+    const assistantMsg = msgs[assistantIdx]
+    const userMsg = msgs.find(m => m.role === 'user' && m.conversationId === conversationId) ?? null
+
+    set(s => ({
+      messages: s.messages.filter(m => m.conversationId !== conversationId || m.role !== 'assistant'),
+      isStreaming: true,
+      ...EMPTY_STREAM,
+      lastError: null,
+    }))
+
+    const token = localStorage.getItem('token') ?? ''
+    const abortController = new AbortController()
+    set({ _abortController: abortController })
+
+    try {
+      const res = await streamChat(sessionId, model, userMsg?.content ?? '', token, { regenerateFrom: conversationId }, abortController.signal)
+      if (!res.ok || !res.body) {
+        set(s => ({
+          isStreaming: false, _abortController: null,
+          messages: [...s.messages, assistantMsg],
+        }))
+        toast.error('重新生成失败')
+        return
+      }
+      const reader = res.body.getReader()
+      set({ _reader: reader })
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      const streamBlocks: StreamBlock[] = []
+      const thinking_buffer: string[] = []
+      const text_buffer: string[] = []
+      let collected_memory_ops: MemoryOperation[] = []
+      let collected_memory_results: MemorySearchResult[] = []
+      let stream_debug_info: DebugInfo | null = null
+      let stream_artifacts: ChatMessage['artifacts'] = null
+      let thinking_start: number | null = null
+      let thinking_elapsed: number | null = null
+      let stream_usage: ChatMessage['tokens'] = null
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const payload = line.slice(6).trim()
+          if (payload === '[DONE]') continue
+          try {
+            const evt: SseEvent = JSON.parse(payload)
+            if (evt.type === 'thinking_delta') {
+              if (!thinking_start) { thinking_start = Date.now(); streamBlocks.push({ kind: 'thinking', text: '', startTime: thinking_start, elapsed: null }) }
+              thinking_buffer.push(evt.content ?? '')
+              const last = streamBlocks[streamBlocks.length - 1]
+              if (last?.kind === 'thinking') last.text = thinking_buffer.join('')
+              set({ streamBlocks: [...streamBlocks] })
+            } else if (evt.type === 'thinking_done') {
+              thinking_elapsed = thinking_start ? (Date.now() - thinking_start) / 1000 : null
+              const last = streamBlocks[streamBlocks.length - 1]
+              if (last?.kind === 'thinking') last.elapsed = thinking_elapsed ? thinking_elapsed * 1000 : null
+            } else if (evt.type === 'text_delta') {
+              text_buffer.push(evt.content ?? '')
+              const last = streamBlocks[streamBlocks.length - 1]
+              if (last?.kind === 'text') { last.text = text_buffer.join('') } else { streamBlocks.push({ kind: 'text', text: text_buffer.join('') }) }
+              set({ streamBlocks: [...streamBlocks] })
+            } else if (evt.type === 'debug_info') {
+              stream_debug_info = evt.debug_info ?? null
+            } else if (evt.type === 'usage' && evt.usage) {
+              const u = evt.usage
+              stream_usage = { input: u.input_tokens ?? u.prompt_tokens ?? 0, output: u.output_tokens ?? u.completion_tokens ?? 0, cached: u.cached_tokens ?? 0 }
+            } else if (evt.type === 'artifacts' && evt.artifacts) {
+              stream_artifacts = evt.artifacts
+            }
+          } catch { /* ignore parse errors */ }
+        }
+      }
+
+      const fullText = text_buffer.join('')
+      if (fullText) {
+        const newMsg: ChatMessage = {
+          id: `ai-regen-${Date.now()}`,
+          role: 'assistant',
+          content: fullText,
+          thinking: thinking_buffer.join('') || null,
+          created_at: new Date().toISOString(),
+          memoryOps: collected_memory_ops.length > 0 ? collected_memory_ops : null,
+          memoryRefs: collected_memory_results.length > 0 ? collected_memory_results : null,
+          thinkingTime: thinking_elapsed,
+          tokens: stream_usage,
+          debugInfo: stream_debug_info,
+          artifacts: stream_artifacts,
+          branchGroup: assistantMsg.branchGroup ?? conversationId,
+          branchIndex: (assistantMsg.branchIndex ?? 0) + 1,
+          branchTotal: (assistantMsg.branchTotal ?? 1) + 1,
+        }
+        set(s => ({
+          messages: [...s.messages, newMsg],
+          isStreaming: false,
+          ...EMPTY_STREAM,
+          _abortController: null, _reader: null,
+        }))
+      } else {
+        set(s => ({
+          messages: [...s.messages, assistantMsg],
+          isStreaming: false, ...EMPTY_STREAM, _abortController: null, _reader: null,
+        }))
+      }
+    } catch {
+      set(s => ({
+        messages: [...s.messages, assistantMsg],
+        isStreaming: false, ...EMPTY_STREAM, _abortController: null, _reader: null,
+      }))
+    }
+
+    get().loadMessages(sessionId)
+  },
+
+  async switchBranch(sessionId, conversationId, branchIndex) {
+    try {
+      await switchBranchAPI(sessionId, conversationId, branchIndex)
+      await get().loadMessages(sessionId)
+    } catch {
+      toast.error('切换分支失败')
+    }
+  },
+
+  retryFailed(sessionId, model) {
+    const msgs = get().messages
+    const failedIdx = findLastIndex(msgs, m => m.role === 'user' && m.failed === true)
+    if (failedIdx === -1) return
+    const content = msgs[failedIdx].content
+    const attachments = msgs[failedIdx].attachments
+    set(s => ({ messages: s.messages.filter((_, i) => i !== failedIdx) }))
+    get().sendMessage(sessionId, model, content, attachments ? { attachments } : undefined)
   },
 
   clearError() {

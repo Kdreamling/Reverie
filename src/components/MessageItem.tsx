@@ -315,7 +315,9 @@ interface MessageItemProps {
   onToggleDebug: () => void
   onCopy: (id: string, content: string) => void
   onDelete: (conversationId: string) => void
-  onRetry: (id: string) => void
+  onRetry: (conversationId: string) => void
+  onSwitchBranch?: (conversationId: string, branchIndex: number) => void
+  onRetryFailed?: () => void
   onSaveAnchor?: (conversationId: string) => Promise<boolean>
   isAnchored?: boolean
 }
@@ -362,7 +364,7 @@ const AnchorButton = memo(function AnchorButton({
   )
 })
 
-const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, isCopied, onToggleDebug, onCopy, onDelete, onRetry, onSaveAnchor, isAnchored }: MessageItemProps) {
+const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, isCopied, onToggleDebug, onCopy, onDelete, onRetry, onSwitchBranch, onRetryFailed, onSaveAnchor, isAnchored }: MessageItemProps) {
   if (msg.role === 'user') {
     // 用户消息：右侧轻气泡（书页旁注风格）
     return (
@@ -388,6 +390,18 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
           >
             {msg.content}
           </div>
+          {msg.failed && (
+            <div className="flex items-center justify-end gap-2 mt-1.5 pr-1">
+              <span style={{ fontSize: 11, color: C.errorText }}>⚠ 发送失败</span>
+              <button
+                onClick={onRetryFailed}
+                className="cursor-pointer"
+                style={{ fontSize: 11, color: C.errorText, background: 'none', border: 'none', textDecoration: 'underline', padding: 0 }}
+              >
+                重新发送
+              </button>
+            </div>
+          )}
           <div className="flex items-center justify-end gap-2 mt-1.5 pr-1">
             {msg.silentRead && (
               <span style={{ fontSize: 10, color: C.textMuted, fontStyle: 'italic' }}>已读</span>
@@ -481,6 +495,27 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
               )}
             </>
           )}
+          {msg.branchGroup && msg.branchTotal != null && msg.branchTotal > 1 && (
+            <span className="flex items-center gap-0.5" style={{ marginLeft: msg.tokens ? 6 : 0 }}>
+              <button
+                onClick={() => msg.conversationId && onSwitchBranch?.(msg.conversationId, (msg.branchIndex ?? 0) - 1)}
+                disabled={(msg.branchIndex ?? 0) <= 0}
+                className="cursor-pointer"
+                style={{ background: 'none', border: 'none', padding: '0 2px', color: (msg.branchIndex ?? 0) > 0 ? C.textMuted : C.border, fontSize: 12, lineHeight: 1 }}
+              >
+                ‹
+              </button>
+              <span style={{ fontSize: 11, color: C.textMuted }}>{(msg.branchIndex ?? 0) + 1}/{msg.branchTotal}</span>
+              <button
+                onClick={() => msg.conversationId && onSwitchBranch?.(msg.conversationId, (msg.branchIndex ?? 0) + 1)}
+                disabled={(msg.branchIndex ?? 0) >= (msg.branchTotal ?? 1) - 1}
+                className="cursor-pointer"
+                style={{ background: 'none', border: 'none', padding: '0 2px', color: (msg.branchIndex ?? 0) < (msg.branchTotal ?? 1) - 1 ? C.textMuted : C.border, fontSize: 12, lineHeight: 1 }}
+              >
+                ›
+              </button>
+            </span>
+          )}
         </span>
         <div className="flex items-center gap-1">
           {msg.debugInfo && (
@@ -491,9 +526,11 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
           <button onClick={() => onCopy(msg.id, msg.content)} className="p-1 cursor-pointer transition-colors" style={{ color: isCopied ? C.success : C.btnDefault }} title="复制">
             {isCopied ? <Check size={13} strokeWidth={2} /> : <Copy size={13} strokeWidth={1.8} />}
           </button>
-          <button onClick={() => onRetry(msg.id)} className="p-1 cursor-pointer transition-colors" style={{ color: C.btnDefault }} onMouseEnter={e => (e.currentTarget.style.color = C.accent)} onMouseLeave={e => (e.currentTarget.style.color = C.btnDefault)} title="重发">
-            <RotateCcw size={13} strokeWidth={1.8} />
-          </button>
+          {msg.conversationId && (
+            <button onClick={() => onRetry(msg.conversationId!)} className="p-1 cursor-pointer transition-colors" style={{ color: C.btnDefault }} onMouseEnter={e => (e.currentTarget.style.color = C.accent)} onMouseLeave={e => (e.currentTarget.style.color = C.btnDefault)} title="重新生成">
+              <RotateCcw size={13} strokeWidth={1.8} />
+            </button>
+          )}
           {msg.conversationId && onSaveAnchor && (
             <AnchorButton conversationId={msg.conversationId} size={13} onSave={onSaveAnchor} initiallySaved={isAnchored} />
           )}

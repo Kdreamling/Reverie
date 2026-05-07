@@ -98,7 +98,7 @@ export default function ChatPage() {
   const fromCalendar = searchParams.get('from') === 'calendar'
   const { sessions, currentSession, loading, fetchSessions, ensureTodaySession, createSession, selectSession, deleteSession, updateSessionModel } =
     useSessionStore()
-  const { messages, isStreaming, sessionEnded: streamSessionEnded, loadMessages, sendMessage, clearMessages, deleteConversation, lastError, retryLast, clearError, stopStreaming } =
+  const { messages, isStreaming, sessionEnded: streamSessionEnded, loadMessages, sendMessage, clearMessages, deleteConversation, regenerate, switchBranch, retryFailed, stopStreaming } =
     useChatStore()
   const { token } = useAuthStore()
 
@@ -346,9 +346,20 @@ export default function ChatPage() {
     }
   }, [deleteConversation])
 
-  const handleRetry = useCallback((_msgId: string) => {
-    // TODO: implement retry
-  }, [])
+  const handleRetry = useCallback((conversationId: string) => {
+    if (!currentSession || isStreaming) return
+    regenerate(currentSession.id, model, conversationId)
+  }, [currentSession, model, isStreaming, regenerate])
+
+  const handleSwitchBranch = useCallback((conversationId: string, branchIndex: number) => {
+    if (!currentSession) return
+    switchBranch(currentSession.id, conversationId, branchIndex)
+  }, [currentSession, switchBranch])
+
+  const handleRetryFailed = useCallback(() => {
+    if (!currentSession) return
+    retryFailed(currentSession.id, model)
+  }, [currentSession, model, retryFailed])
 
   // 锚点：留住这一刻。只传点击的这一对 conversation；后端拉前后上下文给 LLM 看，但不存
   const handleSaveAnchor = useCallback(async (conversationId: string): Promise<boolean> => {
@@ -1143,6 +1154,8 @@ export default function ChatPage() {
                     onCopy={handleCopyMsg}
                     onDelete={handleDeleteConv}
                     onRetry={handleRetry}
+                    onSwitchBranch={handleSwitchBranch}
+                    onRetryFailed={handleRetryFailed}
                     onSaveAnchor={handleSaveAnchor}
                   />
                 )
@@ -1164,44 +1177,6 @@ export default function ChatPage() {
                       fontFamily: "'JetBrains Mono', monospace",
                     }}>
                       Session Closed
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Error / retry block */}
-              {lastError && !isStreaming && (
-                <div className="flex gap-2.5 mb-6">
-                  <div
-                    className="flex-shrink-0 flex items-center justify-center select-none rounded-full"
-                    style={{ width: 34, height: 34, background: C.errorBg, border: `1px solid ${C.errorBorder}`, fontSize: 14 }}
-                  >
-                    ⚠
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-xs font-semibold mb-1.5" style={{ color: C.errorText }}>发送失败</div>
-                    <div
-                      className="rounded-2xl px-4 py-3"
-                      style={{ background: C.errorBg, border: `1px solid ${C.errorBorder}` }}
-                    >
-                      <span className="text-sm" style={{ color: C.errorText }}>{lastError}</span>
-                      <div className="flex items-center gap-3 mt-3">
-                        <button
-                          onClick={() => retryLast(currentSession!.id, model)}
-                          className="px-4 py-1.5 rounded-lg text-sm font-medium cursor-pointer"
-                          style={{ background: 'transparent', border: `1px solid ${C.errorBorder}`, color: C.errorText }}
-                        >
-                          重新发送
-                        </button>
-                        <button
-                          onClick={clearError}
-                          className="flex items-center justify-center cursor-pointer"
-                          style={{ color: C.textMuted }}
-                          title="忽略"
-                        >
-                          <X size={16} strokeWidth={2} />
-                        </button>
-                      </div>
                     </div>
                   </div>
                 </div>

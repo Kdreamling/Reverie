@@ -90,6 +90,10 @@ export interface ChatMessage {
   attachments?: MessageAttachment[] | null
   source?: string | null
   artifacts?: Array<{ index: number; id: string; version: number; title: string; type: string }> | null
+  branchGroup?: string | null
+  branchIndex?: number | null
+  branchTotal?: number | null
+  failed?: boolean
 }
 
 export interface ReadingContextPayload {
@@ -101,7 +105,8 @@ export interface ReadingContextPayload {
 export interface StreamChatOptions {
   readingContext?: ReadingContextPayload
   attachmentIds?: string[]
-  thinking?: boolean  // 覆盖通道默认 thinking 开关（true/false 显式；缺省 = 跟随通道默认）
+  thinking?: boolean
+  regenerateFrom?: string
 }
 
 export async function fetchMessagesAPI(sessionId: string): Promise<ChatMessage[]> {
@@ -120,6 +125,10 @@ export interface DreamEvent {
 
 export async function fetchDreamEvents(limit: number = 10): Promise<DreamEvent[]> {
   return client.get<DreamEvent[]>(`/dream/events?limit=${limit}`)
+}
+
+export async function switchBranch(sessionId: string, conversationId: string, branchIndex: number): Promise<{ ok: boolean; active_conversation_id: string }> {
+  return client.post(`/sessions/${sessionId}/messages/${conversationId}/switch-branch`, { branch_index: branchIndex })
 }
 
 export function streamChat(
@@ -144,6 +153,7 @@ export function streamChat(
       ...(options?.readingContext ? { reading_context: options.readingContext } : {}),
       ...(options?.attachmentIds?.length ? { attachment_ids: options.attachmentIds } : {}),
       ...(typeof options?.thinking === 'boolean' ? { thinking: options.thinking } : {}),
+      ...(options?.regenerateFrom ? { regenerate_from: options.regenerateFrom } : {}),
     }),
     signal,
   })
