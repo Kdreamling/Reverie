@@ -576,6 +576,25 @@ function ProviderConfigTab({ ch, onSaved }: {
   const [thinkingOn, setThinkingOn] = useState(ch.supports_thinking)
   const [thinkingFmt, setThinkingFmt] = useState(ch.thinking_format || 'openai')
   const [saving, setSaving] = useState(false)
+  const [newName, setNewName] = useState(ch.name)
+  const [renaming, setRenaming] = useState(false)
+
+  const handleRename = async () => {
+    const trimmed = newName.trim()
+    if (!trimmed || trimmed === ch.name) return
+    setRenaming(true)
+    try {
+      const resp = await apiFetch<{ success: boolean; message: string }>(
+        `/admin/channels/${encodeURIComponent(ch.name)}/rename`,
+        { method: 'PATCH', body: JSON.stringify({ new_name: trimmed }) },
+      )
+      if (resp.success) { toast.success(resp.message); onSaved() }
+      else toast.error(resp.message)
+    } catch (e) {
+      toast.error(`重命名失败: ${e instanceof Error ? e.message : '未知错误'}`)
+    }
+    setRenaming(false)
+  }
 
   const handleProviderChange = (v: string) => {
     setProvider(v)
@@ -726,7 +745,20 @@ function ProviderConfigTab({ ch, onSaved }: {
       {/* 名称 */}
       <div>
         <div style={{ fontSize: 12, color: C.textMuted, padding: '2px 4px', marginBottom: 6 }}>名称</div>
-        <input value={ch.name} readOnly style={{ ...inputField, background: C.surface, cursor: 'not-allowed' }} />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input value={newName} onChange={e => setNewName(e.target.value)}
+            style={{ ...inputField, flex: 1 }} />
+          {newName.trim() !== ch.name && newName.trim() && (
+            <button onClick={handleRename} disabled={renaming}
+              style={{
+                padding: '8px 16px', background: 'none', border: `1px solid ${C.border}`,
+                borderRadius: 10, color: C.textSecondary, cursor: 'pointer', fontSize: 13,
+                whiteSpace: 'nowrap', opacity: renaming ? 0.5 : 1,
+              }}>
+              {renaming ? '...' : '重命名'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* API Key */}
