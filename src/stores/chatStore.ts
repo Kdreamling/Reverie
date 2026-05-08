@@ -24,6 +24,7 @@ interface SseEvent {
   memory_id?: string
   new_content?: string
   reason?: string
+  message?: string
   usage?: { input_tokens?: number; output_tokens?: number; prompt_tokens?: number; completion_tokens?: number; cached_tokens?: number }
   debug_info?: DebugInfo
   artifacts?: Array<{ index: number; id: string; version: number; title: string; type: string }>
@@ -288,7 +289,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (!res.ok || !res.body) {
         set(s => ({
           isStreaming: false, _abortController: null,
-          messages: s.messages.map((m, i) => i === s.messages.length - 1 && m.role === 'user' ? { ...m, failed: true } : m),
+          messages: s.messages.map((m, i) => i === s.messages.length - 1 && m.role === 'user' ? { ...m, failed: true, failedReason: `HTTP ${res.status}` } : m),
         }))
         return
       }
@@ -351,9 +352,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
       }
 
-      const markFailed = () => set(s => ({
+      const markFailed = (reason?: string) => set(s => ({
         isStreaming: false, ...EMPTY_STREAM, _abortController: null, _reader: null,
-        messages: s.messages.map((m, i) => i === s.messages.length - 1 && m.role === 'user' ? { ...m, failed: true } : m),
+        messages: s.messages.map((m, i) => i === s.messages.length - 1 && m.role === 'user' ? { ...m, failed: true, failedReason: reason } : m),
       }))
 
       const timeoutId = setTimeout(() => {
@@ -542,7 +543,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
               }
               case 'error': {
                 flushDeltas()
-                markFailed()
+                markFailed(event.message || event.content)
                 return
               }
               case 'session_ended': {

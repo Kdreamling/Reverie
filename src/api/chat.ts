@@ -94,6 +94,7 @@ export interface ChatMessage {
   branchIndex?: number | null
   branchTotal?: number | null
   failed?: boolean
+  failedReason?: string
 }
 
 export interface ReadingContextPayload {

@@ -391,8 +391,8 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
             {msg.content}
           </div>
           {msg.failed && (
-            <div className="flex items-center justify-end gap-2 mt-1.5 pr-1">
-              <span style={{ fontSize: 11, color: C.errorText }}>⚠ 发送失败</span>
+            <div className="flex items-center justify-end gap-2 mt-1.5 pr-1" style={{ flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, color: C.errorText }}>⚠ 发送失败{msg.failedReason ? `：${msg.failedReason}` : ''}</span>
               <button
                 onClick={onRetryFailed}
                 className="cursor-pointer"
