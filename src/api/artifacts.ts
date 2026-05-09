@@ -17,6 +17,21 @@ export function listSessionArtifacts(sessionId: string) {
   return client.get<{ artifacts: Artifact[] }>(`/sessions/${sessionId}/artifacts`)
 }
 
+export interface ArtifactSummary {
+  id: string
+  title: string
+  type: string
+  language?: string
+  created_at: string
+}
+
+export function listArtifacts(type?: string, limit = 50) {
+  const params = new URLSearchParams()
+  if (type) params.set('type', type)
+  params.set('limit', String(limit))
+  return client.get<{ artifacts: ArtifactSummary[] }>(`/artifacts?${params}`)
+}
+
 export function getArtifact(id: string) {
   return client.get<Artifact>(`/artifacts/${id}`)
 }
