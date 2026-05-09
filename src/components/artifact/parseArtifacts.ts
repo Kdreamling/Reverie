@@ -24,6 +24,20 @@ function extractAttr(tag: string, name: string): string | undefined {
   return match?.[1] || undefined
 }
 
+const MIME_TO_TYPE: Record<string, string> = {
+  'text/html': 'html',
+  'text/css': 'code',
+  'text/csv': 'csv',
+  'text/markdown': 'markdown',
+  'image/svg+xml': 'svg',
+  'application/json': 'code',
+  'text/javascript': 'code',
+}
+
+function normalizeType(raw: string): string {
+  return MIME_TO_TYPE[raw] || raw
+}
+
 function parseXMLArtifacts(content: string): ParseResult {
   const artifacts: ParsedArtifact[] = []
   let cleanContent = content
@@ -40,7 +54,7 @@ function parseXMLArtifacts(content: string): ParseResult {
     if (!type || !title) continue
 
     artifacts.push({
-      type,
+      type: normalizeType(type),
       title,
       language: extractAttr(attrs, 'language'),
       ref: extractAttr(attrs, 'ref'),
@@ -66,7 +80,7 @@ function parseJSONArtifacts(content: string): ParseResult {
     try {
       const parsed = JSON.parse(match[1])
       artifacts.push({
-        type: parsed.type || 'code',
+        type: normalizeType(parsed.type || 'code'),
         title: parsed.title || 'Untitled',
         language: parsed.language,
         content: parsed.content || '',
