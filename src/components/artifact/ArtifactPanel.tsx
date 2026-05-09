@@ -39,7 +39,22 @@ const typeConfig: Record<string, { label: string; color: string; iconD: string }
 // ─── Preview renderers ───────────────────────────────────────────────────────
 
 function HTMLPreview({ content }: { content: string }) {
-  return <iframe srcDoc={content} sandbox="allow-scripts allow-modals" className="w-full border-0" style={{ minHeight: '100%', height: '100%', background: '#fff', borderRadius: '0 0 20px 20px' }} />
+  const handleOpenNewTab = useCallback(() => {
+    const w = window.open('', '_blank')
+    if (w) { w.document.open(); w.document.write(content); w.document.close() }
+  }, [content])
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ padding: '8px 16px', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+        <button onClick={handleOpenNewTab} style={{
+          padding: '5px 14px', borderRadius: 8, fontSize: 12, border: '1px solid ' + C.border,
+          background: 'transparent', color: C.accent, cursor: 'pointer', fontFamily: FONT,
+        }}>在新标签页打开 ↗</button>
+      </div>
+      <iframe srcDoc={content} sandbox="allow-scripts allow-same-origin allow-modals allow-popups" className="w-full border-0" style={{ flex: 1, minHeight: 500, background: '#fff', borderRadius: '0 0 20px 20px' }} />
+    </div>
+  )
 }
 
 function SVGPreview({ content }: { content: string }) {
