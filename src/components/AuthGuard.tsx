@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import FloatingPet from './pet/FloatingPet'
+import SystemAlertMonitor from './SystemAlertMonitor'
 
 export default function AuthGuard() {
   const isLoggedIn = useAuthStore(s => s.isLoggedIn)
@@ -12,6 +13,7 @@ export default function AuthGuard() {
     <>
       <Outlet />
       {!hidePet && <FloatingPet />}
+      <SystemAlertMonitor />
     </>
   )
 }
