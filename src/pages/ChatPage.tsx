@@ -976,6 +976,7 @@ export default function ChatPage() {
               { label: '日记', action: () => { setSidebarOpen(false); navigate(`/diary/${new Date().toISOString().slice(0, 10)}`) } },
               { label: '时光册', action: () => { setSidebarOpen(false); navigate('/timeline') } },
               { label: '游戏盒', action: () => { setSidebarOpen(false); navigate('/games') } },
+              { label: '工作台', action: () => { setSidebarOpen(false); navigate('/workbench') } },
               { label: '记忆', action: () => { setShowSettings(true); setSettingsPage('memory') } },
               { label: isNight ? '☀️ 日间' : '🌙 夜间', action: toggleNight },
             ].map(n => (
