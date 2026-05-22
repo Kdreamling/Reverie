@@ -41,9 +41,8 @@ export interface DebugInfo {
   keepalive?: { time: string; mode: string; thoughts: string; action: string; content: string }[]
   system_config?: {
     history_budget: number
-    history_fetch_limit: number
     rerank_threshold: number
-    dedup_threshold: number
+    token_budget: number
     micro_summary_model: string
   }
   last_micro_summary?: {

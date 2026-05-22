@@ -198,11 +198,10 @@ function SystemDetail({ debugInfo }: { debugInfo: DebugInfo }) {
       <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 8 }}>System Config</div>
       {config ? (
         <>
-          <div style={itemStyle}><span style={labelStyle}>history_budget</span><span style={valueStyle}>{config.history_budget}</span></div>
-          <div style={itemStyle}><span style={labelStyle}>history_fetch_limit</span><span style={valueStyle}>{config.history_fetch_limit}</span></div>
-          <div style={itemStyle}><span style={labelStyle}>rerank_threshold</span><span style={valueStyle}>{config.rerank_threshold}</span></div>
-          <div style={itemStyle}><span style={labelStyle}>dedup_threshold</span><span style={valueStyle}>{config.dedup_threshold}</span></div>
-          <div style={itemStyle}><span style={labelStyle}>micro_summary_model</span><span style={valueStyle}>{config.micro_summary_model}</span></div>
+          <div style={itemStyle}><span style={labelStyle}>历史窗口上限</span><span style={valueStyle}>{config.history_budget} tokens</span></div>
+          <div style={itemStyle}><span style={labelStyle}>记忆注入上限</span><span style={valueStyle}>{config.token_budget} tokens</span></div>
+          <div style={itemStyle}><span style={labelStyle}>rerank 阈值</span><span style={valueStyle}>{config.rerank_threshold}</span></div>
+          <div style={itemStyle}><span style={labelStyle}>微摘要模型</span><span style={valueStyle}>{config.micro_summary_model}</span></div>
         </>
       ) : (
         <div style={{ color: C.textSecondary, fontSize: 12 }}>no config data</div>
