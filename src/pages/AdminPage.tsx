@@ -1086,9 +1086,154 @@ function formatTokens(n: number): string {
   return String(n)
 }
 
+// ─── Snapshots Section ──────────────────────────────────────────────────────
+
+interface Snapshot {
+  id: string
+  content: string
+  base_importance: number
+  scene_type: string
+  created_at: string
+  hits: number
+}
+
+function SnapshotsSection() {
+  const [snapshots, setSnapshots] = useState<Snapshot[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [deleting, setDeleting] = useState(false)
+
+  const fetchSnapshots = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/snapshots?limit=100', {
+        headers: { 'Authorization': `Bearer ${useAuthStore.getState().token}` },
+      })
+      const data = await res.json()
+      setSnapshots(data.snapshots || [])
+      setTotal(data.total || 0)
+    } catch {
+      toast('加载快照失败', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchSnapshots() }, [fetchSnapshots])
+
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleAll = () => {
+    if (selected.size === snapshots.length) setSelected(new Set())
+    else setSelected(new Set(snapshots.map(s => s.id)))
+  }
+
+  const deleteSelected = async () => {
+    if (selected.size === 0) return
+    setDeleting(true)
+    try {
+      const token = useAuthStore.getState().token
+      const headers: Record<string, string> = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+      if (selected.size === 1) {
+        const id = [...selected][0]
+        await fetch(`/snapshots/${id}`, { method: 'DELETE', headers })
+      } else {
+        await fetch('/snapshots/batch-delete', { method: 'POST', headers, body: JSON.stringify({ ids: [...selected] }) })
+      }
+      setSelected(new Set())
+      toast(`已删除 ${selected.size} 条快照`)
+      await fetchSnapshots()
+    } catch {
+      toast('删除失败', 'error')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const cardStyle: React.CSSProperties = {
+    background: '#fff', borderRadius: 12, padding: 16,
+    border: `1px solid ${C.border}`, marginBottom: 12,
+  }
+
+  if (loading) return <div style={{ ...cardStyle, textAlign: 'center', color: C.textMuted, fontSize: 13 }}>加载中...</div>
+
+  return (
+    <div style={cardStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: 0 }}>对话快照</h3>
+        <span style={{ fontSize: 12, color: C.textMuted }}>共 {total} 条</span>
+        {snapshots.length > 0 && (
+          <button
+            onClick={toggleAll}
+            style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: C.sidebarActive, color: C.accent, border: 'none', cursor: 'pointer' }}
+          >
+            {selected.size === snapshots.length ? '取消全选' : '全选'}
+          </button>
+        )}
+        {selected.size > 0 && (
+          <button
+            onClick={deleteSelected}
+            disabled={deleting}
+            style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(220,80,60,0.1)', color: '#D04030', border: 'none', cursor: 'pointer' }}
+          >
+            {deleting ? '删除中...' : `删除 (${selected.size})`}
+          </button>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {snapshots.map(s => {
+          const isSelected = selected.has(s.id)
+          const date = s.created_at?.slice(0, 16).replace('T', ' ')
+          return (
+            <div
+              key={s.id}
+              onClick={() => toggleSelect(s.id)}
+              style={{
+                padding: '8px 10px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
+                background: isSelected ? 'rgba(160,128,96,0.08)' : C.surface,
+                border: `1px solid ${isSelected ? C.accent + '40' : C.border}`,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <span style={{
+                  width: 14, height: 14, borderRadius: 3,
+                  border: `1.5px solid ${isSelected ? C.accent : C.textMuted}`,
+                  background: isSelected ? C.accent : 'transparent',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 9, color: '#fff', flexShrink: 0,
+                }}>
+                  {isSelected && '✓'}
+                </span>
+                <span style={{ color: C.textMuted, fontSize: 10 }}>{date}</span>
+                <span style={{ color: C.textMuted, fontSize: 10 }}>重要度: {s.base_importance}</span>
+                {s.hits > 0 && <span style={{ color: C.textMuted, fontSize: 10 }}>命中: {s.hits}</span>}
+              </div>
+              <p style={{ color: C.text, wordBreak: 'break-word', whiteSpace: 'pre-wrap', margin: 0, lineHeight: 1.5 }}>
+                {s.content}
+              </p>
+            </div>
+          )
+        })}
+        {snapshots.length === 0 && (
+          <div style={{ textAlign: 'center', color: C.textMuted, fontSize: 13, padding: 20 }}>暂无对话快照</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Tabs ────────────────────────────────────────────────────────────────────
 
-type Tab = 'status' | 'models' | 'logs' | 'scheduler' | 'cache'
+type Tab = 'status' | 'models' | 'logs' | 'scheduler' | 'cache' | 'snapshots'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'status', label: '总览' },
@@ -1096,6 +1241,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'logs', label: '日志' },
   { key: 'cache', label: '缓存' },
   { key: 'scheduler', label: '运维' },
+  { key: 'snapshots', label: '快照' },
 ]
 
 // ─── Main Component ──────────────────────────────────────────────────────────
@@ -1538,6 +1684,8 @@ export default function AdminPage() {
             onRefresh={() => loadCacheHealth(cacheHours)}
           />
         )}
+
+        {tab === 'snapshots' && <SnapshotsSection />}
 
         {tab === 'scheduler' && (
           <>

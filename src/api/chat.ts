@@ -29,21 +29,13 @@ export interface DebugInfo {
   }[]
   sliding_window: { rounds: number; range: string; messages?: { user_msg?: string; assistant_msg?: string }[] }
   summaries: { dimension: string; content: string }[]
+  rolling_summary?: { days: number; tokens: number; entries: { content: string; date: string }[] }
   token_usage: { budget: number; memories: number; search: number; summaries: number; total: number; graph?: number }
   session_summary?: { content: string; exists: boolean }
   previous_session_tail?: { rounds: number; tokens: number; content: string }
   session_memories?: { id: string; content: string; mem_type: string }[]
-  graph?: {
-    seed_nodes: {
-      id: string; content: string; category: string; similarity: number
-      emotion_intensity?: number; base_importance?: number; occurred_at?: string
-    }[]
-    expanded_nodes: {
-      id: string; content: string; category: string; edge_relation_type: string
-      edge_strength?: number; emotion_intensity?: number; base_importance?: number; occurred_at?: string
-    }[]
-    formatted_text?: string
-  } | null
+  journals?: { count: number; entries: { content: string; created_at: string }[] }
+  anchor_evoked?: { id: string; score: number; summary: string }
   life_items?: { id: string; type: string; content: string; priority: string; due_at?: string; scheduled_at?: string }[]
   events?: { type: string; value: string; time: string }[]
   keepalive?: { time: string; mode: string; thoughts: string; action: string; content: string }[]
@@ -53,7 +45,6 @@ export interface DebugInfo {
     rerank_threshold: number
     dedup_threshold: number
     micro_summary_model: string
-    graph_enabled: boolean
   }
   last_micro_summary?: {
     content: string

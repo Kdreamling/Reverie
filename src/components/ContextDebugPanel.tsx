@@ -1,20 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import type { DebugInfo } from '../api/chat'
-import { client } from '../api/client'
 import { C } from '../theme'
 
-interface Snapshot {
-  id: string
-  content: string
-  base_importance: number
-  scene_type: string
-  created_at: string
-  hits: number
-}
-
-type Tab = 'memories' | 'search' | 'window' | 'summaries' | 'session_summary' | 'session_memories' | 'graph' | 'life_items' | 'events' | 'keepalive' | 'system' | 'snapshots'
+type Tab = 'memories' | 'search' | 'window' | 'summaries' | 'session_summary' | 'session_memories' | 'journals' | 'anchor' | 'life_items' | 'events' | 'keepalive' | 'system'
 
 const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: 'system', icon: 'S', label: '系统' },
@@ -24,8 +14,8 @@ const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: 'window', icon: '💬', label: '历史' },
   { key: 'summaries', icon: '📝', label: '摘要' },
   { key: 'session_summary', icon: '📋', label: 'Session摘要' },
-  { key: 'snapshots', icon: '📸', label: '快照' },
-  { key: 'graph', icon: '🕸���', label: '图谱' },
+  { key: 'journals', icon: '📖', label: '日记' },
+  { key: 'anchor', icon: '🔖', label: '共振' },
   { key: 'life_items', icon: '☑️', label: '待办' },
   { key: 'events', icon: '📡', label: '感知' },
   { key: 'keepalive', icon: '🌙', label: '自由活动' },
@@ -67,13 +57,14 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
   const memCount = debugInfo.memories.core_base.length + debugInfo.memories.core_living.length + debugInfo.memories.scene.length
   const searchCount = debugInfo.search_results.length
   const windowRounds = debugInfo.sliding_window?.rounds ?? 0
-  const summaryCount = debugInfo.summaries.length
+  const summaryCount = debugInfo.summaries.length + (debugInfo.rolling_summary?.entries?.length ?? 0)
   const { token_usage } = debugInfo
   const usageRatio = token_usage.budget > 0 ? token_usage.total / token_usage.budget : 0
 
   const hasSessionSummary = (debugInfo.session_summary?.exists ?? false) || !!debugInfo.previous_session_tail?.content
   const sessionMemCount = debugInfo.session_memories?.length ?? 0
-  const graphTotal = (debugInfo.graph?.seed_nodes?.length ?? 0) + (debugInfo.graph?.expanded_nodes?.length ?? 0)
+  const journalCount = debugInfo.journals?.count ?? 0
+  const hasAnchor = !!debugInfo.anchor_evoked?.id
   const lifeItemCount = debugInfo.life_items?.length ?? 0
   const eventCount = debugInfo.events?.length ?? 0
   const keepaliveCount = debugInfo.keepalive?.length ?? 0
@@ -86,8 +77,8 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
     window: windowRounds > 0 ? `${windowRounds}轮` : '0',
     summaries: summaryCount,
     session_summary: hasSessionSummary ? '有' : '无',
-    snapshots: '查看',
-    graph: graphTotal,
+    journals: journalCount,
+    anchor: hasAnchor ? '有' : '无',
     life_items: lifeItemCount,
     events: eventCount,
     keepalive: keepaliveCount,
@@ -107,7 +98,15 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
       {activeTab === null ? (
         <div className="px-2.5 py-2.5 sm:px-3">
           <div className="flex flex-wrap gap-1.5 mb-2">
-            {TABS.filter(t => (t.key !== 'session_summary' || hasSessionSummary) && (t.key !== 'graph' || graphTotal > 0) && (t.key !== 'session_memories' || sessionMemCount > 0) && (t.key !== 'life_items' || lifeItemCount > 0) && (t.key !== 'events' || eventCount > 0) && (t.key !== 'keepalive' || keepaliveCount > 0)).map(t => {
+            {TABS.filter(t =>
+              (t.key !== 'session_summary' || hasSessionSummary) &&
+              (t.key !== 'session_memories' || sessionMemCount > 0) &&
+              (t.key !== 'journals' || journalCount > 0) &&
+              (t.key !== 'anchor' || hasAnchor) &&
+              (t.key !== 'life_items' || lifeItemCount > 0) &&
+              (t.key !== 'events' || eventCount > 0) &&
+              (t.key !== 'keepalive' || keepaliveCount > 0)
+            ).map(t => {
               const c = counts[t.key]
               const empty = c === 0 || c === '0'
               return (
@@ -170,8 +169,8 @@ export default function ContextDebugPanel({ debugInfo }: Props) {
             {activeTab === 'window' && <WindowDetail debugInfo={debugInfo} />}
             {activeTab === 'summaries' && <SummaryDetail debugInfo={debugInfo} />}
             {activeTab === 'session_summary' && <SessionSummaryDetail debugInfo={debugInfo} />}
-            {activeTab === 'snapshots' && <SnapshotsDetail />}
-            {activeTab === 'graph' && <GraphDetail debugInfo={debugInfo} />}
+            {activeTab === 'journals' && <JournalsDetail debugInfo={debugInfo} />}
+            {activeTab === 'anchor' && <AnchorDetail debugInfo={debugInfo} />}
             {activeTab === 'life_items' && <LifeItemsDetail debugInfo={debugInfo} />}
             {activeTab === 'events' && <EventsDetail debugInfo={debugInfo} />}
             {activeTab === 'keepalive' && <KeepaliveDetail debugInfo={debugInfo} />}
@@ -204,7 +203,6 @@ function SystemDetail({ debugInfo }: { debugInfo: DebugInfo }) {
           <div style={itemStyle}><span style={labelStyle}>rerank_threshold</span><span style={valueStyle}>{config.rerank_threshold}</span></div>
           <div style={itemStyle}><span style={labelStyle}>dedup_threshold</span><span style={valueStyle}>{config.dedup_threshold}</span></div>
           <div style={itemStyle}><span style={labelStyle}>micro_summary_model</span><span style={valueStyle}>{config.micro_summary_model}</span></div>
-          <div style={itemStyle}><span style={labelStyle}>graph_enabled</span><span style={valueStyle}>{config.graph_enabled ? 'ON' : 'OFF'}</span></div>
         </>
       ) : (
         <div style={{ color: C.textSecondary, fontSize: 12 }}>no config data</div>
@@ -343,24 +341,56 @@ function WindowDetail({ debugInfo }: { debugInfo: DebugInfo }) {
 }
 
 function SummaryDetail({ debugInfo }: { debugInfo: DebugInfo }) {
+  const rolling = debugInfo.rolling_summary
+  const hasDimensional = debugInfo.summaries.length > 0
+  const hasRolling = rolling && rolling.entries.length > 0
   return (
     <>
-      {debugInfo.summaries.map((s, i) => (
-        <div
-          key={i}
-          className="rounded-lg px-2.5 py-2 text-xs"
-          style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${C.border}` }}
-        >
-          <span
-            className="px-1.5 py-0.5 rounded text-xs font-medium mb-1 inline-block"
-            style={{ background: C.sidebarActive, color: C.accent, fontSize: 10 }}
-          >
-            {s.dimension}
-          </span>
-          <div className="leading-relaxed md-content" style={{ color: C.text, wordBreak: 'break-word', fontSize: 12 }}><ReactMarkdown>{s.content}</ReactMarkdown></div>
-        </div>
-      ))}
-      {debugInfo.summaries.length === 0 && (
+      {hasRolling && (
+        <>
+          <div className="text-xs font-medium mb-1" style={{ color: C.textSecondary }}>
+            最近动态（{rolling.days}天 · {rolling.tokens} tokens）
+          </div>
+          {rolling.entries.map((e, i) => (
+            <div
+              key={`rolling-${i}`}
+              className="rounded-lg px-2.5 py-2 text-xs"
+              style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${C.border}` }}
+            >
+              <span
+                className="px-1.5 py-0.5 rounded text-xs font-medium mb-1 inline-block"
+                style={{ background: '#e8d5c4', color: '#8b6914', fontSize: 10 }}
+              >
+                {e.date || `第${i + 1}天`}
+              </span>
+              <div className="leading-relaxed md-content" style={{ color: C.text, wordBreak: 'break-word', fontSize: 12 }}>
+                <ReactMarkdown>{e.content}</ReactMarkdown>
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+      {hasDimensional && (
+        <>
+          {hasRolling && <div className="text-xs font-medium mb-1 mt-2" style={{ color: C.textSecondary }}>中期维度摘要</div>}
+          {debugInfo.summaries.map((s, i) => (
+            <div
+              key={i}
+              className="rounded-lg px-2.5 py-2 text-xs"
+              style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${C.border}` }}
+            >
+              <span
+                className="px-1.5 py-0.5 rounded text-xs font-medium mb-1 inline-block"
+                style={{ background: C.sidebarActive, color: C.accent, fontSize: 10 }}
+              >
+                {s.dimension}
+              </span>
+              <div className="leading-relaxed md-content" style={{ color: C.text, wordBreak: 'break-word', fontSize: 12 }}><ReactMarkdown>{s.content}</ReactMarkdown></div>
+            </div>
+          ))}
+        </>
+      )}
+      {!hasRolling && !hasDimensional && (
         <p className="text-xs py-2" style={{ color: C.textMuted }}>无摘要</p>
       )}
     </>
@@ -440,6 +470,59 @@ function SessionMemoriesDetail({ debugInfo }: { debugInfo: DebugInfo }) {
   )
 }
 
+function JournalsDetail({ debugInfo }: { debugInfo: DebugInfo }) {
+  const entries = debugInfo.journals?.entries ?? []
+  return (
+    <>
+      {entries.map((j, i) => (
+        <div
+          key={i}
+          className="rounded-lg px-2.5 py-2 text-xs"
+          style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${LAYER_COLORS.ai_journal.dot}22` }}
+        >
+          <span
+            className="px-1.5 py-0.5 rounded text-xs font-medium mb-1 inline-block"
+            style={{ background: LAYER_COLORS.ai_journal.bg, color: LAYER_COLORS.ai_journal.fg, fontSize: 10 }}
+          >
+            {j.created_at?.slice(0, 16).replace('T', ' ') || ''}
+          </span>
+          <p className="leading-relaxed mt-1" style={{ color: C.text, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{j.content}</p>
+        </div>
+      ))}
+      {entries.length === 0 && (
+        <p className="text-xs py-2" style={{ color: C.textMuted }}>无近期日记注入</p>
+      )}
+    </>
+  )
+}
+
+function AnchorDetail({ debugInfo }: { debugInfo: DebugInfo }) {
+  const anchor = debugInfo.anchor_evoked
+  if (!anchor?.id) return <p className="text-xs py-2" style={{ color: C.textMuted }}>本轮无共振锚点</p>
+  return (
+    <div
+      className="rounded-lg px-2.5 py-2 text-xs"
+      style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${C.border}` }}
+    >
+      <div className="flex items-center gap-1.5 mb-1">
+        <span
+          className="px-1.5 py-0.5 rounded text-xs font-medium"
+          style={{ background: '#e8d5c4', color: '#8b6914', fontSize: 10 }}
+        >
+          浮现的记忆
+        </span>
+        <span style={{ color: C.textMuted, fontSize: 10 }}>
+          相似度: {anchor.score?.toFixed(2) ?? '-'}
+        </span>
+        <span style={{ color: C.textMuted, fontSize: 10 }}>
+          id: {anchor.id.slice(0, 8)}...
+        </span>
+      </div>
+      <p className="leading-relaxed mt-1" style={{ color: C.text, wordBreak: 'break-word' }}>{anchor.summary}</p>
+    </div>
+  )
+}
+
 const PRIORITY_COLORS: Record<string, string> = {
   urgent: '#D97757',
   normal: '#A08060',
@@ -515,216 +598,6 @@ function EventsDetail({ debugInfo }: { debugInfo: DebugInfo }) {
       ))}
       {events.length === 0 && (
         <p className="text-xs py-2" style={{ color: C.textMuted }}>无感知事件</p>
-      )}
-    </>
-  )
-}
-
-function SnapshotsDetail() {
-  const [snapshots, setSnapshots] = useState<Snapshot[]>([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [deleting, setDeleting] = useState(false)
-
-  const fetchSnapshots = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await client.get<{ snapshots: Snapshot[]; total: number }>('/snapshots?limit=100')
-      setSnapshots(res.snapshots)
-      setTotal(res.total)
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { fetchSnapshots() }, [fetchSnapshots])
-
-  const toggleSelect = (id: string) => {
-    setSelected(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  const toggleAll = () => {
-    if (selected.size === snapshots.length) setSelected(new Set())
-    else setSelected(new Set(snapshots.map(s => s.id)))
-  }
-
-  const deleteSelected = async () => {
-    if (selected.size === 0) return
-    setDeleting(true)
-    try {
-      if (selected.size === 1) {
-        const id = [...selected][0]
-        await client.delete(`/snapshots/${id}`)
-      } else {
-        await client.post('/snapshots/batch-delete', { ids: [...selected] })
-      }
-      setSelected(new Set())
-      await fetchSnapshots()
-    } catch {
-      // ignore
-    } finally {
-      setDeleting(false)
-    }
-  }
-
-  if (loading) return <p className="text-xs py-2" style={{ color: C.textMuted }}>加载中...</p>
-
-  return (
-    <>
-      {/* toolbar */}
-      <div className="flex items-center gap-2 mb-1.5">
-        <span className="text-xs" style={{ color: C.textMuted }}>共 {total} 条快照</span>
-        {snapshots.length > 0 && (
-          <button
-            onClick={toggleAll}
-            className="text-xs px-2 py-0.5 rounded cursor-pointer"
-            style={{ background: C.sidebarActive, color: C.accent }}
-          >
-            {selected.size === snapshots.length ? '取消全选' : '全选'}
-          </button>
-        )}
-        {selected.size > 0 && (
-          <button
-            onClick={deleteSelected}
-            disabled={deleting}
-            className="text-xs px-2 py-0.5 rounded cursor-pointer"
-            style={{ background: 'rgba(220,80,60,0.1)', color: '#D04030' }}
-          >
-            {deleting ? '删除中...' : `删除 (${selected.size})`}
-          </button>
-        )}
-      </div>
-
-      {snapshots.map(s => {
-        const isSelected = selected.has(s.id)
-        const date = s.created_at?.slice(0, 16).replace('T', ' ')
-        return (
-          <div
-            key={s.id}
-            className="rounded-lg px-2.5 py-2 text-xs"
-            style={{
-              background: isSelected ? 'rgba(160,128,96,0.08)' : 'rgba(255,255,255,0.6)',
-              border: `1px solid ${isSelected ? C.accent + '40' : C.border}`,
-              cursor: 'pointer',
-            }}
-            onClick={() => toggleSelect(s.id)}
-          >
-            <div className="flex items-center gap-1.5 mb-1">
-              <span style={{
-                width: 14, height: 14, borderRadius: 3,
-                border: `1.5px solid ${isSelected ? C.accent : C.textMuted}`,
-                background: isSelected ? C.accent : 'transparent',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 9, color: '#fff', flexShrink: 0,
-              }}>
-                {isSelected && '✓'}
-              </span>
-              <span style={{ color: C.textMuted, fontSize: 10 }}>{date}</span>
-              <span style={{ color: C.textMuted, fontSize: 10 }}>重要度: {s.base_importance}</span>
-              {s.hits > 0 && <span style={{ color: C.textMuted, fontSize: 10 }}>命中: {s.hits}</span>}
-            </div>
-            <p className="leading-relaxed" style={{ color: C.text, wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>
-              {s.content}
-            </p>
-          </div>
-        )
-      })}
-
-      {snapshots.length === 0 && (
-        <p className="text-xs py-2" style={{ color: C.textMuted }}>暂无对话快照</p>
-      )}
-    </>
-  )
-}
-
-const RELATION_LABELS: Record<string, string> = {
-  causal: '因果', echo: '呼应', growth: '成长',
-  same_topic: '同主题', temporal: '时间线',
-}
-
-function GraphDetail({ debugInfo }: { debugInfo: DebugInfo }) {
-  const graph = debugInfo.graph
-  if (!graph) return <p className="text-xs py-2" style={{ color: C.textMuted }}>图谱未启用</p>
-  const [showRaw, setShowRaw] = useState(false)
-
-  return (
-    <>
-      {graph.seed_nodes.map((seed, i) => (
-        <div
-          key={`seed-${i}`}
-          className="rounded-lg px-2.5 py-2 text-xs"
-          style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${C.accent}22` }}
-        >
-          <div className="flex flex-wrap items-center gap-1.5 mb-1">
-            <span
-              className="px-1.5 py-0.5 rounded text-xs font-medium"
-              style={{ background: C.sidebarActive, color: C.accent, fontSize: 10 }}
-            >
-              ◆ 种子
-            </span>
-            <span style={{ color: C.textMuted, fontSize: 10 }}>
-              相似度: {seed.similarity.toFixed(2)}
-            </span>
-            {seed.base_importance != null && seed.base_importance >= 0.9 && (
-              <span style={{ color: C.accentWarm, fontSize: 10 }}>★</span>
-            )}
-          </div>
-          <p style={{ color: C.text, wordBreak: 'break-word' }}>{seed.content}</p>
-
-          {/* 展开的邻居节点 */}
-          {graph.expanded_nodes.map((nb, j) => (
-            <div
-              key={`nb-${j}`}
-              className="ml-3 mt-1.5 rounded-lg px-2 py-1.5"
-              style={{ background: C.memoryBg, borderLeft: `2px solid ${C.accent}30` }}
-            >
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <span
-                  className="px-1.5 py-0.5 rounded"
-                  style={{ background: LAYER_COLORS.scene.bg, color: LAYER_COLORS.scene.fg, fontSize: 10 }}
-                >
-                  └─ {RELATION_LABELS[nb.edge_relation_type] || nb.edge_relation_type}
-                </span>
-                {nb.emotion_intensity != null && (
-                  <span style={{ color: C.textMuted, fontSize: 10 }}>强度: {nb.emotion_intensity}</span>
-                )}
-                {nb.base_importance != null && nb.base_importance >= 0.9 && (
-                  <span style={{ color: C.accentWarm, fontSize: 10 }}>★</span>
-                )}
-              </div>
-              <p style={{ color: C.textSecondary, wordBreak: 'break-word' }}>{nb.content}</p>
-            </div>
-          ))}
-        </div>
-      ))}
-
-      {/* 注入原文（可折叠） */}
-      {graph.formatted_text && (
-        <div
-          className="rounded-lg px-2.5 py-2 text-xs"
-          style={{ background: 'rgba(255,255,255,0.4)', border: `1px solid ${C.border}` }}
-        >
-          <button
-            onClick={() => setShowRaw(!showRaw)}
-            className="cursor-pointer text-xs"
-            style={{ color: C.textMuted }}
-          >
-            {showRaw ? '▼' : '▶'} 注入原文
-          </button>
-          {showRaw && (
-            <pre className="mt-1 whitespace-pre-wrap" style={{ color: C.textSecondary, fontSize: 11 }}>
-              {graph.formatted_text}
-            </pre>
-          )}
-        </div>
       )}
     </>
   )
