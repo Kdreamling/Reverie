@@ -1,5 +1,12 @@
 import { client } from './client'
 
+export interface EpisodeConversation {
+  id: string
+  user_msg: string
+  assistant_msg: string
+  created_at: string | null
+}
+
 export interface Anchor {
   id: string
   created_at: string
@@ -8,8 +15,13 @@ export interface Anchor {
   time_window_end: string
   session_id: string | null
   conversation_ids: string[]
+  focus_conversation_id: string | null
   summary: string
   raw_excerpt: string | null
+  emotion_arc: string | null
+  relationship_shift: string | null
+  themes: string[] | null
+  episode_turns: number | null
   emotion_tags: string[]
   topics: string[]
   entities: string[]
@@ -17,6 +29,7 @@ export interface Anchor {
   last_evoked_at: string | null
   evoked_count: number
   dream_note: string | null
+  episode_conversations?: EpisodeConversation[]
 }
 
 export interface CreateAnchorParams {

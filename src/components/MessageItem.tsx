@@ -346,7 +346,7 @@ const AnchorButton = memo(function AnchorButton({
   }, [status, onSave, conversationId])
 
   const color = status === 'saved' ? C.accent : C.btnDefault
-  const title = status === 'saved' ? '已收入时光册' : status === 'saving' ? '正在收藏…' : '留住这一刻'
+  const title = status === 'saved' ? '已收入时光册' : status === 'saving' ? '正在收藏这段对话…' : '留住这段对话'
 
   return (
     <button

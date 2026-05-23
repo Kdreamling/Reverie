@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Bookmark, Edit3, Check, X, Trash2, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
 import { C, SERIF } from '../theme'
-import { listAnchors, updateAnchorNote, deleteAnchor, type Anchor } from '../api/anchors'
+import { listAnchors, getAnchor, updateAnchorNote, deleteAnchor, type Anchor } from '../api/anchors'
 import { toast } from '../stores/toastStore'
 
 // ─── 时间格式化 ───────────────────────────────────────────────────────────────
@@ -52,6 +52,26 @@ function EmotionTag({ text }: { text: string }) {
   )
 }
 
+// ─── 母题标签 ──────────────────────────────────────────────────────────────
+function ThemeTag({ text }: { text: string }) {
+  return (
+    <span style={{
+      fontSize: 11,
+      padding: '2px 10px',
+      borderRadius: 999,
+      border: `1px solid ${C.border}`,
+      color: C.textSecondary,
+      background: 'transparent',
+      letterSpacing: '0.02em',
+      whiteSpace: 'nowrap',
+      fontFamily: SERIF,
+      fontStyle: 'italic',
+    }}>
+      {text}
+    </span>
+  )
+}
+
 // ─── Anchor 卡片 ────────────────────────────────────────────────────────────
 function AnchorCard({
   anchor,
@@ -63,6 +83,8 @@ function AnchorCard({
   onDelete: (id: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [episodeExpanded, setEpisodeExpanded] = useState(false)
+  const [episodeLoading, setEpisodeLoading] = useState(false)
   const [editingNote, setEditingNote] = useState(false)
   const [noteText, setNoteText] = useState(anchor.dream_note ?? '')
   const [savingNote, setSavingNote] = useState(false)
@@ -96,6 +118,27 @@ function AnchorCard({
       toast.error('删除失败')
     }
   }, [anchor.id, onDelete])
+
+  const handleToggleEpisode = useCallback(async () => {
+    if (episodeExpanded) {
+      setEpisodeExpanded(false)
+      return
+    }
+    if (anchor.episode_conversations) {
+      setEpisodeExpanded(true)
+      return
+    }
+    setEpisodeLoading(true)
+    try {
+      const full = await getAnchor(anchor.id)
+      onUpdate({ ...anchor, episode_conversations: full.episode_conversations })
+      setEpisodeExpanded(true)
+    } catch {
+      toast.error('加载对话原文失败')
+    } finally {
+      setEpisodeLoading(false)
+    }
+  }, [anchor, episodeExpanded, onUpdate])
 
   return (
     <article style={{
@@ -144,6 +187,30 @@ function AnchorCard({
         {anchor.summary}
       </div>
 
+      {/* 情绪弧线 + 关系变化 */}
+      {(anchor.emotion_arc || anchor.relationship_shift) && (
+        <div style={{
+          fontSize: 13,
+          color: C.textSecondary,
+          fontFamily: SERIF,
+          fontStyle: 'italic',
+          lineHeight: 1.8,
+          marginBottom: 14,
+          paddingLeft: 12,
+          borderLeft: `1.5px solid ${C.border}`,
+        }}>
+          {anchor.emotion_arc && <div>{anchor.emotion_arc}</div>}
+          {anchor.relationship_shift && <div style={{ marginTop: 2 }}>{anchor.relationship_shift}</div>}
+        </div>
+      )}
+
+      {/* 母题标签 */}
+      {anchor.themes && anchor.themes.length > 0 && (
+        <div className="flex flex-wrap gap-2" style={{ marginBottom: 14 }}>
+          {anchor.themes.map(t => <ThemeTag key={t} text={t} />)}
+        </div>
+      )}
+
       {/* Topics + Entities（主题、实体，细字） */}
       {(anchor.topics.length > 0 || anchor.entities.length > 0) && (
         <div style={{
@@ -164,7 +231,7 @@ function AnchorCard({
         </div>
       )}
 
-      {/* 原文片段（折叠） */}
+      {/* 关键原话（折叠） */}
       {anchor.raw_excerpt && (
         <div style={{ marginBottom: 12 }}>
           <button
@@ -175,7 +242,7 @@ function AnchorCard({
             onMouseLeave={e => (e.currentTarget.style.color = C.textMuted)}
           >
             {expanded ? <ChevronUp size={13} strokeWidth={1.8} /> : <ChevronDown size={13} strokeWidth={1.8} />}
-            <span>{expanded ? '收起原话' : '展开当时的原话'}</span>
+            <span>{expanded ? '收起原话' : '关键原话'}</span>
           </button>
           {expanded && (
             <pre style={{
@@ -192,6 +259,53 @@ function AnchorCard({
             }}>
               {anchor.raw_excerpt}
             </pre>
+          )}
+        </div>
+      )}
+
+      {/* Episode 完整对话（折叠，按需加载） */}
+      {(anchor.episode_turns ?? 0) > 1 && (
+        <div style={{ marginBottom: 12 }}>
+          <button
+            onClick={handleToggleEpisode}
+            className="flex items-center gap-1 cursor-pointer transition-colors"
+            style={{ fontSize: 12, color: C.textMuted, letterSpacing: '0.03em' }}
+            onMouseEnter={e => (e.currentTarget.style.color = C.accent)}
+            onMouseLeave={e => (e.currentTarget.style.color = C.textMuted)}
+            disabled={episodeLoading}
+          >
+            {episodeLoading ? <Loader2 size={13} strokeWidth={1.8} className="animate-spin" />
+              : episodeExpanded ? <ChevronUp size={13} strokeWidth={1.8} />
+              : <ChevronDown size={13} strokeWidth={1.8} />}
+            <span>{episodeExpanded ? '收起对话' : `展开这段对话（${anchor.episode_turns} 轮）`}</span>
+          </button>
+          {episodeExpanded && anchor.episode_conversations && (
+            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {anchor.episode_conversations.map(conv => {
+                const isFocus = conv.id === anchor.focus_conversation_id
+                return (
+                  <div key={conv.id} style={{
+                    padding: '10px 14px',
+                    borderLeft: isFocus ? `2.5px solid ${C.accent}` : `1.5px solid ${C.border}`,
+                    background: isFocus ? C.warmGlow : 'transparent',
+                    borderRadius: 2,
+                  }}>
+                    {conv.user_msg && (
+                      <div style={{ fontFamily: SERIF, fontSize: 13, lineHeight: 1.8, color: C.textSecondary, marginBottom: 4 }}>
+                        <span style={{ fontSize: 11, color: C.textMuted, marginRight: 6 }}>Dream</span>
+                        {conv.user_msg}
+                      </div>
+                    )}
+                    {conv.assistant_msg && (
+                      <div style={{ fontFamily: SERIF, fontSize: 13, lineHeight: 1.8, color: C.text }}>
+                        <span style={{ fontSize: 11, color: C.textMuted, marginRight: 6 }}>晨</span>
+                        {conv.assistant_msg}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
       )}
@@ -384,7 +498,7 @@ export default function TimelinePage() {
               时光册
             </h1>
             <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2, letterSpacing: '0.06em' }}>
-              {anchors.length > 0 ? `${anchors.length} 段被留住的时刻` : '和晨一起留下的时刻'}
+              {anchors.length > 0 ? `${anchors.length} 段被留住的经历` : '和晨一起留下的经历'}
             </div>
           </div>
         </div>
