@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Bookmark, Edit3, Check, X, Trash2, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
 import { C, SERIF } from '../theme'
-import { listAnchors, getAnchor, updateAnchorNote, deleteAnchor, type Anchor } from '../api/anchors'
+import { listAnchors, getAnchor, updateAnchorNote, updateAnchorSummary, deleteAnchor, type Anchor } from '../api/anchors'
 import { toast } from '../stores/toastStore'
 
 // ─── 时间格式化 ───────────────────────────────────────────────────────────────
@@ -88,6 +88,9 @@ function AnchorCard({
   const [editingNote, setEditingNote] = useState(false)
   const [noteText, setNoteText] = useState(anchor.dream_note ?? '')
   const [savingNote, setSavingNote] = useState(false)
+  const [editingSummary, setEditingSummary] = useState(false)
+  const [summaryText, setSummaryText] = useState(anchor.summary)
+  const [savingSummary, setSavingSummary] = useState(false)
 
   const handleSaveNote = useCallback(async () => {
     setSavingNote(true)
@@ -102,6 +105,21 @@ function AnchorCard({
       setSavingNote(false)
     }
   }, [anchor, noteText, onUpdate])
+
+  const handleSaveSummary = useCallback(async () => {
+    if (!summaryText.trim()) return
+    setSavingSummary(true)
+    try {
+      await updateAnchorSummary(anchor.id, summaryText.trim())
+      onUpdate({ ...anchor, summary: summaryText.trim() })
+      setEditingSummary(false)
+      toast.success('摘要已保存')
+    } catch {
+      toast.error('保存失败')
+    } finally {
+      setSavingSummary(false)
+    }
+  }, [anchor, summaryText, onUpdate])
 
   const handleCancelNote = useCallback(() => {
     setNoteText(anchor.dream_note ?? '')
@@ -176,16 +194,45 @@ function AnchorCard({
       </header>
 
       {/* Summary */}
-      <div style={{
-        fontFamily: SERIF,
-        fontSize: 16.5,
-        lineHeight: 2,
-        color: C.text,
-        letterSpacing: '0.01em',
-        marginBottom: 16,
-      }}>
-        {anchor.summary}
-      </div>
+      {editingSummary ? (
+        <div style={{ marginBottom: 16 }}>
+          <textarea
+            value={summaryText}
+            onChange={e => setSummaryText(e.target.value)}
+            rows={5}
+            style={{
+              width: '100%', fontFamily: SERIF, fontSize: 15, lineHeight: 1.8,
+              color: C.text, background: 'transparent', border: `1px solid ${C.borderStrong}`,
+              borderRadius: 10, padding: '10px 14px', resize: 'vertical', outline: 'none',
+            }}
+          />
+          <div className="flex gap-2 justify-end mt-2">
+            <button
+              onClick={() => { setSummaryText(anchor.summary); setEditingSummary(false) }}
+              disabled={savingSummary}
+              className="px-2 py-1 cursor-pointer" style={{ fontSize: 12, color: C.textMuted }}
+            ><X size={13} strokeWidth={1.8} /></button>
+            <button
+              onClick={handleSaveSummary}
+              disabled={savingSummary}
+              className="px-2 py-1 cursor-pointer" style={{ fontSize: 12, color: C.accent }}
+            >{savingSummary ? <Loader2 size={13} strokeWidth={1.8} className="animate-spin" /> : <Check size={13} strokeWidth={1.8} />}</button>
+          </div>
+        </div>
+      ) : (
+        <div
+          onClick={() => setEditingSummary(true)}
+          style={{
+            fontFamily: SERIF, fontSize: 16.5, lineHeight: 2,
+            color: C.text, letterSpacing: '0.01em', marginBottom: 16,
+            cursor: 'pointer', borderRadius: 8,
+            transition: 'background 0.2s',
+          }}
+          title="点击编辑摘要"
+        >
+          {anchor.summary}
+        </div>
+      )}
 
       {/* 情绪弧线 + 关系变化 */}
       {(anchor.emotion_arc || anchor.relationship_shift) && (

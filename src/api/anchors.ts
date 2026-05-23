@@ -68,6 +68,10 @@ export async function updateAnchorNote(id: string, note: string): Promise<void> 
   await client.patch<{ ok: boolean }>(`/anchors/${id}/note`, { note })
 }
 
+export async function updateAnchorSummary(id: string, summary: string): Promise<void> {
+  await client.patch<{ ok: boolean }>(`/anchors/${id}/summary`, { summary })
+}
+
 export async function deleteAnchor(id: string): Promise<void> {
   await client.delete<{ ok: boolean }>(`/anchors/${id}`)
 }
