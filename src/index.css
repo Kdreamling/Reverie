@@ -339,3 +339,11 @@ body.night-mode .event-bubble-label {
   color: rgba(196,154,120,0.55);
 }
 
+.search-highlight {
+  animation: searchPulse 2s ease-out;
+}
+@keyframes searchPulse {
+  0% { background: rgba(196,154,120,0.15); }
+  100% { background: transparent; }
+}
+

@@ -167,6 +167,7 @@ export default function ChatPage() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const [scrollToConvId, setScrollToConvId] = useState<string | null>(null)
   const plusMenuRef = useRef<HTMLDivElement>(null)
   const [lockInfo, setLockInfo] = useState<{ chen_locked_dream: any; dream_locked_chen: any } | null>(null)
   const [knockMsg, setKnockMsg] = useState('')
@@ -249,6 +250,20 @@ export default function ChatPage() {
       setSearchLoading(false)
     }, 350)
   }, [])
+
+  useEffect(() => {
+    if (!scrollToConvId || isLoadingMessages) return
+    const timer = setTimeout(() => {
+      const el = document.querySelector(`[data-conv-id="${scrollToConvId}"]`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el.classList.add('search-highlight')
+        setTimeout(() => el.classList.remove('search-highlight'), 2000)
+      }
+      setScrollToConvId(null)
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [scrollToConvId, isLoadingMessages])
 
   const handleKnock = async () => {
     if (!token || knockSending || knockCount >= maxKnocks) return
@@ -942,7 +957,7 @@ export default function ChatPage() {
                 {searchResults.map(r => (
                   <button
                     key={r.conversation_id}
-                    onClick={() => { selectSession(r.session_id); setSidebarOpen(false); handleSearch('') }}
+                    onClick={() => { selectSession(r.session_id); setScrollToConvId(r.conversation_id); setSidebarOpen(false); handleSearch('') }}
                     className="w-full text-left rounded-xl px-4 py-2.5 mb-1 transition-colors duration-150 cursor-pointer"
                     style={{ background: 'transparent', border: '1px solid transparent', color: C.text }}>
                     <div className="flex items-center justify-between gap-2 mb-1">
@@ -1260,23 +1275,24 @@ export default function ChatPage() {
                   ? { ...msg, silentRead: true }
                   : msg
                 return (
-                  <MessageItem
-                    key={msg.id}
-                    msg={msgWithSeen}
-                    modelLabel={msg.role === 'assistant' ? (models.find(m => m.name === model || m.value === model)?.label ?? model) : undefined}
-                    isDebugOpen={_debugOpenMsgId === msg.id}
-                    isCopied={copiedMsgId === msg.id}
-                    onToggleDebug={() => {
-                      if (msg.debugInfo) setSheetDebugInfo(msg.debugInfo)
-                    }}
-                    onCopy={handleCopyMsg}
-                    onDelete={handleDeleteConv}
-                    onRetry={handleRetry}
-                    onSwitchBranch={handleSwitchBranch}
-                    onRetryFailed={handleRetryFailed}
-                    onDismissFailed={handleDismissFailed}
-                    onSaveAnchor={handleSaveAnchor}
-                  />
+                  <div key={msg.id} data-conv-id={msg.conversationId || msg.id}>
+                    <MessageItem
+                      msg={msgWithSeen}
+                      modelLabel={msg.role === 'assistant' ? (models.find(m => m.name === model || m.value === model)?.label ?? model) : undefined}
+                      isDebugOpen={_debugOpenMsgId === msg.id}
+                      isCopied={copiedMsgId === msg.id}
+                      onToggleDebug={() => {
+                        if (msg.debugInfo) setSheetDebugInfo(msg.debugInfo)
+                      }}
+                      onCopy={handleCopyMsg}
+                      onDelete={handleDeleteConv}
+                      onRetry={handleRetry}
+                      onSwitchBranch={handleSwitchBranch}
+                      onRetryFailed={handleRetryFailed}
+                      onDismissFailed={handleDismissFailed}
+                      onSaveAnchor={handleSaveAnchor}
+                    />
+                  </div>
                 )
               })}
 
