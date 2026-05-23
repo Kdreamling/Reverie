@@ -98,7 +98,7 @@ export default function ChatPage() {
   const fromCalendar = searchParams.get('from') === 'calendar'
   const { sessions, currentSession, loading, fetchSessions, ensureTodaySession, createSession, selectSession, deleteSession, updateSessionModel } =
     useSessionStore()
-  const { messages, isStreaming, sessionEnded: streamSessionEnded, loadMessages, sendMessage, clearMessages, deleteConversation, regenerate, switchBranch, retryFailed, stopStreaming } =
+  const { messages, isStreaming, sessionEnded: streamSessionEnded, loadMessages, sendMessage, clearMessages, deleteConversation, regenerate, switchBranch, retryFailed, dismissFailed, stopStreaming } =
     useChatStore()
   const { token } = useAuthStore()
 
@@ -360,6 +360,10 @@ export default function ChatPage() {
     if (!currentSession) return
     retryFailed(currentSession.id, model)
   }, [currentSession, model, retryFailed])
+
+  const handleDismissFailed = useCallback(() => {
+    dismissFailed()
+  }, [dismissFailed])
 
   // 锚点：留住这一刻。只传点击的这一对 conversation；后端拉前后上下文给 LLM 看，但不存
   const handleSaveAnchor = useCallback(async (conversationId: string): Promise<boolean> => {
@@ -1158,6 +1162,7 @@ export default function ChatPage() {
                     onRetry={handleRetry}
                     onSwitchBranch={handleSwitchBranch}
                     onRetryFailed={handleRetryFailed}
+                    onDismissFailed={handleDismissFailed}
                     onSaveAnchor={handleSaveAnchor}
                   />
                 )

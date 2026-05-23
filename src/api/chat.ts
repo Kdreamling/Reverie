@@ -85,6 +85,7 @@ export interface ChatMessage {
   branchTotal?: number | null
   failed?: boolean
   failedReason?: string
+  pendingId?: string
 }
 
 export interface ReadingContextPayload {

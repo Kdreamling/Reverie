@@ -318,6 +318,7 @@ interface MessageItemProps {
   onRetry: (conversationId: string) => void
   onSwitchBranch?: (conversationId: string, branchIndex: number) => void
   onRetryFailed?: () => void
+  onDismissFailed?: () => void
   onSaveAnchor?: (conversationId: string) => Promise<boolean>
   isAnchored?: boolean
 }
@@ -364,7 +365,7 @@ const AnchorButton = memo(function AnchorButton({
   )
 })
 
-const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, isCopied, onToggleDebug, onCopy, onDelete, onRetry, onSwitchBranch, onRetryFailed, onSaveAnchor, isAnchored }: MessageItemProps) {
+const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, isCopied, onToggleDebug, onCopy, onDelete, onRetry, onSwitchBranch, onRetryFailed, onDismissFailed, onSaveAnchor, isAnchored }: MessageItemProps) {
   if (msg.role === 'user') {
     // 用户消息：右侧轻气泡（书页旁注风格）
     return (
@@ -399,6 +400,13 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
                 style={{ fontSize: 11, color: C.errorText, background: 'none', border: 'none', textDecoration: 'underline', padding: 0 }}
               >
                 重新发送
+              </button>
+              <button
+                onClick={onDismissFailed}
+                className="cursor-pointer"
+                style={{ fontSize: 11, color: C.textMuted, background: 'none', border: 'none', textDecoration: 'underline', padding: 0 }}
+              >
+                删除
               </button>
             </div>
           )}

@@ -12,6 +12,7 @@ import {
   type StreamChatOptions,
 } from '../api/chat'
 import { updateSessionAPI } from '../api/sessions'
+import { savePendingMessageAPI, fetchPendingMessagesAPI, deletePendingMessageAPI } from '../api/pendingMessages'
 import { useSessionStore } from './sessionStore'
 
 interface SseEvent {
@@ -76,6 +77,7 @@ interface ChatState {
   regenerate: (sessionId: string, model: string, conversationId: string) => Promise<void>
   switchBranch: (sessionId: string, conversationId: string, branchIndex: number) => Promise<void>
   retryFailed: (sessionId: string, model: string) => void
+  dismissFailed: () => void
   clearError: () => void
 }
 
@@ -234,6 +236,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
 
       set({ messages, sessionEnded: false })
+
+      fetchPendingMessagesAPI(sessionId).then(pending => {
+        if (!pending.length) return
+        const pendingMsgs: ChatMessage[] = pending.map(p => ({
+          id: `pending-${p.id}`,
+          role: 'user' as const,
+          content: p.content,
+          created_at: p.created_at,
+          attachments: p.attachments ?? null,
+          failed: true,
+          failedReason: p.failed_reason ?? undefined,
+          pendingId: p.id,
+        }))
+        set(s => ({ messages: [...s.messages, ...pendingMsgs] }))
+      }).catch(() => {})
     } catch {
       // silently fail
     }
@@ -278,6 +295,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const token = localStorage.getItem('token') ?? ''
     const abortController = new AbortController()
     set({ _abortController: abortController })
+
+    let pendingSaved = false
+    const markFailed = (reason?: string) => {
+      set(s => ({
+        isStreaming: false, ...EMPTY_STREAM, _abortController: null, _reader: null,
+        messages: s.messages.map((m, i) => i === s.messages.length - 1 && m.role === 'user' ? { ...m, failed: true, failedReason: reason } : m),
+      }))
+      if (!pendingSaved) {
+        pendingSaved = true
+        savePendingMessageAPI(sessionId, content, options?.attachments, reason).catch(() => {})
+      }
+    }
+
     try {
       const res = await streamChat(sessionId, model, content, token, options, abortController.signal)
 
@@ -287,10 +317,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         return
       }
       if (!res.ok || !res.body) {
-        set(s => ({
-          isStreaming: false, _abortController: null,
-          messages: s.messages.map((m, i) => i === s.messages.length - 1 && m.role === 'user' ? { ...m, failed: true, failedReason: `HTTP ${res.status}` } : m),
-        }))
+        markFailed(`HTTP ${res.status}`)
         return
       }
 
@@ -351,11 +378,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
           flushTimer = setTimeout(flushDeltas, 16)
         }
       }
-
-      const markFailed = (reason?: string) => set(s => ({
-        isStreaming: false, ...EMPTY_STREAM, _abortController: null, _reader: null,
-        messages: s.messages.map((m, i) => i === s.messages.length - 1 && m.role === 'user' ? { ...m, failed: true, failedReason: reason } : m),
-      }))
 
       const timeoutId = setTimeout(() => {
         if (!gotFirstChunk && get().isStreaming) {
@@ -625,10 +647,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return
     } finally {
       if (get().isStreaming) {
-        set(s => ({
-          isStreaming: false, ...EMPTY_STREAM, _abortController: null, _reader: null,
-          messages: s.messages.map((m, i) => i === s.messages.length - 1 && m.role === 'user' ? { ...m, failed: true } : m),
-        }))
+        markFailed()
       }
     }
   },
@@ -801,8 +820,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (failedIdx === -1) return
     const content = msgs[failedIdx].content
     const attachments = msgs[failedIdx].attachments
+    const pendingId = msgs[failedIdx].pendingId
+    if (pendingId) {
+      deletePendingMessageAPI(pendingId).catch(() => {})
+    }
     set(s => ({ messages: s.messages.filter((_, i) => i !== failedIdx) }))
     get().sendMessage(sessionId, model, content, attachments ? { attachments } : undefined)
+  },
+
+  dismissFailed() {
+    const msgs = get().messages
+    const failedIdx = findLastIndex(msgs, m => m.role === 'user' && m.failed === true)
+    if (failedIdx === -1) return
+    const pendingId = msgs[failedIdx].pendingId
+    if (pendingId) {
+      deletePendingMessageAPI(pendingId).catch(() => {})
+    }
+    set(s => ({ messages: s.messages.filter((_, i) => i !== failedIdx) }))
   },
 
   clearError() {
