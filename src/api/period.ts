@@ -14,18 +14,25 @@ export interface PeriodLatest {
   predicted_next: string | null
   avg_cycle_days: number | null
   is_estimated?: boolean
+  in_period?: boolean
 }
 
 export async function getLatestPeriod(): Promise<PeriodLatest> {
   return client.get<PeriodLatest>('/period/latest')
 }
 
-export async function createPeriod(start_date?: string, note?: string): Promise<PeriodRecord> {
+export interface CreatePeriodResult {
+  ok: boolean
+  record?: PeriodRecord
+  merged?: boolean
+  message?: string
+}
+
+export async function createPeriod(start_date?: string, note?: string): Promise<CreatePeriodResult> {
   const body: Record<string, string> = {}
   if (start_date) body.start_date = start_date
   if (note) body.note = note
-  const res = await client.post<{ ok: boolean; record: PeriodRecord }>('/period', body)
-  return res.record
+  return client.post<CreatePeriodResult>('/period', body)
 }
 
 export async function listPeriod(): Promise<PeriodRecord[]> {

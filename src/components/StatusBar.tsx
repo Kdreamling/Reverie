@@ -82,6 +82,7 @@ export default function StatusBar({ isNight }: Props) {
     setPeriodSubmitting(false)
   }
 
+
   const handlePeriodUndo = async () => {
     if (periodSubmitting || !period?.latest) return
     if (!confirm(`撤销 ${period.latest.start_date} 的记录？`)) return
@@ -111,7 +112,7 @@ export default function StatusBar({ isNight }: Props) {
     summaryParts.push(`睡${h}h${m > 0 ? m + 'm' : ''}`)
   }
   if (period?.days_since != null) {
-    summaryParts.push(`周期第${period.days_since}天`)
+    summaryParts.push(period.in_period ? `经期第${period.days_since + 1}天` : `周期第${period.days_since}天`)
   }
 
   const nText = isNight ? 'rgba(224,213,200,0.9)' : C.text
@@ -162,6 +163,7 @@ export default function StatusBar({ isNight }: Props) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   })()
   const isLatestToday = period?.latest?.start_date === bjToday
+  const inPeriod = period?.in_period ?? false
 
   return (
     <div style={{ width: '100%', marginBottom: 6 }}>
@@ -493,8 +495,12 @@ export default function StatusBar({ isNight }: Props) {
                   还没有记录
                 </span>
               )}
-              <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-                {!isLatestToday && (
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+                {inPeriod ? (
+                  <span style={{ fontSize: 10, fontFamily: "'Noto Sans SC'", color: nAccent, opacity: 0.8 }}>
+                    经期中 · 第{(period?.days_since ?? 0) + 1}天
+                  </span>
+                ) : !isLatestToday && (
                   <button
                     onClick={handlePeriodToday}
                     disabled={periodSubmitting}

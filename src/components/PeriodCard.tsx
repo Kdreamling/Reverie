@@ -77,6 +77,7 @@ export default function PeriodCard({ C }: Props) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   })()
   const isLatestToday = data?.latest?.start_date === bjToday
+  const inPeriod = data?.in_period ?? false
 
   const cardStyle: React.CSSProperties = {
     margin: '0 20px 20px',
@@ -109,8 +110,17 @@ export default function PeriodCard({ C }: Props) {
             Period
           </span>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {!isLatestToday && (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {inPeriod ? (
+            <span style={{
+              fontSize: 11,
+              fontFamily: "'Noto Sans SC'",
+              color: C.amber,
+              opacity: 0.8,
+            }}>
+              经期中 · 第{(data?.days_since ?? 0) + 1}天
+            </span>
+          ) : !isLatestToday && (
             <button
               onClick={logToday}
               disabled={submitting}
