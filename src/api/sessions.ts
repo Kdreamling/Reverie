@@ -39,6 +39,23 @@ export async function updateSessionAPI(
   return client.patch<Session>(`/sessions/${id}`, data)
 }
 
+// Search API
+export interface SearchResult {
+  conversation_id: string
+  session_id: string
+  session_title: string | null
+  snippet: string
+  source_field: 'user' | 'assistant'
+  created_at: string
+}
+
+export async function searchConversations(q: string, limit = 20): Promise<SearchResult[]> {
+  const res = await client.get<{ results: SearchResult[] }>(
+    `/sessions/conversations/search?q=${encodeURIComponent(q)}&limit=${limit}`,
+  )
+  return res.results
+}
+
 // Calendar API
 export interface CalendarSession {
   id: string

@@ -5,7 +5,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
 import { useAuthStore } from '../stores/authStore'
-import { updateSessionAPI } from '../api/sessions'
+import { updateSessionAPI, searchConversations, type SearchResult } from '../api/sessions'
 import { uploadAttachment, type AttachmentInfo } from '../api/attachments'
 import type { MessageAttachment, DreamEvent } from '../api/chat'
 import { fetchDreamEvents } from '../api/chat'
@@ -163,6 +163,10 @@ export default function ChatPage() {
   const [showPlusMenu, setShowPlusMenu] = useState(false)
   // thinking 开关：null = 跟随当前模型默认，true/false = 用户显式覆盖
   const [thinkingOn, setThinkingOn] = useState<boolean | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const plusMenuRef = useRef<HTMLDivElement>(null)
   const [lockInfo, setLockInfo] = useState<{ chen_locked_dream: any; dream_locked_chen: any } | null>(null)
   const [knockMsg, setKnockMsg] = useState('')
@@ -227,6 +231,24 @@ export default function ChatPage() {
       }
     }).catch(() => {})
   }, [isLockedByChen, chenLockId, token])
+
+  const handleSearch = useCallback((q: string) => {
+    setSearchQuery(q)
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    if (!q.trim()) {
+      setSearchResults([])
+      setSearchLoading(false)
+      return
+    }
+    setSearchLoading(true)
+    searchTimerRef.current = setTimeout(async () => {
+      try {
+        const results = await searchConversations(q.trim())
+        setSearchResults(results)
+      } catch { setSearchResults([]) }
+      setSearchLoading(false)
+    }, 350)
+  }, [])
 
   const handleKnock = async () => {
     if (!token || knockSending || knockCount >= maxKnocks) return
@@ -858,92 +880,182 @@ export default function ChatPage() {
         <div style={{ padding: '12px 14px 6px' }}>
           <div className="flex items-center gap-2" style={{ padding: '9px 14px', borderRadius: 12, background: 'transparent', border: `1px solid ${C.border}` }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.textMuted} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-            <input placeholder="搜索..." className="flex-1 border-none outline-none bg-transparent" style={{ color: C.text, fontSize: 12.5, fontFamily: "'EB Garamond', 'Noto Serif SC', serif" }} />
+            <input
+              value={searchQuery}
+              onChange={e => handleSearch(e.target.value)}
+              placeholder="搜索..."
+              className="flex-1 border-none outline-none bg-transparent"
+              style={{ color: C.text, fontSize: 12.5, fontFamily: "'EB Garamond', 'Noto Serif SC', serif" }}
+            />
+            {searchQuery && (
+              <button onClick={() => handleSearch('')} style={{ color: C.textMuted, cursor: 'pointer', background: 'none', border: 'none', padding: 0, display: 'flex' }}>
+                <X size={14} />
+              </button>
+            )}
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto px-3 pt-2 pb-2" style={{ scrollbarWidth: 'none' }}>
-          {loading && !sessions.length && (
-            <p className="px-3 py-4 text-sm" style={{ color: C.textMuted }}>Loading…</p>
-          )}
-          {GROUPS.map(({ key, label }) => {
-            const items = sessions.filter(s => getGroup(s.created_at) === key && s.scene_type !== 'reading')
-            if (!items.length) return null
-            return (
-              <div key={key} className="mb-2">
-                <div className="flex items-center gap-2 px-3 pt-3 pb-1.5 select-none" style={{ color: C.textMuted }}>
-                  <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{label}</span>
-                </div>
-                {items.map(session => {
-                  const isActive = session.id === currentSession?.id
-                  const isHovered = session.id === hoveredId
-                  const isSwiped = session.id === swipedId
-                  return (
-                    <div key={session.id} className="relative mb-1 rounded-xl select-none" style={{ overflow: 'hidden' }}>
-                      {isSwiped && (
-                        <div className="absolute right-0 top-0 bottom-0 flex" style={{ width: 130 }}
-                          onTouchStart={e => e.nativeEvent.stopImmediatePropagation()}
-                          onTouchMove={e => e.nativeEvent.stopImmediatePropagation()}
-                          onTouchEnd={e => e.nativeEvent.stopImmediatePropagation()}>
-                          <button className="flex-1 flex items-center justify-center text-xs cursor-pointer"
-                            style={{ background: C.surfaceSolid, color: C.textSecondary }}
-                            onClick={e => { e.stopPropagation(); setSwipedId(null); setRenameModal({ id: session.id, title: session.title || '' }) }}
-                            onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); setSwipedId(null); setRenameModal({ id: session.id, title: session.title || '' }) }}>
-                            重命名
-                          </button>
-                          <button className="flex-1 flex items-center justify-center text-xs cursor-pointer"
-                            style={{ background: C.errorBg, color: C.errorText }}
-                            onClick={e => { e.stopPropagation(); setSwipedId(null); if (window.confirm('确定要删除这个对话吗？')) deleteSession(session.id) }}
-                            onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); setSwipedId(null); if (window.confirm('确定要删除这个对话吗？')) deleteSession(session.id) }}>
-                            删除
-                          </button>
-                        </div>
-                      )}
+          {searchQuery.trim() ? (
+            <>
+              {/* Title matches */}
+              {(() => {
+                const q = searchQuery.trim().toLowerCase()
+                const titleMatches = sessions.filter(s =>
+                  s.scene_type !== 'reading' && (s.title || '').toLowerCase().includes(q)
+                )
+                return titleMatches.length > 0 && (
+                  <div className="mb-3">
+                    <div className="flex items-center gap-2 px-3 pt-2 pb-1.5 select-none" style={{ color: C.textMuted }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase' }}>session</span>
+                    </div>
+                    {titleMatches.map(session => (
                       <button
-                        onClick={() => {
-                          if (isSwiped) { setSwipedId(null); return }
-                          if (session.scene_type === 'reading') { navigate(`/read/${session.id}`); setSidebarOpen(false); return }
-                          selectSession(session.id); setSidebarOpen(false)
-                        }}
-                        onMouseEnter={() => setHoveredId(session.id)}
-                        onMouseLeave={() => setHoveredId(null)}
-                        onTouchStart={e => { e.nativeEvent.stopImmediatePropagation(); handleItemTouchStart(e, session.id) }}
-                        onTouchMove={e => { e.nativeEvent.stopImmediatePropagation(); handleItemTouchMove(e) }}
-                        onTouchEnd={e => { e.nativeEvent.stopImmediatePropagation(); handleItemTouchEnd(e) }}
-                        className="relative w-full text-left rounded-xl px-4 py-3 transition-colors duration-150 cursor-pointer"
+                        key={session.id}
+                        onClick={() => { selectSession(session.id); setSidebarOpen(false); handleSearch('') }}
+                        className="w-full text-left rounded-xl px-4 py-3 mb-1 transition-colors duration-150 cursor-pointer"
                         style={{
-                          background: isActive ? 'rgba(160,120,90,0.06)' : isHovered ? 'rgba(160,120,90,0.03)' : 'transparent',
-                          border: `1px solid ${isActive ? 'rgba(196,154,120,0.18)' : 'transparent'}`,
+                          background: session.id === currentSession?.id ? 'rgba(160,120,90,0.06)' : 'transparent',
+                          border: `1px solid ${session.id === currentSession?.id ? 'rgba(196,154,120,0.18)' : 'transparent'}`,
                           color: C.text,
-                          transform: isSwiped ? 'translateX(-130px)' : 'translateX(0)',
-                          transition: 'transform 0.25s ease',
                         }}>
                         <div className="flex items-start justify-between gap-3">
-                          <p className="text-sm leading-snug"
-                            style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: isActive ? 600 : 400, color: C.text }}
-                            onDoubleClick={e => { e.stopPropagation(); setRenameModal({ id: session.id, title: session.title || '' }) }}>
+                          <p className="text-sm leading-snug" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 400 }}>
                             {session.title || 'New Chat'}
                           </p>
                           <span className="flex-shrink-0" style={{ color: C.metaText, fontSize: 11 }}>
                             {formatSessionTime(session.updated_at)}
                           </span>
                         </div>
-                        {isHovered && (
-                          <span role="button"
-                            onClick={e => { e.stopPropagation(); if (window.confirm('确定要删除这个对话吗？')) deleteSession(session.id) }}
-                            className="absolute right-2 top-1/2 flex items-center justify-center rounded cursor-pointer"
-                            style={{ width: 18, height: 18, transform: 'translateY(-50%)', color: C.textMuted }}
-                            onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = C.errorText)}
-                            onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = C.textMuted)}>
-                            <X size={12} strokeWidth={2} />
-                          </span>
-                        )}
                       </button>
+                    ))}
+                  </div>
+                )
+              })()}
+
+              {/* Content matches */}
+              <div>
+                <div className="flex items-center gap-2 px-3 pt-2 pb-1.5 select-none" style={{ color: C.textMuted }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                    {searchLoading ? 'searching...' : `${searchResults.length} result${searchResults.length !== 1 ? 's' : ''}`}
+                  </span>
+                </div>
+                {searchResults.map(r => (
+                  <button
+                    key={r.conversation_id}
+                    onClick={() => { selectSession(r.session_id); setSidebarOpen(false); handleSearch('') }}
+                    className="w-full text-left rounded-xl px-4 py-2.5 mb-1 transition-colors duration-150 cursor-pointer"
+                    style={{ background: 'transparent', border: '1px solid transparent', color: C.text }}>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span style={{ fontSize: 11, color: C.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                        {r.session_title || ''}
+                      </span>
+                      <span style={{ fontSize: 10, color: C.metaText, flexShrink: 0 }}>
+                        {new Date(r.created_at).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}
+                      </span>
                     </div>
-                  )
-                })}
+                    <p style={{
+                      fontSize: 12, color: C.textMuted, lineHeight: 1.5,
+                      overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                      fontFamily: "'Noto Sans SC', sans-serif",
+                    }}>
+                      <span style={{ fontSize: 10, color: r.source_field === 'user' ? C.accent : C.textMuted, marginRight: 4 }}>
+                        {r.source_field === 'user' ? 'Dream' : '晨'}
+                      </span>
+                      {r.snippet}
+                    </p>
+                  </button>
+                ))}
+                {!searchLoading && !searchResults.length && (
+                  <p className="px-4 py-3 text-xs" style={{ color: C.textMuted }}>没找到相关对话</p>
+                )}
               </div>
-            )
-          })}
+            </>
+          ) : (
+            <>
+              {loading && !sessions.length && (
+                <p className="px-3 py-4 text-sm" style={{ color: C.textMuted }}>Loading…</p>
+              )}
+              {GROUPS.map(({ key, label }) => {
+                const items = sessions.filter(s => getGroup(s.created_at) === key && s.scene_type !== 'reading')
+                if (!items.length) return null
+                return (
+                  <div key={key} className="mb-2">
+                    <div className="flex items-center gap-2 px-3 pt-3 pb-1.5 select-none" style={{ color: C.textMuted }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{label}</span>
+                    </div>
+                    {items.map(session => {
+                      const isActive = session.id === currentSession?.id
+                      const isHovered = session.id === hoveredId
+                      const isSwiped = session.id === swipedId
+                      return (
+                        <div key={session.id} className="relative mb-1 rounded-xl select-none" style={{ overflow: 'hidden' }}>
+                          {isSwiped && (
+                            <div className="absolute right-0 top-0 bottom-0 flex" style={{ width: 130 }}
+                              onTouchStart={e => e.nativeEvent.stopImmediatePropagation()}
+                              onTouchMove={e => e.nativeEvent.stopImmediatePropagation()}
+                              onTouchEnd={e => e.nativeEvent.stopImmediatePropagation()}>
+                              <button className="flex-1 flex items-center justify-center text-xs cursor-pointer"
+                                style={{ background: C.surfaceSolid, color: C.textSecondary }}
+                                onClick={e => { e.stopPropagation(); setSwipedId(null); setRenameModal({ id: session.id, title: session.title || '' }) }}
+                                onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); setSwipedId(null); setRenameModal({ id: session.id, title: session.title || '' }) }}>
+                                重命名
+                              </button>
+                              <button className="flex-1 flex items-center justify-center text-xs cursor-pointer"
+                                style={{ background: C.errorBg, color: C.errorText }}
+                                onClick={e => { e.stopPropagation(); setSwipedId(null); if (window.confirm('确定要删除这个对话吗？')) deleteSession(session.id) }}
+                                onTouchEnd={e => { e.preventDefault(); e.nativeEvent.stopImmediatePropagation(); setSwipedId(null); if (window.confirm('确定要删除这个对话吗？')) deleteSession(session.id) }}>
+                                删除
+                              </button>
+                            </div>
+                          )}
+                          <button
+                            onClick={() => {
+                              if (isSwiped) { setSwipedId(null); return }
+                              if (session.scene_type === 'reading') { navigate(`/read/${session.id}`); setSidebarOpen(false); return }
+                              selectSession(session.id); setSidebarOpen(false)
+                            }}
+                            onMouseEnter={() => setHoveredId(session.id)}
+                            onMouseLeave={() => setHoveredId(null)}
+                            onTouchStart={e => { e.nativeEvent.stopImmediatePropagation(); handleItemTouchStart(e, session.id) }}
+                            onTouchMove={e => { e.nativeEvent.stopImmediatePropagation(); handleItemTouchMove(e) }}
+                            onTouchEnd={e => { e.nativeEvent.stopImmediatePropagation(); handleItemTouchEnd(e) }}
+                            className="relative w-full text-left rounded-xl px-4 py-3 transition-colors duration-150 cursor-pointer"
+                            style={{
+                              background: isActive ? 'rgba(160,120,90,0.06)' : isHovered ? 'rgba(160,120,90,0.03)' : 'transparent',
+                              border: `1px solid ${isActive ? 'rgba(196,154,120,0.18)' : 'transparent'}`,
+                              color: C.text,
+                              transform: isSwiped ? 'translateX(-130px)' : 'translateX(0)',
+                              transition: 'transform 0.25s ease',
+                            }}>
+                            <div className="flex items-start justify-between gap-3">
+                              <p className="text-sm leading-snug"
+                                style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: isActive ? 600 : 400, color: C.text }}
+                                onDoubleClick={e => { e.stopPropagation(); setRenameModal({ id: session.id, title: session.title || '' }) }}>
+                                {session.title || 'New Chat'}
+                              </p>
+                              <span className="flex-shrink-0" style={{ color: C.metaText, fontSize: 11 }}>
+                                {formatSessionTime(session.updated_at)}
+                              </span>
+                            </div>
+                            {isHovered && (
+                              <span role="button"
+                                onClick={e => { e.stopPropagation(); if (window.confirm('确定要删除这个对话吗？')) deleteSession(session.id) }}
+                                className="absolute right-2 top-1/2 flex items-center justify-center rounded cursor-pointer"
+                                style={{ width: 18, height: 18, transform: 'translateY(-50%)', color: C.textMuted }}
+                                onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = C.errorText)}
+                                onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = C.textMuted)}>
+                                <X size={12} strokeWidth={2} />
+                              </span>
+                            )}
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </>
+          )}
         </nav>
 
         {/* Rename modal */}
