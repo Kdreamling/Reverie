@@ -119,6 +119,31 @@ export async function saveCharacterAPI(projectId: string, state: CharacterState)
   return res.character_state
 }
 
+// 故事笔记
+export interface ProjectNote {
+  id: string
+  project_id: string
+  chapter: number
+  content: string
+  note_type: string
+  auto: boolean
+  created_at: string
+}
+
+export async function fetchNotesAPI(projectId: string): Promise<ProjectNote[]> {
+  const res = await client.get<{ ok: boolean; notes: ProjectNote[] }>(`/projects/${projectId}/notes`)
+  return res.notes
+}
+
+export async function createNoteAPI(projectId: string, data: { content: string; chapter?: number; note_type?: string }): Promise<ProjectNote> {
+  const res = await client.post<{ ok: boolean; note: ProjectNote }>(`/projects/${projectId}/notes`, data)
+  return res.note
+}
+
+export async function deleteNoteAPI(projectId: string, noteId: string): Promise<void> {
+  await client.delete<{ ok: boolean }>(`/projects/${projectId}/notes/${noteId}`)
+}
+
 // 项目内会话
 export async function createProjectSessionAPI(projectId: string): Promise<ProjectSession> {
   return client.post<ProjectSession>(`/projects/${projectId}/sessions`, {})

@@ -3,8 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { C, FONT } from '../theme'
 import { useProjectStore } from '../stores/projectStore'
 import { deleteSessionAPI } from '../api/sessions'
-import type { Project, ProjectFile, CharacterState, InventoryItem } from '../api/projects'
-import { fetchCharacterAPI, saveCharacterAPI } from '../api/projects'
+import type { Project, ProjectFile, CharacterState, InventoryItem, ProjectNote } from '../api/projects'
+import { fetchCharacterAPI, saveCharacterAPI, fetchNotesAPI, createNoteAPI, deleteNoteAPI } from '../api/projects'
 
 // ─── Icons ───
 function I({ d, w, sw, color }: { d: string; w?: number; sw?: string; color?: string }) {
@@ -25,6 +25,7 @@ const IcoFormat = () => <I d="M4 7V4h16v3M9 20h6M12 4v16" w={15} />
 const IcoFolder = () => <I d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" w={15} />
 const IcoInfo = () => <I d="M12 12m-10 0a10 10 0 1020 0 10 10 0 10-20 0M12 16v-4M12 8h.01" w={15} />
 const IcoUser = () => <I d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 3a4 4 0 100 8 4 4 0 000-8" w={15} />
+const IcoNote = () => <I d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8" w={15} />
 
 // ─── Default format rules (for reset) ───
 const DEFAULT_FORMAT_RULES = `## 剧本模式 · 行为规范
@@ -269,11 +270,12 @@ function SettingsView({ project, onBack, onUpdate, onCreateFile, onDeleteFile }:
   onCreateFile: (projectId: string, data: { name: string; content: string; file_type?: string; priority?: string }) => Promise<ProjectFile>
   onDeleteFile: (projectId: string, fileId: string) => Promise<void>
 }) {
-  const [tab, setTab] = useState<'world' | 'format' | 'character' | 'files' | 'info'>('world')
+  const [tab, setTab] = useState<'world' | 'format' | 'character' | 'notes' | 'files' | 'info'>('world')
   const tabs = [
     { k: 'world' as const, l: '世界观', icon: <IcoGlobe /> },
     { k: 'format' as const, l: '格式', icon: <IcoFormat /> },
     { k: 'character' as const, l: '角色卡', icon: <IcoUser /> },
+    { k: 'notes' as const, l: '笔记', icon: <IcoNote /> },
     { k: 'files' as const, l: '文件', icon: <IcoFolder /> },
     { k: 'info' as const, l: '信息', icon: <IcoInfo /> },
   ]
@@ -318,6 +320,7 @@ function SettingsView({ project, onBack, onUpdate, onCreateFile, onDeleteFile }:
         {tab === 'world' && <WorldTab project={project} onSave={onUpdate} />}
         {tab === 'format' && <FormatTab project={project} onSave={onUpdate} />}
         {tab === 'character' && <CharacterTab project={project} />}
+        {tab === 'notes' && <NotesTab project={project} />}
         {tab === 'files' && <FilesTab project={project} onCreateFile={onCreateFile} onDeleteFile={onDeleteFile} />}
         {tab === 'info' && <InfoTab project={project} onSave={onUpdate} />}
       </div>
@@ -762,6 +765,110 @@ function CharacterTab({ project }: { project: Project }) {
       >
         {saving ? '保存中...' : dirty ? '保存角色卡' : '已保存'}
       </button>
+    </div>
+  )
+}
+
+
+// ═══════════════════════════════════════════════
+//  NOTES TAB
+// ═══════════════════════════════════════════════
+
+const NOTE_TYPES = [
+  { k: 'event', l: '事件', color: '#6b9bd2' },
+  { k: 'foreshadow', l: '伏笔', color: '#c49a6c' },
+  { k: 'npc', l: 'NPC', color: '#9b8ec4' },
+  { k: 'loot', l: '战利品', color: '#6bc48e' },
+]
+
+function NotesTab({ project }: { project: Project }) {
+  const [notes, setNotes] = useState<ProjectNote[]>([])
+  const [loading, setLoading] = useState(true)
+  const [newContent, setNewContent] = useState('')
+  const [newType, setNewType] = useState('event')
+
+  useEffect(() => {
+    fetchNotesAPI(project.id).then(setNotes).catch(() => {}).finally(() => setLoading(false))
+  }, [project.id])
+
+  const handleAdd = async () => {
+    if (!newContent.trim()) return
+    const note = await createNoteAPI(project.id, { content: newContent.trim(), note_type: newType })
+    setNotes(prev => [note, ...prev])
+    setNewContent('')
+  }
+
+  const handleDelete = async (noteId: string) => {
+    await deleteNoteAPI(project.id, noteId)
+    setNotes(prev => prev.filter(n => n.id !== noteId))
+  }
+
+  const grouped = notes.reduce<Record<number, ProjectNote[]>>((acc, n) => {
+    (acc[n.chapter] ??= []).push(n)
+    return acc
+  }, {})
+
+  const lbl: React.CSSProperties = { fontSize: 11, color: C.textMuted, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }
+  const inp: React.CSSProperties = { background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 10px', fontSize: 13, color: C.text, outline: 'none', fontFamily: "'Noto Sans SC', sans-serif" }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Add note */}
+      <div>
+        <div style={lbl}>添加笔记</div>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+          {NOTE_TYPES.map(t => (
+            <button key={t.k} onClick={() => setNewType(t.k)} style={{
+              padding: '3px 10px', borderRadius: 6, fontSize: 11,
+              background: newType === t.k ? t.color + '20' : 'transparent',
+              border: `1px solid ${newType === t.k ? t.color : C.border}`,
+              color: newType === t.k ? t.color : C.textMuted,
+              cursor: 'pointer', fontFamily: "'Noto Sans SC', sans-serif",
+            }}>{t.l}</button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <input value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="记录剧情要点、伏笔、NPC信息..."
+            style={{ ...inp, flex: 1 }}
+            onKeyDown={e => { if (e.key === 'Enter') handleAdd() }}
+          />
+          <button onClick={handleAdd} style={{ ...inp, cursor: 'pointer', color: C.accent, borderColor: C.accent, padding: '6px 12px' }}>添加</button>
+        </div>
+      </div>
+
+      {/* Notes list */}
+      {loading ? (
+        <div style={{ color: C.textMuted, fontSize: 13, textAlign: 'center', padding: 20 }}>加载中...</div>
+      ) : notes.length === 0 ? (
+        <div style={{ color: C.textMuted, fontSize: 13, textAlign: 'center', padding: 20 }}>还没有笔记。在这里记录重要的剧情节点和伏笔。</div>
+      ) : (
+        Object.entries(grouped).sort(([a], [b]) => Number(a) - Number(b)).map(([chapter, items]) => (
+          <div key={chapter}>
+            <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 600, letterSpacing: '0.08em', marginBottom: 6 }}>
+              第 {chapter} 章
+            </div>
+            {items.map(note => {
+              const typeInfo = NOTE_TYPES.find(t => t.k === note.note_type)
+              return (
+                <div key={note.id} style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', marginBottom: 4,
+                  borderRadius: 8, border: `1px solid ${C.border}`,
+                }}>
+                  <span style={{
+                    fontSize: 9, padding: '2px 6px', borderRadius: 4,
+                    background: (typeInfo?.color ?? '#888') + '18',
+                    color: typeInfo?.color ?? C.textMuted,
+                    fontWeight: 600, flexShrink: 0, marginTop: 2,
+                  }}>{typeInfo?.l ?? note.note_type}</span>
+                  <span style={{ flex: 1, fontSize: 13, color: C.text, lineHeight: 1.5 }}>{note.content}</span>
+                  {note.auto && <span style={{ fontSize: 9, color: C.textMuted, flexShrink: 0 }}>auto</span>}
+                  <button onClick={() => handleDelete(note.id)} style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', padding: 2, fontSize: 11, flexShrink: 0 }}>✕</button>
+                </div>
+              )
+            })}
+          </div>
+        ))
+      )}
     </div>
   )
 }
