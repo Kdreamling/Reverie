@@ -5,6 +5,7 @@ export interface Session {
   title: string | null
   model: string
   scene_type: string
+  project_id?: string | null
   created_at: string
   updated_at: string
   closed_by_ai?: boolean

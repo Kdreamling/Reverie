@@ -1,5 +1,27 @@
 import { client } from './client'
 
+export interface InventoryItem {
+  name: string
+  description?: string
+  stat_bonus?: Record<string, number> | null
+}
+
+export interface CharacterState {
+  name: string
+  hp: { current: number; max: number }
+  currency: { name: string; amount: number }
+  total_points: number
+  attributes: Record<string, number>
+  inventory: InventoryItem[]
+  status_effects: string[]
+  dice_config: {
+    base_die: number
+    current_die: number
+    crit_success: 'max' | number
+    crit_fail: number
+  }
+}
+
 export interface Project {
   id: string
   title: string
@@ -11,6 +33,7 @@ export interface Project {
   status: string
   created_at: string
   updated_at: string
+  character_state?: CharacterState | null
   files?: ProjectFile[]
   sessions?: ProjectSession[]
 }
@@ -83,6 +106,17 @@ export async function deleteProjectFileAPI(
   fileId: string,
 ): Promise<void> {
   return client.delete<void>(`/projects/${projectId}/files/${fileId}`)
+}
+
+// 角色状态
+export async function fetchCharacterAPI(projectId: string): Promise<CharacterState | null> {
+  const res = await client.get<{ ok: boolean; character_state: CharacterState | null }>(`/projects/${projectId}/character`)
+  return res.character_state
+}
+
+export async function saveCharacterAPI(projectId: string, state: CharacterState): Promise<CharacterState> {
+  const res = await client.put<{ ok: boolean; character_state: CharacterState }>(`/projects/${projectId}/character`, state)
+  return res.character_state
 }
 
 // 项目内会话

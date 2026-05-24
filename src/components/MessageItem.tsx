@@ -5,6 +5,10 @@ import type { ChatMessage, MessageAttachment } from '../api/chat'
 // ContextDebugPanel import removed (unused)
 import { C } from '../theme'
 import ProcessTrace, { type TraceItem } from './ProcessTrace'
+import { parseRpMessage, type RpBlock, type CheckResult } from './rp/rpParser'
+import CheckBubble from './rp/CheckBubble'
+import { NarrationBlock, NpcDialogue, StatusChangeBubble, DiceUpgradeBubble } from './rp/RpBubbles'
+import type { CharacterState } from '../api/projects'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -321,6 +325,11 @@ interface MessageItemProps {
   onDismissFailed?: () => void
   onSaveAnchor?: (conversationId: string) => Promise<boolean>
   isAnchored?: boolean
+  isRoleplay?: boolean
+  characterState?: import('../api/projects').CharacterState | null
+  onCheckResult?: (result: import('./rp/rpParser').CheckResult) => void
+  onStatusChange?: (block: import('./rp/rpParser').RpBlock) => void
+  onDiceUpgrade?: (newDie: number) => void
 }
 
 // ─── 锚点按钮 ────────────────────────────────────────────────────────────────
@@ -365,7 +374,57 @@ const AnchorButton = memo(function AnchorButton({
   )
 })
 
-const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, isCopied, onToggleDebug, onCopy, onDelete, onRetry, onSwitchBranch, onRetryFailed, onDismissFailed, onSaveAnchor, isAnchored }: MessageItemProps) {
+function RpMessageBody({ content, characterState, onCheckResult, onStatusChange, onDiceUpgrade }: {
+  content: string
+  characterState: CharacterState
+  onCheckResult?: (result: CheckResult) => void
+  onStatusChange?: (block: RpBlock) => void
+  onDiceUpgrade?: (newDie: number) => void
+}) {
+  const blocks = parseRpMessage(content)
+
+  return (
+    <div>
+      {blocks.map((block, i) => {
+        switch (block.type) {
+          case 'narration':
+            return <NarrationBlock key={i} content={block.content} />
+          case 'npc_dialogue':
+            return <NpcDialogue key={i} npcName={block.npcName ?? ''} content={block.content} />
+          case 'check':
+            return (
+              <CheckBubble
+                key={i}
+                attribute={block.attribute ?? ''}
+                target={block.target ?? 5}
+                characterState={characterState}
+                onResult={(r) => onCheckResult?.(r)}
+              />
+            )
+          case 'status_change':
+            if (onStatusChange) onStatusChange(block)
+            return <StatusChangeBubble key={i} block={block} />
+          case 'dice_upgrade':
+            if (onDiceUpgrade && block.newDie) onDiceUpgrade(block.newDie)
+            return <DiceUpgradeBubble key={i} newDie={block.newDie ?? 10} />
+          case 'note':
+            return null
+          default:
+            return (
+              <div key={i} style={{
+                fontFamily: "'EB Garamond', 'Noto Serif SC', serif",
+                fontSize: 16.5, lineHeight: 2, color: 'rgba(220,215,205,0.95)',
+              }}>
+                {block.content}
+              </div>
+            )
+        }
+      })}
+    </div>
+  )
+}
+
+const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, isCopied, onToggleDebug, onCopy, onDelete, onRetry, onSwitchBranch, onRetryFailed, onDismissFailed, onSaveAnchor, isAnchored, isRoleplay, characterState, onCheckResult, onStatusChange, onDiceUpgrade }: MessageItemProps) {
   if (msg.role === 'user') {
     // 用户消息：右侧轻气泡（书页旁注风格）
     return (
@@ -477,17 +536,27 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
         return items.length > 0 ? <ProcessTrace items={items} /> : null
       })()}
 
-      {/* Body — serif book paragraph */}
-      <div style={{
-        fontFamily: "'EB Garamond', 'Noto Serif SC', 'Cormorant Garamond', Georgia, serif",
-        fontSize: 16.5,
-        fontWeight: 500,
-        lineHeight: 2,
-        color: C.text,
-        letterSpacing: '0.01em',
-      }}>
-        <MarkdownContent content={msg.content} savedArtifacts={msg.artifacts} />
-      </div>
+      {/* Body — serif book paragraph or RP blocks */}
+      {isRoleplay && characterState ? (
+        <RpMessageBody
+          content={msg.content}
+          characterState={characterState}
+          onCheckResult={onCheckResult}
+          onStatusChange={onStatusChange}
+          onDiceUpgrade={onDiceUpgrade}
+        />
+      ) : (
+        <div style={{
+          fontFamily: "'EB Garamond', 'Noto Serif SC', 'Cormorant Garamond', Georgia, serif",
+          fontSize: 16.5,
+          fontWeight: 500,
+          lineHeight: 2,
+          color: C.text,
+          letterSpacing: '0.01em',
+        }}>
+          <MarkdownContent content={msg.content} savedArtifacts={msg.artifacts} />
+        </div>
+      )}
 
       {/* Action row — only on hover */}
       <div className="room-msg-actions flex items-center justify-between mt-2" style={{ minHeight: 20 }}>

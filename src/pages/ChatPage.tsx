@@ -7,6 +7,9 @@ import { useChatStore } from '../stores/chatStore'
 import { useAuthStore } from '../stores/authStore'
 import { updateSessionAPI, searchConversations, type SearchResult } from '../api/sessions'
 import { uploadAttachment, type AttachmentInfo } from '../api/attachments'
+import { fetchCharacterAPI, saveCharacterAPI, type CharacterState } from '../api/projects'
+import { rollDice, formatCheckResultForModel, applyStatusChange, type CheckResult, type RpBlock } from '../components/rp/rpParser'
+import { FreeRollBubble } from '../components/rp/RpBubbles'
 import type { MessageAttachment, DreamEvent } from '../api/chat'
 import { fetchDreamEvents } from '../api/chat'
 import { fetchSelectableModels, sceneTypeToScene, type SelectableModel } from '../api/models'
@@ -168,6 +171,8 @@ export default function ChatPage() {
   const [searchLoading, setSearchLoading] = useState(false)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const [scrollToConvId, setScrollToConvId] = useState<string | null>(null)
+  const [characterState, setCharacterState] = useState<CharacterState | null>(null)
+  const isRoleplay = currentSession?.scene_type === 'roleplay'
   const plusMenuRef = useRef<HTMLDivElement>(null)
   const [lockInfo, setLockInfo] = useState<{ chen_locked_dream: any; dream_locked_chen: any } | null>(null)
   const [knockMsg, setKnockMsg] = useState('')
@@ -250,6 +255,41 @@ export default function ChatPage() {
       setSearchLoading(false)
     }, 350)
   }, [])
+
+  useEffect(() => {
+    if (!isRoleplay || !currentSession?.project_id) { setCharacterState(null); return }
+    fetchCharacterAPI(currentSession.project_id).then(cs => {
+      if (cs) setCharacterState(cs)
+    }).catch(() => {})
+  }, [isRoleplay, currentSession?.project_id])
+
+  const handleCheckResult = useCallback((result: CheckResult) => {
+    if (!currentSession) return
+    const text = formatCheckResultForModel(result)
+    sendMessage(currentSession.id, model, text)
+  }, [currentSession, model, sendMessage])
+
+  const handleRpStatusChange = useCallback((block: RpBlock) => {
+    if (!characterState || !currentSession?.project_id) return
+    const next = applyStatusChange(characterState, block)
+    setCharacterState(next)
+    saveCharacterAPI(currentSession.project_id, next).catch(() => {})
+  }, [characterState, currentSession?.project_id])
+
+  const handleDiceUpgrade = useCallback((newDie: number) => {
+    if (!characterState || !currentSession?.project_id) return
+    const next = { ...characterState, dice_config: { ...characterState.dice_config, current_die: newDie } }
+    setCharacterState(next)
+    saveCharacterAPI(currentSession.project_id, next).catch(() => {})
+  }, [characterState, currentSession?.project_id])
+
+  const handleFreeRoll = useCallback(() => {
+    if (!characterState || !currentSession) return
+    const die = characterState.dice_config.current_die
+    const result = rollDice(die)
+    const text = `[自由投骰：d${die} = ${result}]`
+    sendMessage(currentSession.id, model, text)
+  }, [characterState, currentSession, model, sendMessage])
 
   useEffect(() => {
     if (!scrollToConvId || isLoadingMessages) return
@@ -1291,6 +1331,11 @@ export default function ChatPage() {
                       onRetryFailed={handleRetryFailed}
                       onDismissFailed={handleDismissFailed}
                       onSaveAnchor={handleSaveAnchor}
+                      isRoleplay={isRoleplay}
+                      characterState={characterState}
+                      onCheckResult={handleCheckResult}
+                      onStatusChange={handleRpStatusChange}
+                      onDiceUpgrade={handleDiceUpgrade}
                     />
                   </div>
                 )
@@ -1442,6 +1487,17 @@ export default function ChatPage() {
                   className="flex-1 resize-none bg-transparent text-sm outline-none leading-relaxed disabled:opacity-40"
                   style={{ color: nText, minHeight: 24, maxHeight: 120, overflowY: 'auto', scrollbarWidth: 'none' }}
                 />
+                {isRoleplay && characterState && !isStreaming && (
+                  <button
+                    onClick={handleFreeRoll}
+                    disabled={!currentSession}
+                    className="flex-shrink-0 flex items-center justify-center cursor-pointer disabled:opacity-30"
+                    style={{ width: 30, height: 30, color: C.textMuted, fontSize: 16 }}
+                    title={`投 d${characterState.dice_config.current_die}`}
+                  >
+                    🎲
+                  </button>
+                )}
                 {isStreaming ? (
                   <button
                     onClick={stopStreaming}
