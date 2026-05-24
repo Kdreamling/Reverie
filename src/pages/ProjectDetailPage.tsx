@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { C, FONT } from '../theme'
 import { useProjectStore } from '../stores/projectStore'
 import { deleteSessionAPI } from '../api/sessions'
-import type { Project, ProjectFile } from '../api/projects'
+import type { Project, ProjectFile, CharacterState, InventoryItem } from '../api/projects'
+import { fetchCharacterAPI, saveCharacterAPI } from '../api/projects'
 
 // ─── Icons ───
 function I({ d, w, sw, color }: { d: string; w?: number; sw?: string; color?: string }) {
@@ -23,6 +24,7 @@ const IcoGlobe = () => <I d="M12 12m-10 0a10 10 0 1020 0 10 10 0 10-20 0M2 12h20
 const IcoFormat = () => <I d="M4 7V4h16v3M9 20h6M12 4v16" w={15} />
 const IcoFolder = () => <I d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" w={15} />
 const IcoInfo = () => <I d="M12 12m-10 0a10 10 0 1020 0 10 10 0 10-20 0M12 16v-4M12 8h.01" w={15} />
+const IcoUser = () => <I d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 3a4 4 0 100 8 4 4 0 000-8" w={15} />
 
 // ─── Default format rules (for reset) ───
 const DEFAULT_FORMAT_RULES = `## 剧本模式 · 行为规范
@@ -267,10 +269,11 @@ function SettingsView({ project, onBack, onUpdate, onCreateFile, onDeleteFile }:
   onCreateFile: (projectId: string, data: { name: string; content: string; file_type?: string; priority?: string }) => Promise<ProjectFile>
   onDeleteFile: (projectId: string, fileId: string) => Promise<void>
 }) {
-  const [tab, setTab] = useState<'world' | 'format' | 'files' | 'info'>('world')
+  const [tab, setTab] = useState<'world' | 'format' | 'character' | 'files' | 'info'>('world')
   const tabs = [
     { k: 'world' as const, l: '世界观', icon: <IcoGlobe /> },
     { k: 'format' as const, l: '格式', icon: <IcoFormat /> },
+    { k: 'character' as const, l: '角色卡', icon: <IcoUser /> },
     { k: 'files' as const, l: '文件', icon: <IcoFolder /> },
     { k: 'info' as const, l: '信息', icon: <IcoInfo /> },
   ]
@@ -314,6 +317,7 @@ function SettingsView({ project, onBack, onUpdate, onCreateFile, onDeleteFile }:
       <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
         {tab === 'world' && <WorldTab project={project} onSave={onUpdate} />}
         {tab === 'format' && <FormatTab project={project} onSave={onUpdate} />}
+        {tab === 'character' && <CharacterTab project={project} />}
         {tab === 'files' && <FilesTab project={project} onCreateFile={onCreateFile} onDeleteFile={onDeleteFile} />}
         {tab === 'info' && <InfoTab project={project} onSave={onUpdate} />}
       </div>
@@ -571,6 +575,193 @@ function InfoTab({ project, onSave }: { project: Project; onSave: (id: string, d
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+
+// ═══════════════════════════════════════════════
+//  CHARACTER TAB
+// ═══════════════════════════════════════════════
+
+const DEFAULT_CHARACTER: CharacterState = {
+  name: '角色名',
+  hp: { current: 10, max: 10 },
+  currency: { name: '金币', amount: 0 },
+  total_points: 20,
+  attributes: {},
+  inventory: [],
+  status_effects: [],
+  dice_config: { base_die: 10, current_die: 10, crit_success: 'max' as const, crit_fail: 1 },
+}
+
+function CharacterTab({ project }: { project: Project }) {
+  const [cs, setCs] = useState<CharacterState>(project.character_state ?? DEFAULT_CHARACTER)
+  const [saving, setSaving] = useState(false)
+  const [dirty, setDirty] = useState(false)
+  const [newAttrName, setNewAttrName] = useState('')
+  const [newItemName, setNewItemName] = useState('')
+
+  useEffect(() => {
+    if (project.id) {
+      fetchCharacterAPI(project.id).then(data => {
+        if (data) setCs(data)
+      }).catch(() => {})
+    }
+  }, [project.id])
+
+  const update = (patch: Partial<CharacterState>) => {
+    setCs(prev => ({ ...prev, ...patch }))
+    setDirty(true)
+  }
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await saveCharacterAPI(project.id, cs)
+      setDirty(false)
+    } catch { /* silent */ }
+    setSaving(false)
+  }
+
+  const usedPoints = Object.values(cs.attributes).reduce((a, b) => a + b, 0)
+  const remainingPoints = cs.total_points - usedPoints
+
+  const lbl: React.CSSProperties = { fontSize: 11, color: C.textMuted, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }
+  const inp: React.CSSProperties = { background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 10px', fontSize: 13, color: C.text, outline: 'none', fontFamily: "'Noto Sans SC', sans-serif" }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Name + HP + Currency */}
+      <div>
+        <div style={lbl}>角色名</div>
+        <input value={cs.name} onChange={e => update({ name: e.target.value })} style={{ ...inp, width: '100%' }} />
+      </div>
+
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 100 }}>
+          <div style={lbl}>HP</div>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <input type="number" value={cs.hp.current} onChange={e => update({ hp: { ...cs.hp, current: parseInt(e.target.value) || 0 } })} style={{ ...inp, width: 50, textAlign: 'center' }} />
+            <span style={{ color: C.textMuted }}>/</span>
+            <input type="number" value={cs.hp.max} onChange={e => update({ hp: { ...cs.hp, max: parseInt(e.target.value) || 1 } })} style={{ ...inp, width: 50, textAlign: 'center' }} />
+          </div>
+        </div>
+        <div style={{ flex: 1, minWidth: 100 }}>
+          <div style={lbl}>{cs.currency.name}</div>
+          <input type="number" value={cs.currency.amount} onChange={e => update({ currency: { ...cs.currency, amount: parseInt(e.target.value) || 0 } })} style={{ ...inp, width: 80, textAlign: 'center' }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 100 }}>
+          <div style={lbl}>骰子</div>
+          <span style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>d{cs.dice_config.current_die}</span>
+        </div>
+      </div>
+
+      {/* Attributes */}
+      <div>
+        <div style={{ ...lbl, display: 'flex', justifyContent: 'space-between' }}>
+          <span>属性 (总点数 {cs.total_points})</span>
+          <span style={{ color: remainingPoints > 0 ? C.accent : remainingPoints < 0 ? '#ef4444' : C.textMuted }}>
+            剩余 {remainingPoints}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 8 }}>
+          <span style={{ fontSize: 11, color: C.textMuted }}>总数</span>
+          <input type="number" value={cs.total_points} onChange={e => update({ total_points: parseInt(e.target.value) || 0 })} style={{ ...inp, width: 60, textAlign: 'center' }} />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {Object.entries(cs.attributes).map(([name, val]) => (
+            <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ flex: 1, fontSize: 13, color: C.text }}>{name}</span>
+              <button onClick={() => {
+                const next = { ...cs.attributes }
+                if (next[name] > 0) next[name] = next[name] - 1
+                update({ attributes: next })
+              }} style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 6, width: 24, height: 24, cursor: 'pointer', color: C.textMuted, fontSize: 14 }}>-</button>
+              <span style={{ fontSize: 15, fontWeight: 600, color: C.text, width: 20, textAlign: 'center' }}>{val}</span>
+              <button onClick={() => {
+                const next = { ...cs.attributes }
+                next[name] = next[name] + 1
+                update({ attributes: next })
+              }} style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 6, width: 24, height: 24, cursor: 'pointer', color: C.textMuted, fontSize: 14 }}>+</button>
+              <button onClick={() => {
+                const next = { ...cs.attributes }
+                delete next[name]
+                update({ attributes: next })
+              }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted, fontSize: 12, padding: 2 }}>✕</button>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          <input value={newAttrName} onChange={e => setNewAttrName(e.target.value)} placeholder="新属性名" style={{ ...inp, flex: 1 }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && newAttrName.trim()) {
+                update({ attributes: { ...cs.attributes, [newAttrName.trim()]: 0 } })
+                setNewAttrName('')
+              }
+            }}
+          />
+          <button onClick={() => {
+            if (newAttrName.trim()) {
+              update({ attributes: { ...cs.attributes, [newAttrName.trim()]: 0 } })
+              setNewAttrName('')
+            }
+          }} style={{ ...inp, cursor: 'pointer', color: C.accent, borderColor: C.accent, padding: '6px 12px' }}>添加</button>
+        </div>
+      </div>
+
+      {/* Inventory */}
+      <div>
+        <div style={lbl}>物品栏</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {cs.inventory.map((item, idx) => (
+            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, border: `1px solid ${C.border}` }}>
+              <span style={{ flex: 1, fontSize: 13, color: C.text }}>{item.name}</span>
+              {item.description && <span style={{ fontSize: 11, color: C.textMuted }}>{item.description}</span>}
+              {item.stat_bonus && <span style={{ fontSize: 10, color: C.accent }}>
+                {Object.entries(item.stat_bonus).map(([k, v]) => `${k}+${v}`).join(' ')}
+              </span>}
+              <button onClick={() => {
+                const next = [...cs.inventory]
+                next.splice(idx, 1)
+                update({ inventory: next })
+              }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted, fontSize: 12, padding: 2 }}>✕</button>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          <input value={newItemName} onChange={e => setNewItemName(e.target.value)} placeholder="物品名" style={{ ...inp, flex: 1 }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && newItemName.trim()) {
+                update({ inventory: [...cs.inventory, { name: newItemName.trim(), stat_bonus: null }] })
+                setNewItemName('')
+              }
+            }}
+          />
+          <button onClick={() => {
+            if (newItemName.trim()) {
+              update({ inventory: [...cs.inventory, { name: newItemName.trim(), stat_bonus: null }] })
+              setNewItemName('')
+            }
+          }} style={{ ...inp, cursor: 'pointer', color: C.accent, borderColor: C.accent, padding: '6px 12px' }}>添加</button>
+        </div>
+      </div>
+
+      {/* Save button */}
+      <button
+        onClick={save}
+        disabled={saving || !dirty}
+        style={{
+          padding: '10px 0', borderRadius: 10,
+          background: dirty ? C.accentGradient : C.surface,
+          border: 'none', color: dirty ? '#fff' : C.textMuted,
+          fontSize: 13, fontWeight: 600, cursor: dirty ? 'pointer' : 'default',
+          fontFamily: "'Noto Sans SC', sans-serif",
+          transition: 'all 0.2s',
+        }}
+      >
+        {saving ? '保存中...' : dirty ? '保存角色卡' : '已保存'}
+      </button>
     </div>
   )
 }

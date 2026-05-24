@@ -1304,6 +1304,25 @@ export default function ChatPage() {
           ) : (
             <div className="mx-auto w-full relative conv-spine" style={{ maxWidth: 680, padding: 'clamp(56px, 9vw, 80px) clamp(28px, 7vw, 56px) clamp(140px, 28vw, 220px) clamp(28px, 7vw, 56px)' }}>
 
+              {/* RP mini status bar */}
+              {isRoleplay && characterState && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center',
+                  padding: '8px 16px', marginBottom: 20, borderRadius: 12,
+                  background: 'rgba(20,25,35,0.6)', border: '1px solid rgba(80,100,140,0.2)',
+                  fontSize: 12, fontFamily: "'Space Grotesk', 'Noto Sans SC', sans-serif",
+                  color: 'rgba(220,215,205,0.7)', backdropFilter: 'blur(10px)',
+                }}>
+                  <span style={{ fontWeight: 600, color: 'rgba(220,215,205,0.9)' }}>{characterState.name}</span>
+                  <span>❤ {characterState.hp.current}/{characterState.hp.max}</span>
+                  <span>💰 {characterState.currency.amount}</span>
+                  <span>🎲 d{characterState.dice_config.current_die}</span>
+                  {Object.entries(characterState.attributes).slice(0, 3).map(([k, v]) => (
+                    <span key={k}>{k} {v}</span>
+                  ))}
+                </div>
+              )}
+
               {/* Completed messages — event bubbles hidden on frontend per Dream, backend still sees them */}
               {Array.isArray(messages) && messages.map((msg, idx) => {
                 if (msg.role === 'event') {
