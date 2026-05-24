@@ -1176,7 +1176,13 @@ export default function ChatPage() {
       </aside>
 
       {/* ── Main chat area (full-screen room) ── */}
-      <div className="flex flex-col flex-1 min-w-0 h-full" style={{ position: 'relative', zIndex: 10 }}>
+      <div className="flex flex-col flex-1 min-w-0 h-full" style={{
+        position: 'relative', zIndex: 10,
+        ...(isRoleplay ? {
+          background: 'linear-gradient(180deg, #0d1117 0%, #161b25 40%, #1a1f2e 100%)',
+          color: 'rgba(220,215,205,0.95)',
+        } : {}),
+      }}>
 
         {/* Header fade overlay — keeps nav buttons readable when messages scroll underneath */}
         <div className="header-fade-overlay" />
