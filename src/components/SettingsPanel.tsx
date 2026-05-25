@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Brain, Settings, LogOut, Camera, Download, FileText, Server, BookOpen, Terminal, Plug } from 'lucide-react'
+import { ChevronLeft, Brain, Settings, LogOut, Camera, Download, FileText, Server, BookOpen, Terminal, Plug, Shield, Key } from 'lucide-react'
 import { C } from '../theme'
 import { useAuthStore } from '../stores/authStore'
+import { client } from '../api/client'
 import { useSessionStore } from '../stores/sessionStore'
 import { exportSession, downloadText } from '../api/export'
 import MemoryPanel from './MemoryPanel'
@@ -287,8 +288,39 @@ export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
         </div>
       </div>
 
-      {/* Logout */}
+      {/* Security + Logout */}
       <div style={{ borderTop: `1px solid ${C.border}`, paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <button
+          onClick={async () => {
+            if (!confirm('强制登出所有设备？你需要重新登录。')) return
+            try {
+              await client.post('/auth/revoke', {})
+              logout()
+            } catch { alert('操作失败') }
+          }}
+          className="flex items-center gap-3 w-full px-5 py-3 text-sm transition-colors duration-150 cursor-pointer"
+          style={{ color: C.textSecondary }}
+        >
+          <Shield size={15} strokeWidth={1.6} />
+          <span>强制登出所有设备</span>
+        </button>
+        <button
+          onClick={() => {
+            const oldPw = prompt('输入当前密码：')
+            if (!oldPw) return
+            const newPw = prompt('输入新密码：')
+            if (!newPw) return
+            if (newPw.length < 4) { alert('密码至少 4 位'); return }
+            client.post('/auth/change-password', { old_password: oldPw, new_password: newPw })
+              .then(() => { alert('密码已修改，请重新登录'); logout() })
+              .catch(() => alert('修改失败，请检查旧密码'))
+          }}
+          className="flex items-center gap-3 w-full px-5 py-3 text-sm transition-colors duration-150 cursor-pointer"
+          style={{ color: C.textSecondary }}
+        >
+          <Key size={15} strokeWidth={1.6} />
+          <span>修改密码</span>
+        </button>
         <button
           onClick={() => { logout() }}
           className="flex items-center gap-3 w-full px-5 py-4 text-sm transition-colors duration-150 cursor-pointer"
