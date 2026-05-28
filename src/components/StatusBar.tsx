@@ -135,12 +135,8 @@ export default function StatusBar({ isNight }: Props) {
     const m = Math.round((status.sleep_hours - h) * 60)
     summaryParts.push(`睡${h}h${m > 0 ? m + 'm' : ''}`)
   }
-  if (period?.days_since != null) {
-    if (period.in_period) {
-      summaryParts.push(`经期第${period.days_since + 1}天`)
-    } else {
-      summaryParts.push(`周期第${period.days_since}天`)
-    }
+  if (period?.in_period) {
+    summaryParts.push(`经期第${(period.days_since ?? 0) + 1}天`)
   }
 
   const nText = isNight ? 'rgba(224,213,200,0.9)' : C.text
@@ -505,22 +501,33 @@ export default function StatusBar({ isNight }: Props) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {period?.latest ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 14, color: nText, fontFamily: "'Space Grotesk'", fontWeight: 600 }}>
-                    {period.days_since}
-                    <span style={{ fontSize: 10, color: nTextSec, fontWeight: 400, marginLeft: 2 }}>天</span>
-                  </span>
-                  {period.avg_cycle_days && (
+                  {inPeriod ? (
+                    <>
+                      <span style={{ fontSize: 14, color: nText, fontFamily: "'Space Grotesk'", fontWeight: 600 }}>
+                        {(period.days_since ?? 0) + 1}
+                        <span style={{ fontSize: 10, color: nTextSec, fontWeight: 400, marginLeft: 2 }}>天</span>
+                      </span>
+                      {period.avg_cycle_days && (
+                        <span style={{ fontSize: 10, color: nTextSec, fontFamily: "'Noto Sans SC'" }}>
+                          {period.avg_cycle_days}天周期
+                        </span>
+                      )}
+                    </>
+                  ) : (
                     <span style={{ fontSize: 10, color: nTextSec, fontFamily: "'Noto Sans SC'" }}>
-                      {period.avg_cycle_days}天周期
-                      {period.predicted_next && ` · 预测 ${(() => {
+                      上次 {(() => {
+                        const [, m, d] = (period.latest.start_date).split('-')
+                        return `${parseInt(m)}/${parseInt(d)}`
+                      })()}
+                      {period.latest.end_date && (() => {
+                        const [, m, d] = period.latest.end_date.split('-')
+                        return `→${parseInt(m)}/${parseInt(d)}`
+                      })()}
+                      {period.duration ? ` 共${period.duration}天` : ''}
+                      {period.predicted_next && ` · 预测下次 ${(() => {
                         const [, m, d] = period.predicted_next.split('-')
                         return `${parseInt(m)}/${parseInt(d)}`
                       })()}`}
-                    </span>
-                  )}
-                  {hasEnded && period.duration && (
-                    <span style={{ fontSize: 10, color: nTextSec, fontFamily: "'Noto Sans SC'" }}>
-                      · 上次{period.duration}天
                     </span>
                   )}
                 </div>
