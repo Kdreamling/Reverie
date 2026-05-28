@@ -3,6 +3,7 @@ import { client } from './client'
 export interface PeriodRecord {
   id: string
   start_date: string
+  end_date: string | null
   cycle_days: number | null
   note: string | null
   created_at: string
@@ -38,6 +39,12 @@ export async function createPeriod(start_date?: string, note?: string): Promise<
 export async function listPeriod(): Promise<PeriodRecord[]> {
   const res = await client.get<{ records: PeriodRecord[] }>('/period')
   return res.records
+}
+
+export async function endPeriod(id: string, end_date?: string): Promise<{ ok: boolean; record?: PeriodRecord }> {
+  const body: Record<string, string> = {}
+  if (end_date) body.end_date = end_date
+  return client.patch<{ ok: boolean; record?: PeriodRecord }>(`/period/${id}/end`, body)
 }
 
 export async function deletePeriod(id: string): Promise<void> {

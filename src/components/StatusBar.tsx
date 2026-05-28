@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { C } from '../theme'
 import { getTodayStatus, updateTodayStatus, fetchWeather, type DayStatus } from '../api/status'
-import { getLatestPeriod, createPeriod, deletePeriod, type PeriodLatest } from '../api/period'
+import { getLatestPeriod, createPeriod, deletePeriod, endPeriod, type PeriodLatest } from '../api/period'
 
 const MOODS = [
   { key: 'great', icon: Smile, label: '开心' },
@@ -82,6 +82,18 @@ export default function StatusBar({ isNight }: Props) {
     setPeriodSubmitting(false)
   }
 
+
+  const handlePeriodEnd = async () => {
+    if (periodSubmitting || !period?.latest) return
+    if (!confirm('经期结束了？')) return
+    setPeriodSubmitting(true)
+    try {
+      await endPeriod(period.latest.id)
+      const fresh = await getLatestPeriod()
+      setPeriod(fresh)
+    } catch { /* silent */ }
+    setPeriodSubmitting(false)
+  }
 
   const handlePeriodUndo = async () => {
     if (periodSubmitting || !period?.latest) return
@@ -497,9 +509,29 @@ export default function StatusBar({ isNight }: Props) {
               )}
               <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
                 {inPeriod ? (
-                  <span style={{ fontSize: 10, fontFamily: "'Noto Sans SC'", color: nAccent, opacity: 0.8 }}>
-                    经期中 · 第{(period?.days_since ?? 0) + 1}天
-                  </span>
+                  <>
+                    <span style={{ fontSize: 10, fontFamily: "'Noto Sans SC'", color: nAccent, opacity: 0.8 }}>
+                      经期中 · 第{(period?.days_since ?? 0) + 1}天
+                    </span>
+                    <button
+                      onClick={handlePeriodEnd}
+                      disabled={periodSubmitting}
+                      style={{
+                        background: 'transparent',
+                        color: nAccent,
+                        border: `1px solid ${nBorder}`,
+                        borderRadius: 8,
+                        padding: '4px 10px',
+                        fontSize: 10,
+                        fontFamily: "'Noto Sans SC'",
+                        cursor: periodSubmitting ? 'wait' : 'pointer',
+                        opacity: periodSubmitting ? 0.5 : 1,
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      结束了
+                    </button>
+                  </>
                 ) : !isLatestToday && (
                   <button
                     onClick={handlePeriodToday}
