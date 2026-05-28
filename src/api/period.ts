@@ -16,6 +16,7 @@ export interface PeriodLatest {
   avg_cycle_days: number | null
   is_estimated?: boolean
   in_period?: boolean
+  duration?: number | null
 }
 
 export async function getLatestPeriod(): Promise<PeriodLatest> {
@@ -45,6 +46,10 @@ export async function endPeriod(id: string, end_date?: string): Promise<{ ok: bo
   const body: Record<string, string> = {}
   if (end_date) body.end_date = end_date
   return client.patch<{ ok: boolean; record?: PeriodRecord }>(`/period/${id}/end`, body)
+}
+
+export async function unendPeriod(id: string): Promise<{ ok: boolean; record?: PeriodRecord }> {
+  return client.patch<{ ok: boolean; record?: PeriodRecord }>(`/period/${id}/unend`, {})
 }
 
 export async function deletePeriod(id: string): Promise<void> {

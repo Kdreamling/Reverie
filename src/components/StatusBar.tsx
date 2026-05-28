@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { C } from '../theme'
 import { getTodayStatus, updateTodayStatus, fetchWeather, type DayStatus } from '../api/status'
-import { getLatestPeriod, createPeriod, deletePeriod, endPeriod, type PeriodLatest } from '../api/period'
+import { getLatestPeriod, createPeriod, deletePeriod, endPeriod, unendPeriod, type PeriodLatest } from '../api/period'
 
 const MOODS = [
   { key: 'great', icon: Smile, label: '开心' },
@@ -95,6 +95,18 @@ export default function StatusBar({ isNight }: Props) {
     setPeriodSubmitting(false)
   }
 
+  const handlePeriodUnend = async () => {
+    if (periodSubmitting || !period?.latest) return
+    if (!confirm('撤销结束标记？')) return
+    setPeriodSubmitting(true)
+    try {
+      await unendPeriod(period.latest.id)
+      const fresh = await getLatestPeriod()
+      setPeriod(fresh)
+    } catch { /* silent */ }
+    setPeriodSubmitting(false)
+  }
+
   const handlePeriodUndo = async () => {
     if (periodSubmitting || !period?.latest) return
     if (!confirm(`撤销 ${period.latest.start_date} 的记录？`)) return
@@ -124,7 +136,11 @@ export default function StatusBar({ isNight }: Props) {
     summaryParts.push(`睡${h}h${m > 0 ? m + 'm' : ''}`)
   }
   if (period?.days_since != null) {
-    summaryParts.push(period.in_period ? `经期第${period.days_since + 1}天` : `周期第${period.days_since}天`)
+    if (period.in_period) {
+      summaryParts.push(`经期第${period.days_since + 1}天`)
+    } else {
+      summaryParts.push(`周期第${period.days_since}天`)
+    }
   }
 
   const nText = isNight ? 'rgba(224,213,200,0.9)' : C.text
@@ -176,6 +192,7 @@ export default function StatusBar({ isNight }: Props) {
   })()
   const isLatestToday = period?.latest?.start_date === bjToday
   const inPeriod = period?.in_period ?? false
+  const hasEnded = period?.latest?.end_date != null
 
   return (
     <div style={{ width: '100%', marginBottom: 6 }}>
@@ -485,9 +502,9 @@ export default function StatusBar({ isNight }: Props) {
               <Droplet size={9} strokeWidth={2} />
               cycle
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {period?.latest ? (
-                <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 14, color: nText, fontFamily: "'Space Grotesk'", fontWeight: 600 }}>
                     {period.days_since}
                     <span style={{ fontSize: 10, color: nTextSec, fontWeight: 400, marginLeft: 2 }}>天</span>
@@ -501,13 +518,18 @@ export default function StatusBar({ isNight }: Props) {
                       })()}`}
                     </span>
                   )}
-                </>
+                  {hasEnded && period.duration && (
+                    <span style={{ fontSize: 10, color: nTextSec, fontFamily: "'Noto Sans SC'" }}>
+                      · 上次{period.duration}天
+                    </span>
+                  )}
+                </div>
               ) : (
                 <span style={{ fontSize: 11, color: nTextSec, fontFamily: "'Noto Sans SC'" }}>
                   还没有记录
                 </span>
               )}
-              <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 {inPeriod ? (
                   <>
                     <span style={{ fontSize: 10, fontFamily: "'Noto Sans SC'", color: nAccent, opacity: 0.8 }}>
@@ -532,7 +554,7 @@ export default function StatusBar({ isNight }: Props) {
                       结束了
                     </button>
                   </>
-                ) : !isLatestToday && (
+                ) : (
                   <button
                     onClick={handlePeriodToday}
                     disabled={periodSubmitting}
@@ -552,7 +574,27 @@ export default function StatusBar({ isNight }: Props) {
                     今天来了
                   </button>
                 )}
-                {period?.latest && (
+                {hasEnded && (
+                  <button
+                    onClick={handlePeriodUnend}
+                    disabled={periodSubmitting}
+                    style={{
+                      background: 'transparent',
+                      color: nTextSec,
+                      border: `1px solid ${nBorder}`,
+                      borderRadius: 8,
+                      padding: '4px 10px',
+                      fontSize: 10,
+                      fontFamily: "'Noto Sans SC'",
+                      cursor: periodSubmitting ? 'wait' : 'pointer',
+                      opacity: periodSubmitting ? 0.5 : 1,
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    撤销结束
+                  </button>
+                )}
+                {period?.latest && !hasEnded && (
                   <button
                     onClick={handlePeriodUndo}
                     disabled={periodSubmitting}
