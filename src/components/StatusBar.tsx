@@ -390,7 +390,7 @@ export default function StatusBar({ isNight }: Props) {
               })}
             </div>
             {status?.training_type && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
                 {(['planned', 'done'] as const).map(flag => {
                   const field = flag === 'planned' ? 'training_planned' : 'training_done'
                   const active = status?.[field] ?? false
@@ -416,6 +416,11 @@ export default function StatusBar({ isNight }: Props) {
                     </button>
                   )
                 })}
+                {status?.training_distance_km != null && status.training_distance_km > 0 && (
+                  <span style={{ fontSize: 10, color: nTextSec, fontFamily: "'JetBrains Mono'" }}>
+                    {status.training_distance_km.toFixed(2)} km
+                  </span>
+                )}
               </div>
             )}
           </div>

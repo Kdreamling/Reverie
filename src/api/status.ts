@@ -14,6 +14,7 @@ export interface DayStatus {
   training_type: string | null
   training_planned: boolean
   training_done: boolean
+  training_distance_km: number | null
   sleep_hours: number | null
   sleep_deep_min: number | null
   sleep_core_min: number | null
