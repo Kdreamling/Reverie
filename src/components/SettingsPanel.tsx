@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Brain, Settings, LogOut, Camera, Download, FileText, Server, BookOpen, Terminal, Plug, Shield, Key } from 'lucide-react'
+import { ChevronLeft, Brain, Settings, LogOut, Camera, Download, FileText, Server, BookOpen, Terminal, Plug, Shield, Key, Sparkles } from 'lucide-react'
 import { C } from '../theme'
 import { useAuthStore } from '../stores/authStore'
 import { client } from '../api/client'
@@ -245,10 +245,11 @@ export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
         {/* 系统工具区 — 横排小图标 */}
         <div className="px-5 md:px-4 pb-4 pt-1">
           <p className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: C.textMuted }}>系统</p>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             {[
               { icon: Server,   label: 'Gateway', path: '/admin',         accent: false },
               { icon: BookOpen, label: '小克日记', path: '/xiaoke-diary', accent: true  },
+              { icon: Sparkles, label: '小克记忆', path: '/xiaoke-memory', accent: true  },
               { icon: Terminal, label: 'Dev',     path: '/dev',           accent: false },
             ].map(item => (
               <button

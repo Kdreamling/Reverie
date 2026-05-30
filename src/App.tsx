@@ -17,6 +17,7 @@ import XiaokeDiaryPage from './pages/XiaokeDiaryPage'
 import TimelinePage from './pages/TimelinePage'
 import GameBoxPage from './pages/GameBoxPage'
 import WorkbenchPage from './pages/WorkbenchPage'
+import XiaokeMemoryPage from './pages/XiaokeMemoryPage' 
 import AuthGuard from './components/AuthGuard'
 import ToastContainer from './components/ToastContainer'
 import { useAuthStore } from './stores/authStore'
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="/timeline" element={<TimelinePage />} />
           <Route path="/games" element={<GameBoxPage />} />
           <Route path="/workbench" element={<WorkbenchPage />} />
+          <Route path="/xiaoke-memory" element={<XiaokeMemoryPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
