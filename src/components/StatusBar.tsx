@@ -638,26 +638,44 @@ export default function StatusBar({ isNight }: Props) {
               <Heart size={9} strokeWidth={2} />
               vitals
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input
-                type="number"
-                placeholder="HR"
-                value={status?.resting_hr ?? ''}
-                onChange={e => save({ resting_hr: e.target.value ? parseInt(e.target.value) : null } as Partial<DayStatus>)}
-                style={{
-                  width: 56,
-                  background: 'transparent',
-                  border: `1px solid ${nBorder}`,
-                  borderRadius: 10,
-                  padding: '6px 8px',
-                  fontSize: 12,
-                  color: nText,
-                  fontFamily: "'Space Grotesk'",
-                  outline: 'none',
-                  textAlign: 'center',
-                }}
-              />
-              <span style={{ fontSize: 10, color: nTextSec }}>bpm resting</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="number"
+                  placeholder="HR"
+                  value={status?.resting_hr ?? ''}
+                  onChange={e => save({ resting_hr: e.target.value ? parseInt(e.target.value) : null } as Partial<DayStatus>)}
+                  style={{
+                    width: 56,
+                    background: 'transparent',
+                    border: `1px solid ${nBorder}`,
+                    borderRadius: 10,
+                    padding: '6px 8px',
+                    fontSize: 12,
+                    color: nText,
+                    fontFamily: "'Space Grotesk'",
+                    outline: 'none',
+                    textAlign: 'center',
+                  }}
+                />
+                <span style={{ fontSize: 10, color: nTextSec }}>bpm</span>
+              </div>
+              {status?.hrv_ms != null && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{
+                    width: 56,
+                    background: 'transparent',
+                    border: `1px solid ${nBorder}`,
+                    borderRadius: 10,
+                    padding: '6px 8px',
+                    fontSize: 12,
+                    color: nText,
+                    fontFamily: "'Space Grotesk'",
+                    textAlign: 'center',
+                  }}>{Math.round(status.hrv_ms)}</div>
+                  <span style={{ fontSize: 10, color: nTextSec }}>ms HRV</span>
+                </div>
+              )}
             </div>
           </div>
 

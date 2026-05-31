@@ -19,6 +19,7 @@ export interface DayStatus {
   sleep_deep_min: number | null
   sleep_core_min: number | null
   resting_hr: number | null
+  hrv_ms: number | null
   note: string | null
   updated_at?: string
 }
