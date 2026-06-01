@@ -843,22 +843,32 @@ export default function ChatPage() {
 
   const showWelcome = !isStreaming && !isLoadingMessages && (!Array.isArray(messages) || messages.length === 0)
 
-  // Night-aware surface colors
-  const nGlass = isNight ? 'rgba(23,20,17,0.92)' : 'rgba(248,244,238,0.92)'
-  const nGlassLight = isNight ? 'rgba(23,20,17,0.6)' : 'rgba(248,244,238,0.6)'
-  const nGlassHover = isNight ? 'rgba(40,35,28,0.8)' : 'rgba(248,244,238,0.8)'
-  const nText = isNight ? '#E0D5C8' : C.text
-  const nTextMuted = isNight ? '#9A8A78' : C.textMuted
-  const nBorder = isNight ? 'rgba(180,150,120,0.06)' : C.border
-  const nAccent = isNight ? '#D4AE8A' : C.accent
+  // Night-aware surface colors (RP mode uses dark chrome too)
+  const dark = isNight || isRoleplay
+  const nGlass = dark ? 'rgba(23,20,17,0.92)' : 'rgba(248,244,238,0.92)'
+  const nGlassLight = dark ? 'rgba(23,20,17,0.6)' : 'rgba(248,244,238,0.6)'
+  const nGlassHover = dark ? 'rgba(40,35,28,0.8)' : 'rgba(248,244,238,0.8)'
+  const nText = dark ? '#E0D5C8' : C.text
+  const nTextMuted = dark ? '#9A8A78' : C.textMuted
+  const nBorder = dark ? 'rgba(180,150,120,0.06)' : C.border
+  const nAccent = dark ? '#D4AE8A' : C.accent
 
   return (
-    <div className="overflow-hidden" style={{ height: '100%', overscrollBehavior: 'none', position: 'relative' }}>
+    <div className="overflow-hidden" style={{
+      height: '100%', overscrollBehavior: 'none', position: 'relative',
+      ...(isRoleplay ? {
+        background: `
+          radial-gradient(ellipse at 25% 15%, rgba(80,60,40,0.18) 0%, transparent 55%),
+          radial-gradient(ellipse at 75% 85%, rgba(60,45,30,0.12) 0%, transparent 50%),
+          linear-gradient(170deg, #1a1614 0%, #1e1916 35%, #211c18 65%, #1a1614 100%)
+        `,
+      } : {}),
+    }}>
 
       {/* ── Room atmosphere ── */}
-      <div className="room-bg" />
-      <div className="room-light" />
-      <div className="room-texture" />
+      {!isRoleplay && <div className="room-bg" />}
+      {!isRoleplay && <div className="room-light" />}
+      {!isRoleplay && <div className="room-texture" />}
 
       {/* ── Push notification banner ── */}
       <PushNotification onTap={() => {
@@ -894,9 +904,9 @@ export default function ChatPage() {
           width: '100%',
           maxWidth: 'min(300px, 85vw)',
           height: '100%',
-          background: isNight ? 'rgba(23,20,17,0.95)' : 'rgba(248,244,238,0.95)',
+          background: dark ? 'rgba(23,20,17,0.95)' : 'rgba(248,244,238,0.95)',
           backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
-          color: isNight ? '#E0D5C8' : C.text,
+          color: dark ? '#E0D5C8' : C.text,
           transform: sidebarVisible ? 'translateX(0)' : 'translateX(-100%)',
           opacity: sidebarVisible ? 1 : 0,
           boxShadow: sidebarVisible ? '12px 0 60px rgba(0,0,0,0.04)' : 'none',
@@ -1178,10 +1188,7 @@ export default function ChatPage() {
       {/* ── Main chat area (full-screen room) ── */}
       <div className="flex flex-col flex-1 min-w-0 h-full" style={{
         position: 'relative', zIndex: 10,
-        ...(isRoleplay ? {
-          background: 'linear-gradient(180deg, #0d1117 0%, #161b25 40%, #1a1f2e 100%)',
-          color: 'rgba(220,215,205,0.95)',
-        } : {}),
+        ...(isRoleplay ? { color: 'rgba(232,225,214,0.92)' } : {}),
       }}>
 
         {/* Header fade overlay — keeps nav buttons readable when messages scroll underneath */}
@@ -1225,10 +1232,10 @@ export default function ChatPage() {
                 <div className="absolute top-10 left-1/2 rounded-2xl overflow-hidden"
                   style={{
                     transform: 'translateX(-50%)', minWidth: 240,
-                    background: isNight ? 'rgba(23,20,17,0.55)' : 'rgba(255,255,255,0.55)',
+                    background: dark ? 'rgba(23,20,17,0.55)' : 'rgba(255,255,255,0.55)',
                     backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
-                    border: `1px solid ${isNight ? 'rgba(180,150,120,0.08)' : 'rgba(180,150,120,0.12)'}`,
-                    boxShadow: isNight ? '0 12px 48px rgba(0,0,0,0.35)' : '0 12px 48px rgba(160,120,90,0.08)',
+                    border: `1px solid ${dark ? 'rgba(180,150,120,0.08)' : 'rgba(180,150,120,0.12)'}`,
+                    boxShadow: dark ? '0 12px 48px rgba(0,0,0,0.35)' : '0 12px 48px rgba(160,120,90,0.08)',
                     padding: '6px',
                     zIndex: 51,
                   }}>
@@ -1241,10 +1248,10 @@ export default function ChatPage() {
                         style={{
                           padding: '10px 12px',
                           background: isActive
-                            ? (isNight ? 'rgba(212,174,138,0.08)' : 'rgba(160,120,90,0.06)')
+                            ? (dark ? 'rgba(212,174,138,0.08)' : 'rgba(160,120,90,0.06)')
                             : 'transparent',
                         }}
-                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = isNight ? 'rgba(212,174,138,0.04)' : 'rgba(160,120,90,0.035)' }}
+                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = dark ? 'rgba(212,174,138,0.04)' : 'rgba(160,120,90,0.035)' }}
                         onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}>
                         <span style={{
                           width: 6, height: 6, borderRadius: '50%',
@@ -1256,7 +1263,7 @@ export default function ChatPage() {
                           fontSize: 13,
                           fontWeight: isActive ? 500 : 400,
                           letterSpacing: '0.01em',
-                          color: isActive ? nText : (isNight ? 'rgba(224,213,200,0.7)' : C.textSecondary),
+                          color: isActive ? nText : (dark ? 'rgba(224,213,200,0.7)' : C.textSecondary),
                         }}>{m.label}</span>
                         {isActive && <span style={{ marginLeft: 'auto', color: nAccent, opacity: 0.7 }}>
                           <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
@@ -1419,7 +1426,7 @@ export default function ChatPage() {
               {/* 敲门弹窗已移至最外层 */}
 
               {/* Status bar */}
-              <StatusBar isNight={isNight} />
+              <StatusBar isNight={dark} />
 
               {/* Streaming hint */}
               {isStreaming && (
@@ -1474,11 +1481,11 @@ export default function ChatPage() {
                   borderRadius: showPlusMenu ? '24px 24px 0 0' : 24,
                   background: nGlass,
                   backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
-                  border: `1px solid ${isFocused ? (isNight ? 'rgba(196,154,120,0.15)' : 'rgba(196,154,120,0.25)') : (isNight ? 'rgba(180,150,120,0.06)' : 'rgba(180,150,120,0.1)')}`,
+                  border: `1px solid ${isFocused ? (dark ? 'rgba(196,154,120,0.15)' : 'rgba(196,154,120,0.25)') : (dark ? 'rgba(180,150,120,0.06)' : 'rgba(180,150,120,0.1)')}`,
                   borderBottom: showPlusMenu ? 'none' : undefined,
                   boxShadow: isFocused
-                    ? (isNight ? '0 8px 48px rgba(0,0,0,0.3), 0 0 0 4px rgba(196,154,120,0.04)' : '0 8px 48px rgba(160,120,90,0.1), 0 0 0 4px rgba(196,154,120,0.06)')
-                    : (isNight ? '0 4px 32px rgba(0,0,0,0.2)' : '0 4px 32px rgba(160,120,90,0.06)'),
+                    ? (dark ? '0 8px 48px rgba(0,0,0,0.3), 0 0 0 4px rgba(196,154,120,0.04)' : '0 8px 48px rgba(160,120,90,0.1), 0 0 0 4px rgba(196,154,120,0.06)')
+                    : (dark ? '0 4px 32px rgba(0,0,0,0.2)' : '0 4px 32px rgba(160,120,90,0.06)'),
                   transform: isFocused ? 'translateY(-2px)' : 'none',
                   opacity: isLockedByChen ? 0.35 : undefined,
                   pointerEvents: isLockedByChen ? 'none' : undefined,
@@ -1560,11 +1567,11 @@ export default function ChatPage() {
                   backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
                   borderRadius: '0 0 22px 22px',
                   border: showPlusMenu
-                    ? `1px solid ${isNight ? 'rgba(180,150,120,0.06)' : 'rgba(180,150,120,0.1)'}`
+                    ? `1px solid ${dark ? 'rgba(180,150,120,0.06)' : 'rgba(180,150,120,0.1)'}`
                     : `1px solid transparent`,
                   borderTop: 'none',
                   boxShadow: showPlusMenu
-                    ? (isNight ? '0 4px 32px rgba(0,0,0,0.2)' : '0 4px 32px rgba(160,120,90,0.06)')
+                    ? (dark ? '0 4px 32px rgba(0,0,0,0.2)' : '0 4px 32px rgba(160,120,90,0.06)')
                     : 'none',
                 }}
               >
@@ -1572,7 +1579,7 @@ export default function ChatPage() {
                   className="flex items-center gap-1 px-3"
                   style={{
                     padding: '10px 12px 14px',
-                    borderTop: `1px dashed ${isNight ? 'rgba(180,150,120,0.1)' : 'rgba(180,150,120,0.15)'}`,
+                    borderTop: `1px dashed ${dark ? 'rgba(180,150,120,0.1)' : 'rgba(180,150,120,0.15)'}`,
                   }}
                 >
                   {(() => {
@@ -1610,7 +1617,7 @@ export default function ChatPage() {
                       ? 'rgba(229,57,53,0.7)'
                       : isActive
                       ? C.accent
-                      : (isNight ? 'rgba(224,213,200,0.75)' : C.textSecondary)
+                      : (dark ? 'rgba(224,213,200,0.75)' : C.textSecondary)
                     return (
                       <button
                         key={item.title}
@@ -1618,9 +1625,9 @@ export default function ChatPage() {
                         disabled={isUploading && !isWarn}
                         title={item.title}
                         className="flex items-center justify-center rounded-xl transition-colors cursor-pointer disabled:opacity-40"
-                        style={{ width: 44, height: 44, color: baseColor, background: isActive ? (isNight ? 'rgba(196,154,120,0.08)' : 'rgba(196,154,120,0.08)') : 'transparent' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = isWarn ? 'rgba(229,57,53,0.06)' : isActive ? (isNight ? 'rgba(196,154,120,0.14)' : 'rgba(196,154,120,0.14)') : (isNight ? 'rgba(224,213,200,0.06)' : 'rgba(160,120,90,0.06)'))}
-                        onMouseLeave={e => (e.currentTarget.style.background = isActive ? (isNight ? 'rgba(196,154,120,0.08)' : 'rgba(196,154,120,0.08)') : 'transparent')}
+                        style={{ width: 44, height: 44, color: baseColor, background: isActive ? (dark ? 'rgba(196,154,120,0.08)' : 'rgba(196,154,120,0.08)') : 'transparent' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = isWarn ? 'rgba(229,57,53,0.06)' : isActive ? (dark ? 'rgba(196,154,120,0.14)' : 'rgba(196,154,120,0.14)') : (dark ? 'rgba(224,213,200,0.06)' : 'rgba(160,120,90,0.06)'))}
+                        onMouseLeave={e => (e.currentTarget.style.background = isActive ? (dark ? 'rgba(196,154,120,0.08)' : 'rgba(196,154,120,0.08)') : 'transparent')}
                       >
                         <item.icon size={20} strokeWidth={1.5} />
                       </button>
@@ -1673,7 +1680,7 @@ export default function ChatPage() {
             },
             {
               key: 'night', label: isNight ? '切换日间' : '切换夜间',
-              icon: isNight
+              icon: dark
                 ? <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2"/><path d="M12 21v2"/><path d="M4.22 4.22l1.42 1.42"/><path d="M18.36 18.36l1.42 1.42"/><path d="M1 12h2"/><path d="M21 12h2"/><path d="M4.22 19.78l1.42-1.42"/><path d="M18.36 5.64l1.42-1.42"/></svg>
                 : <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>,
               action: toggleNight,
@@ -1690,19 +1697,19 @@ export default function ChatPage() {
               className="tool-float-btn group"
               style={{
                 width: 40, height: 40, borderRadius: '50%',
-                border: `1px solid ${isNight ? 'rgba(180,150,120,0.08)' : C.border}`,
-                background: isNight ? 'rgba(23,20,17,0.92)' : 'rgba(248,244,238,0.92)',
+                border: `1px solid ${dark ? 'rgba(180,150,120,0.08)' : C.border}`,
+                background: dark ? 'rgba(23,20,17,0.92)' : 'rgba(248,244,238,0.92)',
                 backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', color: isNight ? '#9A8A78' : C.textMuted, position: 'relative',
+                cursor: 'pointer', color: dark ? '#9A8A78' : C.textMuted, position: 'relative',
                 boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
                 transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
               }}
               onMouseEnter={e => {
                 const el = e.currentTarget
-                el.style.borderColor = isNight ? '#D4AE8A' : C.accent
-                el.style.color = isNight ? '#D4AE8A' : C.accent
-                el.style.background = isNight ? 'rgba(40,35,28,0.95)' : 'rgba(255,255,255,0.9)'
+                el.style.borderColor = dark ? '#D4AE8A' : C.accent
+                el.style.color = dark ? '#D4AE8A' : C.accent
+                el.style.background = dark ? 'rgba(40,35,28,0.95)' : 'rgba(255,255,255,0.9)'
                 el.style.boxShadow = '0 4px 20px rgba(160,120,90,0.1)'
                 el.style.transform = 'scale(1.08)'
                 const tip = el.querySelector('.tool-tip') as HTMLElement
@@ -1710,9 +1717,9 @@ export default function ChatPage() {
               }}
               onMouseLeave={e => {
                 const el = e.currentTarget
-                el.style.borderColor = isNight ? 'rgba(180,150,120,0.08)' : C.border
-                el.style.color = isNight ? '#9A8A78' : C.textMuted
-                el.style.background = isNight ? 'rgba(23,20,17,0.92)' : 'rgba(248,244,238,0.92)'
+                el.style.borderColor = dark ? 'rgba(180,150,120,0.08)' : C.border
+                el.style.color = dark ? '#9A8A78' : C.textMuted
+                el.style.background = dark ? 'rgba(23,20,17,0.92)' : 'rgba(248,244,238,0.92)'
                 el.style.boxShadow = '0 2px 12px rgba(0,0,0,0.03)'
                 el.style.transform = 'scale(1)'
                 const tip = el.querySelector('.tool-tip') as HTMLElement
@@ -1727,9 +1734,9 @@ export default function ChatPage() {
                   right: 'calc(100% + 10px)', top: '50%',
                   transform: 'translateY(-50%) translateX(4px)',
                   padding: '4px 10px', borderRadius: 8,
-                  background: isNight ? 'rgba(23,20,17,0.92)' : 'rgba(248,244,238,0.92)',
-                  border: `1px solid ${isNight ? 'rgba(180,150,120,0.08)' : C.border}`,
-                  fontSize: 11, color: isNight ? '#9A8A78' : C.textMuted,
+                  background: dark ? 'rgba(23,20,17,0.92)' : 'rgba(248,244,238,0.92)',
+                  border: `1px solid ${dark ? 'rgba(180,150,120,0.08)' : C.border}`,
+                  fontSize: 11, color: dark ? '#9A8A78' : C.textMuted,
                   whiteSpace: 'nowrap',
                   opacity: 0, pointerEvents: 'none',
                   transition: 'all 0.2s',

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { CharacterState } from '../../api/projects'
 import type { CheckResult } from './rpParser'
 import { resolveCheck } from './rpParser'
+import { RP } from './RpBubbles'
 
 interface Props {
   attribute: string
@@ -9,19 +10,6 @@ interface Props {
   characterState: CharacterState
   onResult: (result: CheckResult) => void
   existingResult?: CheckResult | null
-}
-
-const RP = {
-  bg: 'rgba(20,25,35,0.85)',
-  bgGlow: 'rgba(40,50,70,0.6)',
-  border: 'rgba(80,100,140,0.3)',
-  text: 'rgba(220,215,205,0.95)',
-  textSoft: 'rgba(220,215,205,0.6)',
-  accent: 'rgba(180,140,100,0.9)',
-  success: 'rgba(120,180,100,0.9)',
-  fail: 'rgba(200,80,70,0.9)',
-  critSuccess: 'rgba(255,200,60,0.95)',
-  critFail: 'rgba(200,40,40,0.95)',
 }
 
 export default function CheckBubble({ attribute, target, characterState, onResult, existingResult }: Props) {
@@ -55,10 +43,10 @@ export default function CheckBubble({ attribute, target, characterState, onResul
 
     return (
       <div style={{
-        margin: '12px 0', padding: '14px 18px', borderRadius: 14,
-        background: RP.bg, border: `1px solid ${borderColor}`,
-        fontFamily: "'Space Grotesk', 'Noto Sans SC', sans-serif",
-        boxShadow: isCritSuccess ? '0 0 20px rgba(255,200,60,0.15)' : isCritFail ? '0 0 20px rgba(200,40,40,0.15)' : 'none',
+        margin: '14px 0', padding: '14px 18px', borderRadius: 14,
+        background: 'rgba(18,16,14,0.5)', border: `1px solid ${borderColor}`,
+        fontFamily: "'Noto Sans SC', sans-serif",
+        boxShadow: isCritSuccess ? '0 0 24px rgba(255,210,70,0.1)' : isCritFail ? '0 0 24px rgba(210,50,45,0.1)' : 'none',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <span style={{ fontSize: 18 }}>🎲</span>
@@ -68,9 +56,8 @@ export default function CheckBubble({ attribute, target, characterState, onResul
           {(isCritSuccess || isCritFail) && (
             <span style={{
               fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
-              background: isCritSuccess ? 'rgba(255,200,60,0.15)' : 'rgba(200,40,40,0.15)',
+              background: isCritSuccess ? 'rgba(255,210,70,0.12)' : 'rgba(210,50,45,0.12)',
               color: isCritSuccess ? RP.critSuccess : RP.critFail,
-              letterSpacing: '0.05em',
             }}>
               {isCritSuccess ? '大成功' : '大失败'}
             </span>
@@ -91,9 +78,9 @@ export default function CheckBubble({ attribute, target, characterState, onResul
 
   return (
     <div style={{
-      margin: '12px 0', padding: '14px 18px', borderRadius: 14,
-      background: RP.bg, border: `1px solid ${RP.border}`,
-      fontFamily: "'Space Grotesk', 'Noto Sans SC', sans-serif",
+      margin: '14px 0', padding: '14px 18px', borderRadius: 14,
+      background: 'rgba(18,16,14,0.5)', border: `1px solid rgba(200,165,120,0.2)`,
+      fontFamily: "'Noto Sans SC', sans-serif",
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <span style={{ fontSize: 14 }}>⚔</span>
@@ -109,8 +96,8 @@ export default function CheckBubble({ attribute, target, characterState, onResul
         disabled={rolling}
         style={{
           width: '100%', padding: '8px 0', borderRadius: 10,
-          background: rolling ? 'rgba(80,100,140,0.2)' : 'rgba(180,140,100,0.12)',
-          border: `1px solid ${rolling ? RP.border : RP.accent}`,
+          background: rolling ? 'rgba(200,165,120,0.06)' : 'rgba(200,165,120,0.1)',
+          border: `1px solid ${rolling ? 'rgba(200,165,120,0.12)' : 'rgba(200,165,120,0.25)'}`,
           color: rolling ? RP.textSoft : RP.accent,
           fontSize: 13, fontWeight: 600, cursor: rolling ? 'wait' : 'pointer',
           transition: 'all 0.2s',

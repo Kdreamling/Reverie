@@ -376,7 +376,7 @@ const AnchorButton = memo(function AnchorButton({
 
 function RpMessageBody({ content, characterState, onCheckResult, onStatusChange, onDiceUpgrade }: {
   content: string
-  characterState: CharacterState
+  characterState?: CharacterState | null
   onCheckResult?: (result: CheckResult) => void
   onStatusChange?: (block: RpBlock) => void
   onDiceUpgrade?: (newDie: number) => void
@@ -384,7 +384,15 @@ function RpMessageBody({ content, characterState, onCheckResult, onStatusChange,
   const blocks = parseRpMessage(content)
 
   return (
-    <div>
+    <div style={{
+      padding: '20px 22px',
+      borderRadius: 18,
+      background: 'rgba(18, 16, 14, 0.55)',
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
+      border: '1px solid rgba(255, 245, 230, 0.06)',
+      boxShadow: '0 4px 24px rgba(0,0,0,0.12)',
+    }}>
       {blocks.map((block, i) => {
         switch (block.type) {
           case 'narration':
@@ -392,6 +400,7 @@ function RpMessageBody({ content, characterState, onCheckResult, onStatusChange,
           case 'npc_dialogue':
             return <NpcDialogue key={i} npcName={block.npcName ?? ''} content={block.content} />
           case 'check':
+            if (!characterState) return null
             return (
               <CheckBubble
                 key={i}
@@ -410,14 +419,7 @@ function RpMessageBody({ content, characterState, onCheckResult, onStatusChange,
           case 'note':
             return null
           default:
-            return (
-              <div key={i} style={{
-                fontFamily: "'EB Garamond', 'Noto Serif SC', serif",
-                fontSize: 16.5, lineHeight: 2, color: 'rgba(220,215,205,0.95)',
-              }}>
-                {block.content}
-              </div>
-            )
+            return <NarrationBlock key={i} content={block.content} />
         }
       })}
     </div>
@@ -436,7 +438,7 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
             </div>
           )}
           <div
-            className="whitespace-pre-wrap user-bubble"
+            className={`whitespace-pre-wrap ${isRoleplay ? '' : 'user-bubble'}`}
             style={{
               padding: '14px 20px',
               borderRadius: '20px 20px 4px 20px',
@@ -446,6 +448,13 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
               lineHeight: 1.75,
               overflowWrap: 'break-word',
               wordBreak: 'normal',
+              ...(isRoleplay ? {
+                background: 'rgba(200, 165, 120, 0.1)',
+                border: '1px solid rgba(200, 165, 120, 0.15)',
+                color: 'rgba(232, 225, 214, 0.88)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+              } : {}),
             }}
           >
             {msg.content}
@@ -499,14 +508,14 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
     <div className="room-msg-group mb-10 room-msg-enter" style={isKeepalive ? { opacity: 0.75 } : undefined}>
       {/* Meta line */}
       <div className="flex items-center gap-2 mb-3">
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.accent, opacity: 0.6, flexShrink: 0 }} />
-        <span style={{ fontFamily: "'EB Garamond', 'Noto Serif SC', serif", fontSize: 13, fontWeight: 500, color: C.accent, letterSpacing: '0.06em' }}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: isRoleplay ? 'rgba(200,165,120,0.6)' : C.accent, opacity: 0.6, flexShrink: 0 }} />
+        <span style={{ fontFamily: "'EB Garamond', 'Noto Serif SC', serif", fontSize: 13, fontWeight: 500, color: isRoleplay ? 'rgba(200,165,120,0.7)' : C.accent, letterSpacing: '0.06em' }}>
           Claude
         </span>
         {isKeepalive && (
           <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 6, background: `${C.accent}18`, color: C.accent, fontWeight: 600, letterSpacing: '0.04em' }}>keepalive</span>
         )}
-        <span style={{ fontSize: 11, color: C.textMuted }}>{formatMsgTime(msg.created_at)}</span>
+        <span style={{ fontSize: 11, color: isRoleplay ? 'rgba(232,225,214,0.4)' : C.textMuted }}>{formatMsgTime(msg.created_at)}</span>
       </div>
 
       {/* Process trace — thinking + memory + tool, kelivo-style stacked card */}
@@ -537,7 +546,7 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
       })()}
 
       {/* Body — serif book paragraph or RP blocks */}
-      {isRoleplay && characterState ? (
+      {isRoleplay ? (
         <RpMessageBody
           content={msg.content}
           characterState={characterState}

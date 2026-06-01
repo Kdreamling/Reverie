@@ -1,55 +1,73 @@
-import type { RpBlock, CheckResult } from './rpParser'
+import ReactMarkdown from 'react-markdown'
+import type { RpBlock } from './rpParser'
 
-const RP = {
-  bg: 'rgba(20,25,35,0.85)',
-  border: 'rgba(80,100,140,0.3)',
-  text: 'rgba(220,215,205,0.95)',
-  textSoft: 'rgba(220,215,205,0.6)',
-  accent: 'rgba(180,140,100,0.9)',
-  npcBg: 'rgba(30,35,50,0.7)',
-  npcBorder: 'rgba(120,130,160,0.25)',
-  npcName: 'rgba(160,170,200,0.9)',
-  narratBorder: 'rgba(180,140,100,0.3)',
+export const RP = {
+  glass: 'rgba(18, 16, 14, 0.55)',
+  glassBorder: 'rgba(255, 245, 230, 0.06)',
+  text: 'rgba(232, 225, 214, 0.92)',
+  textSoft: 'rgba(232, 225, 214, 0.6)',
+  accent: 'rgba(200, 165, 120, 0.85)',
+  success: 'rgba(140, 195, 110, 0.9)',
+  fail: 'rgba(210, 85, 75, 0.9)',
+  critSuccess: 'rgba(255, 210, 70, 0.95)',
+  critFail: 'rgba(210, 50, 45, 0.95)',
+}
+
+function npcColor(name: string): string {
+  const hash = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+  const hue = (hash * 37) % 360
+  return `hsl(${hue}, 40%, 72%)`
 }
 
 export function NarrationBlock({ content }: { content: string }) {
   return (
-    <div style={{
-      padding: '6px 0 6px 14px',
-      borderLeft: `2px solid ${RP.narratBorder}`,
-      fontFamily: "'EB Garamond', 'Noto Serif SC', serif",
-      fontSize: 15, lineHeight: 2,
+    <div className="rp-narration" style={{
+      fontFamily: "'Noto Serif SC', 'EB Garamond', Georgia, serif",
+      fontSize: 15,
+      lineHeight: 2,
       color: RP.text,
-      fontStyle: 'italic',
-      margin: '6px 0',
+      margin: '10px 0',
+      letterSpacing: '0.02em',
     }}>
-      {content}
+      <ReactMarkdown components={{
+        p: ({ children }) => <p style={{ margin: '8px 0' }}>{children}</p>,
+        strong: ({ children }) => <strong style={{ fontWeight: 700, color: 'rgba(240,233,222,0.98)' }}>{children}</strong>,
+        em: ({ children }) => <em style={{ fontStyle: 'italic', color: 'rgba(232,225,214,0.78)' }}>{children}</em>,
+      }}>{content}</ReactMarkdown>
     </div>
   )
 }
 
 export function NpcDialogue({ npcName, content }: { npcName: string; content: string }) {
   const dialogue = content.replace(/^【.+?】/, '').replace(/^"/, '').replace(/"$/, '')
+  const color = npcColor(npcName)
+
   return (
-    <div style={{ margin: '8px 0' }}>
+    <div style={{ margin: '14px 0 10px' }}>
       <span style={{
-        display: 'inline-block', fontSize: 10, fontWeight: 600,
-        padding: '2px 8px', borderRadius: 6,
-        background: 'rgba(120,130,160,0.12)', color: RP.npcName,
-        marginBottom: 4, fontFamily: "'Noto Sans SC', sans-serif",
-        letterSpacing: '0.04em',
+        fontFamily: "'Noto Sans SC', sans-serif",
+        fontSize: 13,
+        fontWeight: 700,
+        color,
+        letterSpacing: '0.06em',
       }}>
         {npcName}
       </span>
       <div style={{
-        padding: '10px 14px', borderRadius: '2px 12px 12px 12px',
-        background: RP.npcBg, border: `1px solid ${RP.npcBorder}`,
-        fontSize: 14, lineHeight: 1.8,
+        fontFamily: "'Noto Serif SC', 'EB Garamond', serif",
+        fontSize: 15,
+        lineHeight: 1.9,
         color: RP.text,
-        fontFamily: "'Noto Sans SC', serif",
         marginTop: 2,
+        paddingLeft: 2,
       }}>
-        {dialogue}
+        <ReactMarkdown components={{
+          p: ({ children }) => <span>{children}</span>,
+          strong: ({ children }) => <strong style={{ fontWeight: 700 }}>{children}</strong>,
+          em: ({ children }) => <em style={{ fontStyle: 'italic', color: 'rgba(232,225,214,0.78)' }}>{children}</em>,
+        }}>
+          {`「${dialogue}」`}
+        </ReactMarkdown>
       </div>
     </div>
   )
@@ -69,10 +87,16 @@ export function StatusChangeBubble({ block }: { block: RpBlock }) {
 
   return (
     <div style={{
-      display: 'inline-block', margin: '4px 0', padding: '4px 12px',
-      borderRadius: 8, fontSize: 11,
-      background: 'rgba(180,140,100,0.1)', border: `1px solid rgba(180,140,100,0.2)`,
-      color: RP.accent, fontFamily: "'Space Grotesk', 'Noto Sans SC', sans-serif",
+      display: 'inline-block',
+      margin: '6px 4px 6px 0',
+      padding: '4px 12px',
+      borderRadius: 8,
+      fontSize: 11,
+      background: 'rgba(200,165,120,0.08)',
+      border: '1px solid rgba(200,165,120,0.18)',
+      color: RP.accent,
+      fontFamily: "'Noto Sans SC', sans-serif",
+      fontWeight: 500,
     }}>
       {label}
     </div>
@@ -82,10 +106,15 @@ export function StatusChangeBubble({ block }: { block: RpBlock }) {
 export function DiceUpgradeBubble({ newDie }: { newDie: number }) {
   return (
     <div style={{
-      display: 'inline-block', margin: '6px 0', padding: '6px 14px',
-      borderRadius: 8, fontSize: 12,
-      background: 'rgba(120,180,100,0.08)', border: `1px solid rgba(120,180,100,0.2)`,
-      color: 'rgba(120,180,100,0.9)', fontFamily: "'Space Grotesk', sans-serif",
+      display: 'inline-block',
+      margin: '8px 0',
+      padding: '6px 14px',
+      borderRadius: 8,
+      fontSize: 12,
+      background: 'rgba(140,195,110,0.06)',
+      border: '1px solid rgba(140,195,110,0.18)',
+      color: RP.success,
+      fontFamily: "'Noto Sans SC', sans-serif",
       fontWeight: 600,
     }}>
       🎲 骰子升级 → d{newDie}
@@ -98,14 +127,17 @@ export function FreeRollBubble({ roll, die }: { roll: number; die: number }) {
   const isMin = roll === 1
   return (
     <div style={{
-      display: 'inline-block', margin: '6px 0', padding: '8px 16px',
-      borderRadius: 10, fontSize: 14,
-      background: RP.bg,
-      border: `1px solid ${isMax ? 'rgba(255,200,60,0.4)' : isMin ? 'rgba(200,40,40,0.4)' : RP.border}`,
-      color: isMax ? 'rgba(255,200,60,0.95)' : isMin ? 'rgba(200,40,40,0.95)' : RP.text,
-      fontFamily: "'Space Grotesk', sans-serif",
+      display: 'inline-block',
+      margin: '8px 0',
+      padding: '8px 16px',
+      borderRadius: 10,
+      fontSize: 14,
+      background: 'rgba(18,16,14,0.6)',
+      border: `1px solid ${isMax ? 'rgba(255,210,70,0.35)' : isMin ? 'rgba(210,50,45,0.35)' : RP.glassBorder}`,
+      color: isMax ? RP.critSuccess : isMin ? RP.critFail : RP.text,
+      fontFamily: "'Noto Sans SC', sans-serif",
       fontWeight: 600,
-      boxShadow: isMax ? '0 0 12px rgba(255,200,60,0.1)' : 'none',
+      boxShadow: isMax ? '0 0 16px rgba(255,210,70,0.08)' : 'none',
     }}>
       🎲 d{die} → {roll}
     </div>
