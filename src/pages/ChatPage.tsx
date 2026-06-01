@@ -181,6 +181,10 @@ export default function ChatPage() {
   const [knockCount, setKnockCount] = useState(0)
   const [lockDismissed, setLockDismissed] = useState(false)
   const maxKnocks = 3
+  const [showScrollBottom, setShowScrollBottom] = useState(false)
+  const [scrollProgress, setScrollProgress] = useState(1)
+  const scrollTrackRef = useRef<HTMLDivElement>(null)
+  const isDraggingScrollRef = useRef(false)
 
   // Night mode: toggle body class + persist
   useEffect(() => {
@@ -669,7 +673,7 @@ export default function ChatPage() {
     return () => clearInterval(id)
   }, [isStreaming])
 
-  // Track user scroll: if they scroll up, pause auto-scroll
+  // Track user scroll: if they scroll up, pause auto-scroll; update scroll progress
   useEffect(() => {
     const el = mainRef.current
     if (!el) return
@@ -677,6 +681,9 @@ export default function ChatPage() {
       if (!el) return
       const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
       userScrolledUpRef.current = distFromBottom > 150
+      setShowScrollBottom(distFromBottom > 400)
+      const maxScroll = el.scrollHeight - el.clientHeight
+      setScrollProgress(maxScroll > 0 ? el.scrollTop / maxScroll : 1)
     }
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
@@ -1402,6 +1409,112 @@ export default function ChatPage() {
           )}
 
         </main>
+
+        {/* Scroll-to-bottom button */}
+        {showScrollBottom && !showWelcome && (
+          <button
+            onClick={() => {
+              messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+              userScrolledUpRef.current = false
+            }}
+            style={{
+              position: 'absolute',
+              bottom: 'calc(100px + env(safe-area-inset-bottom))',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 36, height: 36, borderRadius: '50%',
+              background: dark ? 'rgba(23,20,17,0.88)' : 'rgba(248,244,238,0.88)',
+              backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+              border: `1px solid ${dark ? 'rgba(180,150,120,0.1)' : C.border}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer',
+              color: dark ? '#9A8A78' : C.textMuted,
+              zIndex: 55,
+              boxShadow: dark ? '0 2px 16px rgba(0,0,0,0.3)' : '0 2px 16px rgba(160,120,90,0.1)',
+              transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
+              animation: 'fadeInUp 0.25s ease-out',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = dark ? '#D4AE8A' : C.accent
+              e.currentTarget.style.color = dark ? '#D4AE8A' : C.accent
+              e.currentTarget.style.transform = 'translateX(-50%) scale(1.1)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = dark ? 'rgba(180,150,120,0.1)' : C.border
+              e.currentTarget.style.color = dark ? '#9A8A78' : C.textMuted
+              e.currentTarget.style.transform = 'translateX(-50%) scale(1)'
+            }}
+          >
+            <ChevronDown size={18} strokeWidth={2} />
+          </button>
+        )}
+
+        {/* Side scroll track — PC only */}
+        {!showWelcome && messages.length > 3 && (
+          <div
+            ref={scrollTrackRef}
+            className="hidden md:flex group/track"
+            style={{
+              position: 'absolute',
+              right: 6, top: 60, bottom: 100,
+              width: 20,
+              zIndex: 55,
+              cursor: 'pointer',
+              alignItems: 'stretch', justifyContent: 'center',
+              opacity: 0.4,
+              transition: 'opacity 0.3s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.opacity = '1' }}
+            onMouseLeave={e => { if (!isDraggingScrollRef.current) e.currentTarget.style.opacity = '0.4' }}
+            onPointerDown={e => {
+              isDraggingScrollRef.current = true
+              e.currentTarget.setPointerCapture(e.pointerId)
+              e.currentTarget.style.opacity = '1'
+              const track = scrollTrackRef.current
+              const el = mainRef.current
+              if (!track || !el) return
+              const rect = track.getBoundingClientRect()
+              const ratio = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
+              el.scrollTop = ratio * (el.scrollHeight - el.clientHeight)
+            }}
+            onPointerMove={e => {
+              if (!isDraggingScrollRef.current) return
+              const track = scrollTrackRef.current
+              const el = mainRef.current
+              if (!track || !el) return
+              const rect = track.getBoundingClientRect()
+              const ratio = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
+              el.scrollTop = ratio * (el.scrollHeight - el.clientHeight)
+            }}
+            onPointerUp={e => {
+              isDraggingScrollRef.current = false
+              const el = e.currentTarget
+              const rect = el.getBoundingClientRect()
+              const inBounds = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom
+              if (!inBounds) el.style.opacity = '0.4'
+            }}
+            onPointerCancel={e => {
+              isDraggingScrollRef.current = false
+              e.currentTarget.style.opacity = '0.4'
+            }}
+          >
+            <div style={{
+              width: 3, borderRadius: 2,
+              background: dark ? 'rgba(180,150,120,0.06)' : 'rgba(180,150,120,0.08)',
+              position: 'relative',
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: `${scrollProgress * 100}%`,
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: 8, height: 32, borderRadius: 4,
+                background: dark ? 'rgba(180,150,120,0.25)' : 'rgba(180,150,120,0.3)',
+                transition: isDraggingScrollRef.current ? 'none' : 'top 0.1s ease-out',
+              }} />
+            </div>
+          </div>
+        )}
 
         {/* Input fade overlay */}
         <div className="input-fade-overlay" />
