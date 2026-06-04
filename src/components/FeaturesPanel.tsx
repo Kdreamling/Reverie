@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { ChevronLeft, RefreshCw } from 'lucide-react'
+import { ChevronLeft, RefreshCw, Bell } from 'lucide-react'
 import { client } from '../api/client'
+import { resubscribePush } from '../api/pushSubscription'
 import { C } from '../theme'
 
 interface FlagInfo {
@@ -46,6 +47,97 @@ interface ToolInfo {
 
 interface Props {
   onBack: () => void
+}
+
+function NotificationSection() {
+  const [status, setStatus] = useState<'loading' | 'unsupported' | 'denied' | 'off' | 'on'>('loading')
+  const [subscribing, setSubscribing] = useState(false)
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+      setStatus('unsupported')
+      return
+    }
+    if (Notification.permission === 'denied') {
+      setStatus('denied')
+      return
+    }
+    navigator.serviceWorker.ready.then(reg =>
+      reg.pushManager.getSubscription().then(sub => {
+        setStatus(sub && Notification.permission === 'granted' ? 'on' : 'off')
+      })
+    ).catch(() => setStatus('off'))
+  }, [])
+
+  async function handleSubscribe() {
+    setSubscribing(true)
+    setMessage('')
+    try {
+      await resubscribePush()
+      setStatus('on')
+      setMessage('通知已开启')
+    } catch (err) {
+      if (Notification.permission === 'denied') {
+        setStatus('denied')
+        setMessage('浏览器已拒绝通知权限，请在系统设置中允许')
+      } else {
+        setMessage('订阅失败：' + (err instanceof Error ? err.message : '未知错误'))
+      }
+    } finally {
+      setSubscribing(false)
+    }
+  }
+
+  const statusMap = {
+    loading: { text: '检测中…', color: C.textMuted },
+    unsupported: { text: '当前浏览器不支持', color: C.textMuted },
+    denied: { text: '已被浏览器拒绝', color: C.errorText },
+    off: { text: '未开启', color: C.textMuted },
+    on: { text: '已开启', color: C.success },
+  }
+  const s = statusMap[status]
+
+  return (
+    <>
+      <p className="text-xs font-medium uppercase tracking-wider mt-6 mb-3 px-1" style={{ color: C.textMuted }}>
+        通知
+      </p>
+      <div
+        className="flex items-center gap-4 px-4 py-4 md:py-3 rounded-xl md:rounded-lg"
+        style={{ background: C.sidebarBg, border: `1px solid ${C.border}` }}
+      >
+        <div
+          className="flex items-center justify-center rounded-xl flex-shrink-0"
+          style={{ width: 36, height: 36, background: C.surface }}
+        >
+          <Bell size={16} strokeWidth={1.5} style={{ color: status === 'on' ? C.accent : C.textMuted }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium" style={{ color: C.text }}>浏览器推送</p>
+          <p className="text-xs mt-0.5" style={{ color: s.color }}>{s.text}</p>
+          {message && <p className="text-xs mt-1" style={{ color: status === 'on' ? C.success : C.errorText }}>{message}</p>}
+        </div>
+        {(status === 'off' || status === 'on') && (
+          <button
+            onClick={handleSubscribe}
+            disabled={subscribing}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors duration-150 cursor-pointer disabled:opacity-50 flex-shrink-0"
+            style={{
+              background: status === 'on' ? 'transparent' : C.accent,
+              color: status === 'on' ? C.accent : '#fff',
+              border: status === 'on' ? `1px solid ${C.border}` : 'none',
+            }}
+          >
+            {subscribing ? '订阅中…' : status === 'on' ? '重新订阅' : '开启通知'}
+          </button>
+        )}
+        {status === 'denied' && (
+          <p className="text-xs flex-shrink-0" style={{ color: C.textMuted }}>请在浏览器设置中允许</p>
+        )}
+      </div>
+    </>
+  )
 }
 
 export default function FeaturesPanel({ onBack }: Props) {
@@ -223,6 +315,9 @@ export default function FeaturesPanel({ onBack }: Props) {
         {error && (
           <p className="mt-3 text-xs px-1" style={{ color: C.errorText }}>{error}</p>
         )}
+
+        {/* 通知管理 */}
+        <NotificationSection />
 
         <p className="mt-4 text-xs px-1" style={{ color: C.textMuted }}>
           修改立即生效，服务器重启后恢复默认值。
