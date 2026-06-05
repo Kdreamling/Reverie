@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChevronLeft, RefreshCw, Bell } from 'lucide-react'
+import { ChevronLeft, RefreshCw, Bell, Trash2, Activity } from 'lucide-react'
 import { client } from '../api/client'
 import { resubscribePush } from '../api/pushSubscription'
 import { C } from '../theme'
@@ -47,6 +47,148 @@ interface ToolInfo {
 
 interface Props {
   onBack: () => void
+}
+
+const SERVICE_LABELS: Record<string, string> = {
+  gateway: 'Gateway',
+  supabase: 'Supabase',
+  openrouter: 'OpenRouter',
+  deepseek: 'DeepSeek',
+  siliconflow: 'SiliconFlow',
+}
+
+interface ServiceStatus {
+  ok: boolean
+  error?: string
+  status?: number
+  uptime_hours?: number
+  count?: number
+}
+
+function SystemSection() {
+  const [clearing, setClearing] = useState(false)
+  const [clearMsg, setClearMsg] = useState('')
+  const [health, setHealth] = useState<Record<string, ServiceStatus> | null>(null)
+  const [healthLoading, setHealthLoading] = useState(false)
+  const [healthChecked, setHealthChecked] = useState(false)
+
+  async function handleClearCache() {
+    setClearing(true)
+    setClearMsg('')
+    try {
+      await client.post('/admin/cache/clear', {})
+      setClearMsg('缓存已清除')
+      setTimeout(() => setClearMsg(''), 3000)
+    } catch (err) {
+      setClearMsg('清除失败：' + (err instanceof Error ? err.message : '未知错误'))
+    } finally {
+      setClearing(false)
+    }
+  }
+
+  async function checkHealth() {
+    setHealthLoading(true)
+    try {
+      const res = await client.get<{ ok: boolean; services: Record<string, ServiceStatus> }>('/admin/health')
+      setHealth(res.services)
+      setHealthChecked(true)
+    } catch {
+      setHealth(null)
+    } finally {
+      setHealthLoading(false)
+    }
+  }
+
+  return (
+    <>
+      <p className="text-xs font-medium uppercase tracking-wider mt-6 mb-3 px-1" style={{ color: C.textMuted }}>
+        系统
+      </p>
+      <div className="flex flex-col gap-2">
+        {/* 缓存清除 */}
+        <div
+          className="flex items-center gap-4 px-4 py-4 md:py-3 rounded-xl md:rounded-lg"
+          style={{ background: C.sidebarBg, border: `1px solid ${C.border}` }}
+        >
+          <div
+            className="flex items-center justify-center rounded-xl flex-shrink-0"
+            style={{ width: 36, height: 36, background: C.surface }}
+          >
+            <Trash2 size={16} strokeWidth={1.5} style={{ color: C.accent }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium" style={{ color: C.text }}>清除缓存</p>
+            <p className="text-xs mt-0.5" style={{ color: C.textSecondary }}>重建晨的上下文，修复记忆不更新</p>
+            {clearMsg && (
+              <p className="text-xs mt-1" style={{ color: clearMsg.includes('失败') ? C.errorText : C.success }}>
+                {clearMsg}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={handleClearCache}
+            disabled={clearing}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors duration-150 cursor-pointer disabled:opacity-50 flex-shrink-0"
+            style={{ background: 'transparent', color: C.accent, border: `1px solid ${C.border}` }}
+          >
+            {clearing ? '清除中…' : '清除'}
+          </button>
+        </div>
+
+        {/* 连接状态 */}
+        <div
+          className="px-4 py-4 md:py-3 rounded-xl md:rounded-lg"
+          style={{ background: C.sidebarBg, border: `1px solid ${C.border}` }}
+        >
+          <div className="flex items-center gap-4">
+            <div
+              className="flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{ width: 36, height: 36, background: C.surface }}
+            >
+              <Activity size={16} strokeWidth={1.5} style={{ color: C.accent }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium" style={{ color: C.text }}>连接状态</p>
+              <p className="text-xs mt-0.5" style={{ color: C.textSecondary }}>检测上游服务是否正常</p>
+            </div>
+            <button
+              onClick={checkHealth}
+              disabled={healthLoading}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors duration-150 cursor-pointer disabled:opacity-50 flex-shrink-0"
+              style={{ background: 'transparent', color: C.accent, border: `1px solid ${C.border}` }}
+            >
+              {healthLoading ? (
+                <RefreshCw size={12} className="animate-spin" />
+              ) : healthChecked ? '刷新' : '检测'}
+            </button>
+          </div>
+          {health && (
+            <div className="mt-3 flex flex-col gap-1.5 pl-[52px]">
+              {Object.entries(health).map(([key, svc]) => (
+                <div key={key} className="flex items-center gap-2">
+                  <div
+                    className="rounded-full flex-shrink-0"
+                    style={{
+                      width: 6, height: 6,
+                      background: svc.ok ? C.success : C.errorText,
+                    }}
+                  />
+                  <span className="text-xs" style={{ color: C.text }}>
+                    {SERVICE_LABELS[key] || key}
+                  </span>
+                  <span className="text-xs" style={{ color: C.textMuted }}>
+                    {svc.ok
+                      ? (svc.uptime_hours != null ? `${svc.uptime_hours}h` : '')
+                      : (svc.error || `HTTP ${svc.status}`)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )
 }
 
 function NotificationSection() {
@@ -318,6 +460,9 @@ export default function FeaturesPanel({ onBack }: Props) {
 
         {/* 通知管理 */}
         <NotificationSection />
+
+        {/* 系统控制 */}
+        <SystemSection />
 
         <p className="mt-4 text-xs px-1" style={{ color: C.textMuted }}>
           修改立即生效，服务器重启后恢复默认值。
