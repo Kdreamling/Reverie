@@ -966,12 +966,12 @@ export default function DevPage() {
     if (sessionId) {
       fetch('/api/dev/abort', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ session_id: sessionId }),
       }).catch(() => {})
     }
     abortCtrl?.abort()
-  }, [sessionId, abortCtrl])
+  }, [sessionId, abortCtrl, token])
 
   const injectInstruction = useCallback(async () => {
     if (!input.trim() || !sessionId) return
@@ -984,7 +984,7 @@ export default function DevPage() {
     try {
       await fetch('/api/dev/inject', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ session_id: sessionId, content: text }),
       })
     } catch {
@@ -993,7 +993,7 @@ export default function DevPage() {
         content: 'failed to inject instruction', ts: Date.now(),
       }])
     }
-  }, [input, sessionId])
+  }, [input, sessionId, token])
 
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
