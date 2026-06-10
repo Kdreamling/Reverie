@@ -51,6 +51,12 @@ export interface CalendarDetail {
   date: string
   sessions: CalendarSession[]
   keepalive_logs: KeepaliveLog[]
+  cost?: number
+  message_count?: number
+  // v28 新账本（usage_log 上线后的日期才有）
+  by_source?: Record<string, { cost: number; count: number; tokens: number }> | null
+  hit_rate?: number | null
+  saved?: number | null
 }
 
 export interface CalendarSession {
@@ -69,6 +75,7 @@ export interface CalendarDates {
   month: number
   dates: Record<string, { id: string; title: string; scene_type: string; message_count: number }[]>
   keepalive_dates: string[]
+  costs?: Record<string, number>
 }
 
 // ---- API 调用 ----

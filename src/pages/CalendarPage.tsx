@@ -26,6 +26,19 @@ const PRIORITY_COLORS: Record<string, string> = {
   low: C.textMuted,
 }
 
+const SOURCE_LABELS: Record<string, string> = {
+  chat: '聊天',
+  dev: '开发',
+  warmup: '续缓存',
+  keepalive: '自主活动',
+  micro_summary: '微摘要',
+  session_summary: '会话摘要',
+  dimension_summary: '维度摘要',
+  daily_topic: '话题推荐',
+  legacy_summary: '摘要',
+  search_agent: '记忆搜索',
+}
+
 const CATEGORY_LABELS: Record<string, string> = {
   work: '工作',
   health: '健康',
@@ -40,6 +53,7 @@ export default function CalendarPage() {
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [dates, setDates] = useState<Record<string, { id: string; title: string; scene_type: string; message_count: number }[]>>({})
   const [keepaliveDates, setKeepaliveDates] = useState<Set<string>>(new Set())
+  const [dayCosts, setDayCosts] = useState<Record<string, number>>({})
   const [lifeItemDates, setLifeItemDates] = useState<Record<string, LifeItem[]>>({})
   const [habitLogs, setHabitLogs] = useState<Record<string, HabitLog[]>>({})
   const [allHabits, setAllHabits] = useState<HabitInfo[]>([])
@@ -54,7 +68,7 @@ export default function CalendarPage() {
   useEffect(() => {
     setLoading(true)
     Promise.all([
-      fetchCalendarDates(year, month).then(d => { setDates(d.dates); setKeepaliveDates(new Set(d.keepalive_dates || [])) }).catch(() => { setDates({}); setKeepaliveDates(new Set()) }),
+      fetchCalendarDates(year, month).then(d => { setDates(d.dates); setKeepaliveDates(new Set(d.keepalive_dates || [])); setDayCosts(d.costs || {}) }).catch(() => { setDates({}); setKeepaliveDates(new Set()); setDayCosts({}) }),
       fetchLifeItemsCalendar(year, month).then(d => setLifeItemDates(d.items)).catch(() => setLifeItemDates({})),
       fetchHabitsCalendar(year, month).then(d => { setHabitLogs(d.logs); setAllHabits(d.habits) }).catch(() => { setHabitLogs({}); setAllHabits([]) }),
     ]).finally(() => setLoading(false))
@@ -185,6 +199,11 @@ export default function CalendarPage() {
               }}
             >
               {day}
+              {dayCosts[dateStr] != null && dayCosts[dateStr] > 0 && (
+                <span style={{ fontSize: 8, lineHeight: 1, marginTop: 1, color: C.textMuted, fontFamily: "'JetBrains Mono', monospace" }}>
+                  ${dayCosts[dateStr] >= 10 ? dayCosts[dateStr].toFixed(0) : dayCosts[dateStr].toFixed(1)}
+                </span>
+              )}
               {hasData && (
                 <div style={{ display: 'flex', gap: 2, marginTop: 2, alignItems: 'center' }}>
                   {hasHabits ? (
@@ -228,6 +247,16 @@ export default function CalendarPage() {
             <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>
               {selectedDate.replace(/-/g, '.')}
             </span>
+            {detail?.cost != null && detail.cost > 0 && (
+              <span style={{ fontSize: 12, color: C.accent, fontWeight: 500, fontFamily: "'JetBrains Mono', monospace" }}>
+                ${detail.cost.toFixed(2)}
+              </span>
+            )}
+            {detail?.hit_rate != null && (
+              <span style={{ fontSize: 11, color: C.textMuted }}>
+                缓存命中 {detail.hit_rate.toFixed(0)}%
+              </span>
+            )}
             <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
               {[
                 { key: 'chat' as const, label: '对话', count: detail?.sessions?.length ?? 0 },
@@ -255,6 +284,28 @@ export default function CalendarPage() {
               ))}
             </div>
           </div>
+
+          {/* 成本构成（usage_log 新账本，上线后的日期才有） */}
+          {detail?.by_source && Object.keys(detail.by_source).length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14, alignItems: 'center' }}>
+              {Object.entries(detail.by_source)
+                .sort((a, b) => b[1].cost - a[1].cost)
+                .map(([src, v]) => (
+                  <span key={src} style={{
+                    fontSize: 10, padding: '2px 8px', borderRadius: 10,
+                    background: 'rgba(0,0,0,0.04)', color: C.textSecondary, fontWeight: 500,
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}>
+                    {SOURCE_LABELS[src] || src} ${v.cost.toFixed(2)} · {v.count}{src === 'chat' || src === 'dev' ? '轮' : '次'}
+                  </span>
+                ))}
+              {detail.saved != null && (
+                <span style={{ fontSize: 10, color: detail.saved >= 0 ? '#7A9A70' : C.textMuted }}>
+                  {detail.saved >= 0.005 ? `缓存帮你省了 $${detail.saved.toFixed(2)}` : detail.saved < 0 ? '今天缓存写入多于读取，暂时没省到钱' : ''}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Chat tab */}
           {activeTab === 'chat' && (
