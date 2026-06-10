@@ -17,6 +17,7 @@ const FLAG_META: FlagInfo[] = [
   { key: 'search_enabled', label: '语义检索', desc: '注入相关历史对话' },
   { key: 'memory_tool_enabled', label: 'AI 主动记忆', desc: 'AI 自主检索和保存记忆' },
   { key: 'life_butler_enabled', label: '生活管家', desc: '待办/日程/习惯打卡工具' },
+  { key: 'dev_mode_active', label: 'Dev 工具开关', desc: '晨的代码开发工具（git/shell/部署）。应急用，平时保持关闭，Gateway 重启后自动复位为关' },
 ]
 
 const TOOL_LABELS: Record<string, string> = {
