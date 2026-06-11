@@ -130,10 +130,49 @@ function StatCard({ icon: Icon, label, value, sub, color, C }: { icon: typeof Do
   )
 }
 
+// === 成本构成标签 ===
+const SOURCE_LABELS: Record<string, string> = {
+  chat: '聊天',
+  dev: '开发',
+  warmup: '续缓存',
+  keepalive: '自主活动',
+  micro_summary: '微摘要',
+  session_summary: '会话摘要',
+  dimension_summary: '维度摘要',
+  daily_topic: '话题推荐',
+  legacy_summary: '摘要',
+  search_agent: '记忆搜索',
+}
+
+function CostBreakdown({ detail, C }: { detail: CalendarDetail; C: Theme }) {
+  if (!detail.by_source || Object.keys(detail.by_source).length === 0) return null
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+      {Object.entries(detail.by_source)
+        .sort((a, b) => b[1].cost - a[1].cost)
+        .map(([src, v]) => (
+          <span key={src} style={{
+            fontSize: 9, padding: '2px 8px', borderRadius: 6,
+            background: C.bgGlass, color: C.textSoft, fontWeight: 500,
+            border: `1px solid ${C.border}`, fontFamily: "'JetBrains Mono'",
+          }}>
+            {SOURCE_LABELS[src] || src} ${v.cost.toFixed(2)}·{v.count}{src === 'chat' || src === 'dev' ? '轮' : '次'}
+          </span>
+        ))}
+      {detail.saved != null && detail.saved >= 0.005 && (
+        <span style={{ fontSize: 9, color: C.green, fontFamily: "'JetBrains Mono'" }}>缓存省 ${detail.saved.toFixed(2)}</span>
+      )}
+      {detail.saved != null && detail.saved < 0 && (
+        <span style={{ fontSize: 9, color: C.textMuted, fontFamily: "'Noto Sans SC'" }}>缓存写入多于读取，没省到钱</span>
+      )}
+    </div>
+  )
+}
+
 // === Mini Calendar ===
-function MiniCalendar({ year, month, selected, onSelect, sessionDates, keepaliveDates, lifeDates, diaryDates, C }: {
+function MiniCalendar({ year, month, selected, onSelect, sessionDates, keepaliveDates, lifeDates, diaryDates, costs, C }: {
   year: number; month: number; selected: string | null; onSelect: (d: string) => void
-  sessionDates: Set<string>; keepaliveDates: Set<string>; lifeDates: Set<string>; diaryDates: Set<string>; C: Theme
+  sessionDates: Set<string>; keepaliveDates: Set<string>; lifeDates: Set<string>; diaryDates: Set<string>; costs: Record<string, number>; C: Theme
 }) {
   const firstDay = new Date(year, month - 1, 1).getDay()
   const daysInMonth = new Date(year, month, 0).getDate()
@@ -160,10 +199,11 @@ function MiniCalendar({ year, month, selected, onSelect, sessionDates, keepalive
           const hasDiary = diaryDates.has(dateStr)
           const active = hasSession || hasKeepalive || hasLife || hasDiary
           const sel = dateStr === selected
+          const dayCost = costs[dateStr]
           return (
             <div key={d} onClick={() => active && onSelect(dateStr)} style={{
-              width: 34, height: 34, margin: '1px auto', borderRadius: 10,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 38, height: 42, margin: '1px auto', borderRadius: 10,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               fontSize: 12, fontFamily: "'JetBrains Mono'",
               cursor: active ? 'pointer' : 'default',
               background: sel ? C.amber : 'transparent',
@@ -171,6 +211,14 @@ function MiniCalendar({ year, month, selected, onSelect, sessionDates, keepalive
               fontWeight: sel ? 700 : 400, transition: 'all 0.2s', position: 'relative',
             }}>
               {d}
+              {dayCost != null && dayCost >= 0.005 && (
+                <span style={{
+                  fontSize: 7, lineHeight: 1, marginTop: 2,
+                  color: sel ? C.bg : C.textMuted, fontFamily: "'JetBrains Mono'",
+                }}>
+                  ${dayCost >= 10 ? dayCost.toFixed(0) : dayCost.toFixed(1)}
+                </span>
+              )}
               {active && !sel && (
                 <div style={{
                   position: 'absolute', bottom: 3, display: 'flex', gap: 2,
@@ -418,11 +466,16 @@ export default function DashboardPage() {
   const C = isDark ? THEMES.dark : THEMES.light
   const toggle = (i: number) => setExpanded(p => { const n = new Set(p); n.has(i) ? n.delete(i) : n.add(i); return n })
 
-  // Sparkline data from week stats
+  // Sparkline data from week stats — cost trend
   const sparkData = (weekStats?.daily || []).map(d => ({
     label: d.date.slice(-2),
-    value: d.hit_rate,
+    value: d.cost,
   }))
+
+  // 7-day daily average
+  const weekDailyAvg = weekStats && weekStats.daily.length > 0
+    ? weekStats.totals.cost / weekStats.daily.length
+    : 0
 
   // Calendar data sets
   const sessionDates = new Set(Object.keys(calendarData?.dates || {}))
@@ -492,7 +545,7 @@ export default function DashboardPage() {
       <div style={{ display: 'flex', gap: 10, padding: '0 20px 20px', overflowX: 'auto', scrollSnapType: 'x mandatory', position: 'relative', zIndex: 1, touchAction: 'pan-x' }}>
         <StatCard icon={DollarSign} label="Today" value={`$${(todayStats?.totals.cost ?? 0).toFixed(3)}`} sub={`${todayStats?.totals.message_count ?? 0} 条消息`} C={C} />
         <StatCard icon={Zap} label="Hit Rate" value={`${(todayStats?.totals.hit_rate ?? 0).toFixed(0)}%`} sub={`节省 $${(todayStats?.totals.saved ?? 0).toFixed(2)}`} color={C.green} C={C} />
-        <StatCard icon={TrendingUp} label="Avg/msg" value={`$${(todayStats?.totals.avg_cost ?? 0).toFixed(3)}`} sub="Opus 4.6" C={C} />
+        <StatCard icon={TrendingUp} label="Daily Avg" value={`$${weekDailyAvg.toFixed(2)}`} sub="近 7 日均" C={C} />
         <StatCard icon={Clock} label="Month" value={`$${(monthStats?.totals.cost ?? 0).toFixed(2)}`} sub={`已省 $${(monthStats?.totals.saved ?? 0).toFixed(1)}`} C={C} />
       </div>
 
@@ -502,7 +555,7 @@ export default function DashboardPage() {
           margin: '0 20px 20px', padding: 16, background: C.bgCard, borderRadius: 16,
           border: `1px solid ${C.border}`, position: 'relative', zIndex: 1, transition: 'color 0.35s ease',
         }}>
-          <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 10, fontFamily: "'JetBrains Mono'", letterSpacing: '0.05em', textTransform: 'uppercase' }}>7-Day Cache Hit Rate</div>
+          <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 10, fontFamily: "'JetBrains Mono'", letterSpacing: '0.05em', textTransform: 'uppercase' }}>7-Day Cost Trend</div>
           <Sparkline data={sparkData} C={C} />
         </div>
       )}
@@ -547,13 +600,24 @@ export default function DashboardPage() {
               }} />
             </div>
             <MiniCalendar year={calYear} month={calMonth} selected={selectedDate} onSelect={setSelectedDate}
-              sessionDates={sessionDates} keepaliveDates={keepaliveDates} lifeDates={lifeDates} diaryDates={diaryDatesSet} C={C} />
+              sessionDates={sessionDates} keepaliveDates={keepaliveDates} lifeDates={lifeDates} diaryDates={diaryDatesSet} costs={calendarData?.costs || {}} C={C} />
             {selectedDate && (
               <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: C.text, fontFamily: "'Space Grotesk'", transition: 'color 0.35s' }}>{selectedDate}</div>
                 <div style={{ fontSize: 12, color: C.textSoft, marginTop: 4, fontFamily: "'Noto Sans SC'" }}>
                   {detail ? `${detail.sessions.length} 次对话 · ${detail.keepalive_logs.length} 次自主活动` : '加载中...'}
+                  {detail?.cost != null && detail.cost > 0 && (
+                    <span style={{ color: C.amber, fontFamily: "'JetBrains Mono'", marginLeft: 8 }}>${detail.cost.toFixed(2)}</span>
+                  )}
+                  {detail?.hit_rate != null && (
+                    <span style={{ color: C.textMuted, marginLeft: 8, fontSize: 11 }}>命中 {detail.hit_rate.toFixed(0)}%</span>
+                  )}
                 </div>
+                {detail && (
+                  <div style={{ marginTop: 10 }}>
+                    <CostBreakdown detail={detail} C={C} />
+                  </div>
+                )}
                 {detail && (detail.sessions.length > 0 || detail.keepalive_logs.length > 0) && (
                   <div onClick={() => setTab('timeline')} style={{
                     marginTop: 12, padding: '10px 0', textAlign: 'center', fontSize: 12, color: C.amber, cursor: 'pointer',
@@ -725,7 +789,16 @@ export default function DashboardPage() {
           <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 18, fontFamily: "'Space Grotesk'", display: 'flex', alignItems: 'center', gap: 8, transition: 'color 0.35s' }}>
             <span>{selectedDate || 'Today'}</span>
             <span style={{ fontSize: 10, color: C.textMuted, fontWeight: 400 }}>{sessionCount} sessions · {keepaliveCount} activities</span>
+            {detail?.cost != null && detail.cost > 0 && (
+              <span style={{ fontSize: 10, color: C.amber, fontWeight: 500, marginLeft: 'auto', fontFamily: "'JetBrains Mono'" }}>${detail.cost.toFixed(2)}</span>
+            )}
           </div>
+
+          {detail && detail.by_source && (
+            <div style={{ marginTop: -8, marginBottom: 16 }}>
+              <CostBreakdown detail={detail} C={C} />
+            </div>
+          )}
 
           {timeline.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 0', color: C.textMuted, fontSize: 13, fontFamily: "'Noto Sans SC'" }}>
