@@ -92,6 +92,18 @@ function WelcomeScreen() {
   )
 }
 
+function RippleLoading() {
+  return (
+    <div className="flex flex-col items-center justify-center flex-1 select-none" style={{ paddingBottom: 80, minHeight: '60vh' }}>
+      <div className="ripple-pond">
+        <div className="ripple-ring" />
+        <div className="ripple-ring delay" />
+        <div className="ripple-core" />
+      </div>
+    </div>
+  )
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ChatPage() {
@@ -1323,7 +1335,7 @@ export default function ChatPage() {
         <main ref={mainRef} className="flex-1 overflow-y-auto flex flex-col" style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
           <style>{`.main-scroll::-webkit-scrollbar { width: 0; }`}</style>
           {showWelcome ? (
-          <WelcomeScreen />
+            loading || !currentSession ? <RippleLoading /> : <WelcomeScreen />
           ) : (
             <div className="mx-auto w-full relative conv-spine" style={{ maxWidth: 680, padding: 'clamp(56px, 9vw, 80px) clamp(28px, 7vw, 56px) clamp(140px, 28vw, 220px) clamp(28px, 7vw, 56px)' }}>
 

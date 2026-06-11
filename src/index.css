@@ -219,6 +219,33 @@ html.dashboard-active #root::after {
   animation: blink 1.2s ease-in-out infinite;
 }
 
+/* ── Ripple loading (同 splash 的水波纹，会话加载期间用) ─────────────────── */
+.ripple-pond { position: relative; width: 80px; height: 80px; }
+.ripple-core {
+  position: absolute; top: 36px; left: 36px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #C49A78;
+  animation: ripple-core 2.4s ease-in-out infinite;
+}
+.ripple-ring {
+  position: absolute; top: 0; left: 0;
+  width: 80px; height: 80px; border-radius: 50%;
+  border: 1px solid rgba(196,154,120,0.45);
+  opacity: 0;
+  transform: scale(0.15);
+  animation: ripple-ring 2.4s cubic-bezier(0.25,0.6,0.4,1) infinite;
+}
+.ripple-ring.delay { animation-delay: 0.8s; }
+@keyframes ripple-core {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  18% { opacity: 1; transform: scale(1.25); }
+}
+@keyframes ripple-ring {
+  0%   { opacity: 0;    transform: scale(0.15); }
+  15%  { opacity: 0.55; }
+  100% { opacity: 0;    transform: scale(1); }
+}
+
 /* Input dock bottom offset — tighter on mobile where the gap reads as dead space */
 .input-dock {
   bottom: calc(24px + env(safe-area-inset-bottom));
