@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
-import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square, MapPin, Image, DoorClosed, DoorOpen, Brain, Files } from 'lucide-react'
+import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square, MapPin, Image, DoorClosed, DoorOpen, Brain, Files, Drama, Network, CalendarDays, BookOpen, GraduationCap, PenLine, Images, Gamepad2, Wrench, Moon, Sun } from 'lucide-react'
 import StatusBar from '../components/StatusBar'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
@@ -1154,25 +1154,28 @@ export default function ChatPage() {
 
         {/* Sidebar bottom — nav shortcuts (mobile) + settings */}
         <div style={{ borderTop: `1px solid ${C.border}`, paddingBottom: 'env(safe-area-inset-bottom)' }}>
-          <div className="flex items-center flex-wrap gap-x-3.5 gap-y-2 px-5 pt-3 pb-1">
+          <div className="grid grid-cols-4 gap-1 px-3 pt-3 pb-1">
             {[
-              { label: '剧本', action: () => { setSidebarOpen(false); navigate('/projects') } },
-              { label: '图谱', action: () => { setSidebarOpen(false); navigate('/graph') } },
-              { label: '日历', action: () => { setSidebarOpen(false); navigate('/calendar') } },
-              { label: '共读', action: () => { setSidebarOpen(false); navigate('/bookshelf') } },
-              { label: '学习', action: () => { setSidebarOpen(false); navigate('/study') } },
-              { label: '日记', action: () => { setSidebarOpen(false); navigate(`/diary/${new Date().toISOString().slice(0, 10)}`) } },
-              { label: '时光册', action: () => { setSidebarOpen(false); navigate('/timeline') } },
-              { label: '游戏盒', action: () => { setSidebarOpen(false); navigate('/games') } },
-              { label: '工作台', action: () => { setSidebarOpen(false); navigate('/workbench') } },
-              { label: '记忆', action: () => { setShowSettings(true); setSettingsPage('memory') } },
-              { label: isNight ? '☀️ 日间' : '🌙 夜间', action: toggleNight },
+              { label: '剧本', Icon: Drama, action: () => { setSidebarOpen(false); navigate('/projects') } },
+              { label: '图谱', Icon: Network, action: () => { setSidebarOpen(false); navigate('/graph') } },
+              { label: '日历', Icon: CalendarDays, action: () => { setSidebarOpen(false); navigate('/calendar') } },
+              { label: '共读', Icon: BookOpen, action: () => { setSidebarOpen(false); navigate('/bookshelf') } },
+              { label: '学习', Icon: GraduationCap, action: () => { setSidebarOpen(false); navigate('/study') } },
+              { label: '日记', Icon: PenLine, action: () => { setSidebarOpen(false); navigate(`/diary/${new Date().toISOString().slice(0, 10)}`) } },
+              { label: '时光册', Icon: Images, action: () => { setSidebarOpen(false); navigate('/timeline') } },
+              { label: '游戏盒', Icon: Gamepad2, action: () => { setSidebarOpen(false); navigate('/games') } },
+              { label: '工作台', Icon: Wrench, action: () => { setSidebarOpen(false); navigate('/workbench') } },
+              { label: '记忆', Icon: Brain, action: () => { setShowSettings(true); setSettingsPage('memory') } },
+              { label: isNight ? '日间' : '夜间', Icon: isNight ? Sun : Moon, action: toggleNight },
             ].map(n => (
               <button key={n.label} onClick={n.action}
-                className="text-xs cursor-pointer transition-colors"
-                style={{ color: C.textMuted, fontFamily: "'EB Garamond', 'Noto Serif SC', serif", letterSpacing: '0.04em' }}
+                className="flex flex-col items-center gap-1 py-2 rounded-xl cursor-pointer transition-colors"
+                style={{ color: C.textMuted, background: 'transparent', border: 'none' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(160,120,90,0.05)'; e.currentTarget.style.color = C.accent }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.textMuted }}
               >
-                {n.label}
+                <n.Icon size={17} strokeWidth={1.4} />
+                <span style={{ fontSize: 11, fontFamily: "'EB Garamond', 'Noto Serif SC', serif", letterSpacing: '0.04em' }}>{n.label}</span>
               </button>
             ))}
           </div>
@@ -1203,7 +1206,7 @@ export default function ChatPage() {
 
         {/* Floating header — minimal. absolute (not fixed) so it stays inside #root, which tracks visualViewport on iOS keyboard open */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30, pointerEvents: 'none', paddingTop: 'env(safe-area-inset-top)' }}>
-          <div className="flex items-center justify-between px-4 py-3" style={{ pointerEvents: 'auto' }}>
+          <div className="relative flex items-center justify-between px-4 py-3" style={{ pointerEvents: 'auto' }}>
             {/* Left: menu button (mobile) / sidebar trigger (pc) */}
             <button
               className="flex items-center justify-center rounded-xl cursor-pointer transition-all md:opacity-0 md:pointer-events-none"
@@ -1215,8 +1218,8 @@ export default function ChatPage() {
               <Menu size={18} strokeWidth={1.5} />
             </button>
 
-            {/* Center: model tag — barely visible */}
-            <div className="relative" ref={modelDropdownRef}>
+            {/* Center: model tag — absolutely centered so uneven left/right button widths can't push it off-axis */}
+            <div className="absolute" ref={modelDropdownRef} style={{ left: '50%', transform: 'translateX(-50%)' }}>
               <button
                 onClick={() => setShowModelDropdown(o => !o)}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full cursor-pointer transition-all"
@@ -1520,8 +1523,8 @@ export default function ChatPage() {
         <div className="input-fade-overlay" />
 
         {/* Input area — floating paper. absolute (not fixed) so iOS keyboard pushes it up with the visual viewport */}
-        <div style={{
-            position: 'absolute', bottom: 'calc(24px + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)',
+        <div className="input-dock" style={{
+            position: 'absolute', left: '50%', transform: 'translateX(-50%)',
             width: 580, maxWidth: 'calc(100% - 32px)',
             zIndex: 50,
           }}>

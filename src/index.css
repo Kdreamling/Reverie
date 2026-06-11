@@ -219,6 +219,16 @@ html.dashboard-active #root::after {
   animation: blink 1.2s ease-in-out infinite;
 }
 
+/* Input dock bottom offset — tighter on mobile where the gap reads as dead space */
+.input-dock {
+  bottom: calc(24px + env(safe-area-inset-bottom));
+}
+@media (max-width: 767px) {
+  .input-dock {
+    bottom: calc(8px + env(safe-area-inset-bottom));
+  }
+}
+
 /* Input fade gradient. absolute (not fixed) so it tracks #root on iOS keyboard open */
 .input-fade-overlay {
   position: absolute;
