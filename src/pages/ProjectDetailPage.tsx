@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { C, FONT } from '../theme'
 import { useProjectStore } from '../stores/projectStore'
 import { deleteSessionAPI } from '../api/sessions'
 import type { Project, ProjectFile, CharacterState, InventoryItem, ProjectNote } from '../api/projects'
 import { fetchCharacterAPI, saveCharacterAPI, fetchNotesAPI, createNoteAPI, deleteNoteAPI } from '../api/projects'
+import { parseFileToText, UnsupportedFormatError } from '../utils/fileParser'
 
 // ─── Icons ───
 function I({ d, w, sw, color }: { d: string; w?: number; sw?: string; color?: string }) {
@@ -420,8 +421,30 @@ function FilesTab({ project, onCreateFile, onDeleteFile }: {
   const [fileContent, setFileContent] = useState('')
   const [filePriority, setFilePriority] = useState<'core' | 'reference'>('reference')
   const [adding, setAdding] = useState(false)
+  const [parsing, setParsing] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const files = project.files || []
   const priLabel: Record<string, string> = { core: '核心', reference: '参考' }
+
+  const handleUpload = async (file: File) => {
+    setParsing(true)
+    try {
+      const text = await parseFileToText(file)
+      if (!text.trim()) { alert('文件内容为空'); return }
+      setFileName(file.name)
+      setFileContent(text)
+      setShowAdd(true)
+    } catch (e) {
+      if (e instanceof UnsupportedFormatError) {
+        alert('支持 .txt / .md / .csv / .pdf / .docx / .xlsx')
+      } else {
+        alert('文件解析失败，可能是受保护或损坏的文件')
+        console.error(e)
+      }
+    } finally {
+      setParsing(false)
+    }
+  }
 
   const handleAdd = async () => {
     if (!fileName.trim() || !fileContent.trim()) return
@@ -434,14 +457,27 @@ function FilesTab({ project, onCreateFile, onDeleteFile }: {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <div style={{ fontSize: 12, color: C.textMuted }}>作为持久上下文注入对话</div>
-        <button onClick={() => setShowAdd(!showAdd)} style={{
-          background: 'transparent', border: '1.5px solid ' + C.borderStrong,
-          color: C.accent, padding: '6px 13px', borderRadius: 10, fontSize: 12,
-          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
-          fontWeight: 600, fontFamily: FONT,
-        }}>
-          <I d="M12 5v14M5 12h14" w={13} sw="1.8" /> 添加
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => fileInputRef.current?.click()} disabled={parsing} style={{
+            background: 'transparent', border: '1.5px solid ' + C.borderStrong,
+            color: C.accent, padding: '6px 13px', borderRadius: 10, fontSize: 12,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+            fontWeight: 600, fontFamily: FONT, opacity: parsing ? 0.5 : 1,
+          }}>
+            <I d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" w={13} sw="1.8" />
+            {parsing ? '解析中...' : '上传文件'}
+          </button>
+          <button onClick={() => setShowAdd(!showAdd)} style={{
+            background: 'transparent', border: '1.5px solid ' + C.borderStrong,
+            color: C.accent, padding: '6px 13px', borderRadius: 10, fontSize: 12,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+            fontWeight: 600, fontFamily: FONT,
+          }}>
+            <I d="M12 5v14M5 12h14" w={13} sw="1.8" /> 添加
+          </button>
+        </div>
+        <input ref={fileInputRef} type="file" accept=".txt,.md,.csv,.pdf,.docx,.xlsx,.xls" style={{ display: 'none' }}
+          onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = '' }} />
       </div>
 
       {showAdd && (

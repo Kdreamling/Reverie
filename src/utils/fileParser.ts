@@ -4,7 +4,7 @@
 // pdfjs and mammoth are loaded dynamically — they only show up in the bundle
 // when the user actually uploads a file, keeping the initial chat bundle small.
 
-export const SUPPORTED_EXTENSIONS = ['.txt', '.md', '.pdf', '.docx'] as const
+export const SUPPORTED_EXTENSIONS = ['.txt', '.md', '.csv', '.pdf', '.docx', '.xlsx', '.xls'] as const
 
 export class UnsupportedFormatError extends Error {
   constructor(public ext: string) {
@@ -122,11 +122,27 @@ async function parseDocx(file: File): Promise<string> {
   return result.value
 }
 
+async function parseXlsx(file: File): Promise<string> {
+  const XLSX = await import('xlsx')
+  const buffer = await file.arrayBuffer()
+  const wb = XLSX.read(buffer, { type: 'array' })
+  const parts: string[] = []
+  for (const name of wb.SheetNames) {
+    const csv = XLSX.utils.sheet_to_csv(wb.Sheets[name]).trim()
+    if (!csv) continue
+    parts.push(wb.SheetNames.length > 1 ? `## ${name}\n\n${csv}` : csv)
+  }
+  return parts.join('\n\n')
+}
+
 export async function parseFileToText(file: File): Promise<string> {
   const ext = extOf(file.name)
 
-  if (ext === '.txt' || ext === '.md') {
+  if (ext === '.txt' || ext === '.md' || ext === '.csv') {
     return await file.text()
+  }
+  if (ext === '.xlsx' || ext === '.xls') {
+    return await parseXlsx(file)
   }
   if (ext === '.pdf') {
     return await parsePdf(file)
