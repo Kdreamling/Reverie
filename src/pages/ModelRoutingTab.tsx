@@ -33,6 +33,7 @@ interface ModelInfo {
   sort_order: number
   note?: string | null
   is_warmup_target?: boolean
+  is_warmup_secondary?: boolean
 }
 
 interface ChannelBrief {
@@ -928,6 +929,24 @@ function ProviderModelsTab({ ch, models, onReload }: {
     }
   }
 
+  const handleWarmupSecondaryToggle = async (m: ModelInfo, e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      const resp = await apiFetch<{ success: boolean; is_warmup_secondary?: boolean; message?: string }>(
+        `/admin/models/${encodeURIComponent(m.name)}/warmup-secondary`,
+        { method: 'PATCH' },
+      )
+      if (resp.success) {
+        toast.success(resp.message ?? (resp.is_warmup_secondary ? `${m.label} 已设为副续命目标` : '已取消副续命目标'))
+        onReload()
+      } else {
+        toast.error(resp.message ?? '切换失败')
+      }
+    } catch (err) {
+      toast.error(`切换失败: ${err instanceof Error ? err.message : '未知错误'}`)
+    }
+  }
+
   const handleBatchDelete = async () => {
     if (selected.size === 0) { setDeleteMode(false); return }
     if (!confirm(`确定删除 ${selected.size} 个模型？不可撤销`)) return
@@ -1051,26 +1070,52 @@ function ProviderModelsTab({ ch, models, onReload }: {
                 )
               })()}
 
-              {/* 续命目标切换 ⚡ */}
+              {/* 主续命目标 */}
               {!deleteMode && (
                 <button onClick={e => handleWarmupToggle(m, e)} style={{
-                  background: m.is_warmup_target ? `${C.accent}18` : 'none',
-                  border: 'none', color: m.is_warmup_target ? C.accent : C.textMuted,
-                  cursor: 'pointer', fontSize: 16, padding: 6, flexShrink: 0,
+                  background: 'none', border: 'none',
+                  color: m.is_warmup_target ? C.accent : C.textMuted,
+                  cursor: 'pointer', padding: 6, flexShrink: 0,
                   lineHeight: 1, borderRadius: 8,
-                }} title={m.is_warmup_target ? '当前续命目标（点击取消）' : '设为缓存续命目标'}>
-                  ⚡
+                  opacity: m.is_warmup_target ? 1 : 0.5,
+                  transition: 'opacity 0.15s',
+                }} title={m.is_warmup_target ? '主续命（点击取消）' : '设为主续命'}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M13 2L4.5 12.5h6l-1 9.5 8.5-12.5h-6z" />
+                  </svg>
                 </button>
               )}
 
-              {/* 启用/停用切换（右侧小图标） */}
+              {/* 副续命目标 */}
+              {!deleteMode && (
+                <button onClick={e => handleWarmupSecondaryToggle(m, e)} style={{
+                  background: 'none', border: 'none',
+                  color: m.is_warmup_secondary ? '#d4845a' : C.textMuted,
+                  cursor: 'pointer', padding: 6, flexShrink: 0,
+                  lineHeight: 1, borderRadius: 8,
+                  opacity: m.is_warmup_secondary ? 1 : 0.5,
+                  transition: 'opacity 0.15s',
+                }} title={m.is_warmup_secondary ? '副续命（点击取消）' : '设为副续命'}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22c-2.5 0-7-2.5-7-9 0-4 3-6.5 5-9 .4 2.5 2 4.5 4 5.5C15.5 7.5 16 4 16 2c2 2 5 6 5 11 0 6.5-4.5 9-7 9h-2z" />
+                  </svg>
+                </button>
+              )}
+
+              {/* 启用/停用切换 */}
               {!deleteMode && (
                 <button onClick={e => handleToggle(m, e)} style={{
-                  background: 'none', border: 'none', color: C.textMuted,
-                  cursor: 'pointer', fontSize: 18, padding: 6, flexShrink: 0,
-                  lineHeight: 1,
+                  background: 'none', border: 'none',
+                  color: m.enabled ? C.textMuted : C.textMuted,
+                  cursor: 'pointer', padding: 6, flexShrink: 0,
+                  lineHeight: 1, borderRadius: 8,
+                  opacity: m.enabled ? 0.6 : 0.3,
+                  transition: 'opacity 0.15s',
                 }} title={m.enabled ? '停用' : '启用'}>
-                  {m.enabled ? '⚙' : '○'}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M12 1v2m0 18v2m-9-11h2m18 0h2m-3.6-6.4-1.4 1.4M6 6 4.6 4.6m0 14.8L6 18m12.4 0 1.4 1.4" />
+                  </svg>
                 </button>
               )}
             </div>
@@ -1122,10 +1167,15 @@ function ProviderModelsTab({ ch, models, onReload }: {
         ) : (
           <button onClick={() => setDeleteMode(true)} style={{
             padding: '8px 12px', borderRadius: 10,
-            background: '#fee', border: 'none',
-            color: '#e53935', fontSize: 14, cursor: 'pointer',
+            background: 'none', border: `1px solid rgba(200,120,100,0.2)`,
+            color: C.errorText, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }} title="批量删除">
-            🗑
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14" />
+              <line x1="10" y1="11" x2="10" y2="17" />
+              <line x1="14" y1="11" x2="14" y2="17" />
+            </svg>
           </button>
         )}
       </div>
