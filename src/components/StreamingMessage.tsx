@@ -57,6 +57,53 @@ function blockToTraceItem(block: StreamBlock, idx: number): TraceItem | null {
   }
 }
 
+// ─── Inline <thinking> 解析 ───────────────────────────────────────────────────
+// 工具调用之后那一轮，模型会把思考写进正文并自带 <thinking>...</thinking> 标签
+// （Anthropic 未开 interleaved-thinking 时的行为）。这里把它拆出来折叠展示，
+// 与后端入库时 re.sub 剥除 <thinking> 的逻辑对齐，避免实时流里裸露。
+
+const THINK_OPEN = '<thinking>'
+const THINK_CLOSE = '</thinking>'
+
+type ThinkSeg = { kind: 'text'; text: string } | { kind: 'thinking'; text: string; live: boolean }
+
+/** s 末尾与 tag 前缀匹配的长度（不含完整 tag），用于隐藏流式中半截的标签防闪烁 */
+function trailingPartialLen(s: string, tag: string): number {
+  const max = Math.min(tag.length - 1, s.length)
+  for (let len = max; len > 0; len--) {
+    if (s.endsWith(tag.slice(0, len))) return len
+  }
+  return 0
+}
+
+function splitThinkingSegments(input: string): ThinkSeg[] {
+  const segs: ThinkSeg[] = []
+  let rest = input
+  while (rest.length > 0) {
+    const open = rest.indexOf(THINK_OPEN)
+    if (open === -1) {
+      // 无完整 open 标签：隐藏末尾半截的 "<thinking" 前缀
+      const p = trailingPartialLen(rest, THINK_OPEN)
+      const text = p > 0 ? rest.slice(0, rest.length - p) : rest
+      if (text) segs.push({ kind: 'text', text })
+      break
+    }
+    if (open > 0) segs.push({ kind: 'text', text: rest.slice(0, open) })
+    const afterOpen = rest.slice(open + THINK_OPEN.length)
+    const close = afterOpen.indexOf(THINK_CLOSE)
+    if (close === -1) {
+      // 未闭合（还在生成思考）：隐藏末尾半截的 "</thinking" 前缀
+      const p = trailingPartialLen(afterOpen, THINK_CLOSE)
+      const text = p > 0 ? afterOpen.slice(0, afterOpen.length - p) : afterOpen
+      segs.push({ kind: 'thinking', text, live: true })
+      break
+    }
+    segs.push({ kind: 'thinking', text: afterOpen.slice(0, close), live: false })
+    rest = afterOpen.slice(close + THINK_CLOSE.length)
+  }
+  return segs
+}
+
 // ─── Artifact streaming helpers ──────────────────────────────────────────────
 
 /** Strip artifact blocks from streaming text and return clean text + whether an artifact is in progress */
@@ -258,8 +305,20 @@ function renderStreamBlocks(blocks: StreamBlock[]): React.ReactNode[] {
 
   blocks.forEach((block, i) => {
     if (block.kind === 'text') {
-      flushTrace()
-      if (block.text) out.push(<StreamingTextBlock key={`text-${i}`} text={block.text} />)
+      // 把模型写进正文的 <thinking>...</thinking> 拆出来折叠，其余作正文渲染
+      splitThinkingSegments(block.text).forEach((seg, j) => {
+        if (seg.kind === 'thinking') {
+          if (seg.text.trim() || seg.live) {
+            traceBuffer.push({
+              kind: 'thinking', id: `text-thinking-${i}-${j}`,
+              text: seg.text, elapsed: null, live: seg.live,
+            })
+          }
+        } else {
+          flushTrace()
+          if (seg.text) out.push(<StreamingTextBlock key={`text-${i}-${j}`} text={seg.text} />)
+        }
+      })
     } else if (block.kind === 'tool_searching' && block.query.startsWith('绘制 · ')) {
       flushTrace()
       out.push(<ImageGeneratingCard key={`img-${i}`} prompt={block.query.slice('绘制 · '.length)} startTime={block.startTime} />)

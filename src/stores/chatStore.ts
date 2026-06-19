@@ -629,7 +629,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     ...EMPTY_STREAM,
                   }))
                 } else {
-                  markFailed()
+                  markFailed('收到 done 但内容为空')
                 }
                 break
               }
@@ -643,11 +643,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch (e) {
       // 如果是用户主动停止（abort），不显示错误
       if (e instanceof DOMException && e.name === 'AbortError') return
-      markFailed()
+      const errMsg = e instanceof Error ? `${e.name}: ${e.message}` : String(e)
+      console.error('[chatStore] stream error:', e)
+      markFailed(errMsg)
       return
     } finally {
       if (get().isStreaming) {
-        markFailed()
+        markFailed('stream ended unexpectedly (isStreaming still true)')
       }
     }
   },
