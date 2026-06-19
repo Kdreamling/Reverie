@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, Plus, Pencil, Trash2, Loader, Check, X, Search, Star } from 'lucide-react'
 import { fetchMemoriesAPI, createMemoryAPI, updateMemoryAPI, deleteMemoryAPI, type Memory } from '../api/memories'
-import { C } from '../theme'
+import { C, getC } from '../theme'
+import { useNight } from '../utils/useNight'
 import { toast } from '../stores/toastStore'
 
 const LAYER_FILTERS = [
@@ -53,6 +54,7 @@ function MemorySheet({
   onClose: () => void
   onSave: (data: { content: string; layer: string; scene_type?: string }) => Promise<void>
 }) {
+  const C = getC(useNight())
   const [content, setContent] = useState(memory?.content ?? '')
   const [layer, setLayer] = useState<string>(memory?.layer ?? 'core_living')
   const [saving, setSaving] = useState(false)
@@ -186,6 +188,7 @@ const HIDDEN_LAYERS = new Set(['conversation_snapshot', 'scene'])
 const PAGE_SIZE = 80
 
 export default function MemoryPanel({ onBack }: Props) {
+  const C = getC(useNight())
   const [memories, setMemories] = useState<Memory[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')

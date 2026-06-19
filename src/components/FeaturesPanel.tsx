@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { ChevronLeft, RefreshCw, Bell, Trash2, Activity } from 'lucide-react'
 import { client } from '../api/client'
 import { resubscribePush } from '../api/pushSubscription'
-import { C } from '../theme'
+import { getC } from '../theme'
+import { useNight } from '../utils/useNight'
 
 interface FlagInfo {
   key: string
@@ -67,6 +68,7 @@ interface ServiceStatus {
 }
 
 function SystemSection() {
+  const C = getC(useNight())
   const [clearing, setClearing] = useState(false)
   const [clearMsg, setClearMsg] = useState('')
   const [health, setHealth] = useState<Record<string, ServiceStatus> | null>(null)
@@ -193,6 +195,7 @@ function SystemSection() {
 }
 
 function NotificationSection() {
+  const C = getC(useNight())
   const [status, setStatus] = useState<'loading' | 'unsupported' | 'denied' | 'off' | 'on'>('loading')
   const [subscribing, setSubscribing] = useState(false)
   const [message, setMessage] = useState('')
@@ -284,6 +287,7 @@ function NotificationSection() {
 }
 
 export default function FeaturesPanel({ onBack }: Props) {
+  const C = getC(useNight())
   const [flags, setFlags] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ChevronLeft, Plus, Trash2, Edit3, Play, Power, RefreshCw, Webhook, Puzzle } from 'lucide-react'
-import { C } from '../theme'
+import { getC } from '../theme'
+import { useNight } from '../utils/useNight'
 import { userToolsApi, type UserTool, type RegistrySnapshot } from '../api/userTools'
 
 interface Props {
@@ -34,6 +35,7 @@ const EMPTY_FORM: FormState = {
 }
 
 export default function ExternalToolsPanel({ onBack }: Props) {
+  const C = getC(useNight())
   const [tools, setTools] = useState<UserTool[]>([])
   const [snapshot, setSnapshot] = useState<RegistrySnapshot | null>(null)
   const [loading, setLoading] = useState(true)
@@ -467,6 +469,7 @@ function Field({
   children: React.ReactNode
   className?: string
 }) {
+  const C = getC(useNight())
   return (
     <div className={`flex flex-col gap-1 ${className ?? ''}`}>
       <label className="text-[11px] uppercase tracking-wider" style={{ color: C.textMuted, letterSpacing: '0.05em' }}>

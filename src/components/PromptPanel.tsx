@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { ChevronLeft, RefreshCw, RotateCcw, Save } from 'lucide-react'
 import { client } from '../api/client'
-import { C } from '../theme'
+import { C, getC } from '../theme'
+import { useNight } from '../utils/useNight'
 
 interface SectionInfo {
   label: string
@@ -24,6 +25,7 @@ const BP_LABELS: Record<string, { tag: string; color: string }> = {
 }
 
 export default function PromptPanel({ onBack }: Props) {
+  const C = getC(useNight())
   const [sections, setSections] = useState<Record<string, SectionInfo>>({})
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)

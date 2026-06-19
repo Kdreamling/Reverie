@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Brain, Settings, LogOut, Camera, Download, FileText, Server, BookOpen, Terminal, Plug, Shield, Key, Sparkles } from 'lucide-react'
-import { C } from '../theme'
+import { getC } from '../theme'
+import { useNight } from '../utils/useNight'
 import { useAuthStore } from '../stores/authStore'
 import { client } from '../api/client'
 import { useSessionStore } from '../stores/sessionStore'
@@ -29,6 +30,7 @@ function readFileAsDataURL(file: File): Promise<string> {
 }
 
 function AvatarEditor({ label, storageKey, fallback }: { label: string; storageKey: string; fallback: React.ReactNode }) {
+  const C = getC(useNight())
   const [avatar, setAvatar] = useState<string | null>(() => localStorage.getItem(storageKey))
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -58,7 +60,7 @@ function AvatarEditor({ label, storageKey, fallback }: { label: string; storageK
         {avatar ? (
           <img src={avatar} alt="" className="w-full h-full object-cover" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center" style={{ background: '#eef1f8' }}>
+          <div className="w-full h-full flex items-center justify-center" style={{ background: C.surface }}>
             {fallback}
           </div>
         )}
@@ -77,12 +79,12 @@ function AvatarEditor({ label, storageKey, fallback }: { label: string; storageK
         />
       </div>
       <div className="flex-1">
-        <p className="text-sm font-medium" style={{ color: '#1a1f2e' }}>{label}</p>
+        <p className="text-sm font-medium" style={{ color: C.text }}>{label}</p>
         <div className="flex gap-2 mt-1">
           <button
             onClick={() => fileRef.current?.click()}
             className="text-xs cursor-pointer"
-            style={{ color: '#002FA7' }}
+            style={{ color: C.accent }}
           >
             更换
           </button>
@@ -90,7 +92,7 @@ function AvatarEditor({ label, storageKey, fallback }: { label: string; storageK
             <button
               onClick={handleRemove}
               className="text-xs cursor-pointer"
-              style={{ color: '#9aa3b8' }}
+              style={{ color: C.textMuted }}
             >
               移除
             </button>
@@ -102,6 +104,7 @@ function AvatarEditor({ label, storageKey, fallback }: { label: string; storageK
 }
 
 function ExportButton({ format }: { format: 'json' | 'md' }) {
+  const C = getC(useNight())
   const [loading, setLoading] = useState(false)
   const currentSession = useSessionStore(s => s.currentSession)
 
@@ -135,6 +138,7 @@ function ExportButton({ format }: { format: 'json' | 'md' }) {
 }
 
 export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
+  const C = getC(useNight())
   const logout = useAuthStore(s => s.logout)
   const navigate = useNavigate()
 

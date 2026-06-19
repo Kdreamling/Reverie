@@ -77,6 +77,36 @@ export const C = {
   btnDanger: '#ef4444',
 } as const
 
+// 夜间覆盖色板 —— 对齐 index.css 里的 body.night-mode 变量
+const NIGHT: Partial<Record<keyof typeof C, string>> = {
+  bg: '#171411',
+  surface: 'rgba(200,170,130,0.06)',
+  surfaceSolid: '#211C17',
+  accent: '#C49A78',
+  text: '#E0D5C8',
+  textSecondary: '#9A8A78',
+  textMuted: '#7A6A5A',
+  metaText: '#5A4E42',
+  textFaint: '#5A4E42',
+  border: 'rgba(180,150,120,0.06)',
+  borderStrong: 'rgba(180,150,120,0.16)',
+  sidebarBg: '#1C1815',
+  sidebarActive: 'rgba(196,154,120,0.12)',
+  inputBg: 'rgba(40,34,28,0.6)',
+  toolBg: 'rgba(196,154,120,0.05)',
+  memoryRefAccent: '#8FA3AD',
+  errorBg: 'rgba(184,96,74,0.12)',
+  errorText: '#CC7A60',
+  glass: 'rgba(23,20,17,0.92)',
+  glassStrong: 'rgba(23,20,17,0.95)',
+  success: '#4ade80',
+}
+
+// 按夜间状态取色板：日间返回原色，夜间合并覆盖
+export function getC(night: boolean): typeof C {
+  return night ? { ...C, ...NIGHT } : C
+}
+
 export const FONT = "'Instrument Sans', 'SF Pro Display', -apple-system, sans-serif"
 export const SERIF = "'EB Garamond', 'Noto Serif SC', 'Cormorant Garamond', Georgia, serif"
 
