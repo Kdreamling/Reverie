@@ -4,6 +4,7 @@ import { Copy, Trash2, Check, RotateCcw, Brain, FileText, File as FileIcon, Book
 import type { ChatMessage, MessageAttachment } from '../api/chat'
 // ContextDebugPanel import removed (unused)
 import { C } from '../theme'
+import { pickAvatar } from '../utils/avatarEdit'
 import ProcessTrace, { type TraceItem } from './ProcessTrace'
 import { parseRpMessage, type RpBlock, type CheckResult } from './rp/rpParser'
 import CheckBubble from './rp/CheckBubble'
@@ -283,10 +284,12 @@ function UserAvatar() {
   useSyncExternalStore(subscribeAvatar, getAvatarSnapshot)
   const src = localStorage.getItem('avatar_dream')
   return src ? (
-    <img src={src} alt="D" className="flex-shrink-0 rounded-full object-cover" style={{ width: 34, height: 34, boxShadow: '0 2px 8px rgba(180,160,130,0.15)' }} />
+    <img src={src} alt="D" onClick={() => pickAvatar('dream')} title="点击更换头像" className="flex-shrink-0 rounded-full object-cover cursor-pointer" style={{ width: 34, height: 34, boxShadow: '0 2px 8px rgba(180,160,130,0.15)' }} />
   ) : (
     <div
-      className="flex-shrink-0 flex items-center justify-center rounded-full text-xs font-semibold select-none"
+      onClick={() => pickAvatar('dream')}
+      title="点击更换头像"
+      className="flex-shrink-0 flex items-center justify-center rounded-full text-xs font-semibold select-none cursor-pointer"
       style={{ width: 34, height: 34, background: 'linear-gradient(135deg, #E8DDD0, #D4C8B8)', color: '#6B5D50' }}
     >
       D
@@ -298,10 +301,12 @@ function AiAvatar() {
   useSyncExternalStore(subscribeAvatar, getAvatarSnapshot)
   const src = localStorage.getItem('avatar_claude')
   return src ? (
-    <img src={src} alt="晨" className="flex-shrink-0 rounded-full object-cover" style={{ width: 34, height: 34, boxShadow: `0 2px 8px ${C.accent}25` }} />
+    <img src={src} alt="晨" onClick={() => pickAvatar('claude')} title="点击更换头像" className="flex-shrink-0 rounded-full object-cover cursor-pointer" style={{ width: 34, height: 34, boxShadow: `0 2px 8px ${C.accent}25` }} />
   ) : (
     <div
-      className="flex-shrink-0 flex items-center justify-center rounded-full select-none"
+      onClick={() => pickAvatar('claude')}
+      title="点击更换头像"
+      className="flex-shrink-0 flex items-center justify-center rounded-full select-none cursor-pointer"
       style={{ width: 34, height: 34, background: C.accentGradient, color: '#fff', fontSize: 11, fontWeight: 600, letterSpacing: '-0.02em' }}
     >
       Claude

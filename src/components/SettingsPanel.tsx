@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Brain, Settings, LogOut, Camera, Download, FileText, Server, BookOpen, Terminal, Plug, Shield, Key, Sparkles } from 'lucide-react'
+import { ChevronLeft, Brain, Settings, LogOut, Download, FileText, Server, BookOpen, Terminal, Plug, Shield, Key, Sparkles } from 'lucide-react'
 import { getC } from '../theme'
 import { useNight } from '../utils/useNight'
 import { useAuthStore } from '../stores/authStore'
@@ -18,89 +18,6 @@ interface Props {
   page: Page
   onPageChange: (page: Page) => void
   onClose: () => void
-}
-
-function readFileAsDataURL(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-}
-
-function AvatarEditor({ label, storageKey, fallback }: { label: string; storageKey: string; fallback: React.ReactNode }) {
-  const C = getC(useNight())
-  const [avatar, setAvatar] = useState<string | null>(() => localStorage.getItem(storageKey))
-  const fileRef = useRef<HTMLInputElement>(null)
-
-  async function handleFile(file: File) {
-    if (file.size > 500 * 1024) { alert('图片不能超过 500KB'); return }
-    if (!file.type.startsWith('image/')) { alert('请选择图片文件'); return }
-    const dataUrl = await readFileAsDataURL(file)
-    localStorage.setItem(storageKey, dataUrl)
-    setAvatar(dataUrl)
-    // 通知其他组件刷新
-    window.dispatchEvent(new Event('avatar:changed'))
-  }
-
-  function handleRemove() {
-    localStorage.removeItem(storageKey)
-    setAvatar(null)
-    window.dispatchEvent(new Event('avatar:changed'))
-  }
-
-  return (
-    <div className="flex items-center gap-4">
-      <div
-        className="relative rounded-full overflow-hidden flex-shrink-0 cursor-pointer"
-        style={{ width: 56, height: 56 }}
-        onClick={() => fileRef.current?.click()}
-      >
-        {avatar ? (
-          <img src={avatar} alt="" className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center" style={{ background: C.surface }}>
-            {fallback}
-          </div>
-        )}
-        <div
-          className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
-          style={{ background: 'rgba(0,0,0,0.4)' }}
-        >
-          <Camera size={18} style={{ color: '#fff' }} />
-        </div>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = '' }}
-        />
-      </div>
-      <div className="flex-1">
-        <p className="text-sm font-medium" style={{ color: C.text }}>{label}</p>
-        <div className="flex gap-2 mt-1">
-          <button
-            onClick={() => fileRef.current?.click()}
-            className="text-xs cursor-pointer"
-            style={{ color: C.accent }}
-          >
-            更换
-          </button>
-          {avatar && (
-            <button
-              onClick={handleRemove}
-              className="text-xs cursor-pointer"
-              style={{ color: C.textMuted }}
-            >
-              移除
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  )
 }
 
 function ExportButton({ format }: { format: 'json' | 'md' }) {
@@ -203,23 +120,6 @@ export default function SettingsPanel({ page, onPageChange, onClose }: Props) {
       </button>
 
       <div className="flex-1 overflow-y-auto">
-        {/* Avatar section */}
-        <div className="px-5 md:px-4 py-5" style={{ borderBottom: `1px solid ${C.border}` }}>
-          <p className="text-xs font-medium uppercase tracking-wider mb-4" style={{ color: C.textMuted }}>头像</p>
-          <div className="flex flex-col gap-5">
-            <AvatarEditor
-              label="Dream"
-              storageKey="avatar_dream"
-              fallback={<span className="text-lg font-semibold" style={{ color: C.accent }}>D</span>}
-            />
-            <AvatarEditor
-              label="Claude"
-              storageKey="avatar_claude"
-              fallback={<span style={{ color: C.accent, fontSize: 20 }}>✦</span>}
-            />
-          </div>
-        </div>
-
         {/* Menu items */}
         <nav className="px-3 md:px-2 py-4 md:py-3">
           {menuItems.map(item => (

@@ -5,6 +5,7 @@ import ChatPage from './pages/ChatPage'
 import AuthGuard from './components/AuthGuard'
 import ToastContainer from './components/ToastContainer'
 import { useAuthStore } from './stores/authStore'
+import { syncAvatarsFromBackend } from './utils/avatarEdit'
 
 const ReadingPage = lazy(() => import('./pages/ReadingPage'))
 const BookshelfPage = lazy(() => import('./pages/BookshelfPage'))
@@ -37,6 +38,7 @@ function PageLoading() {
 export default function App() {
   const init = useAuthStore(s => s.init)
   const logout = useAuthStore(s => s.logout)
+  const isLoggedIn = useAuthStore(s => s.isLoggedIn)
 
   useEffect(() => {
     init()
@@ -44,6 +46,10 @@ export default function App() {
     window.addEventListener('auth:unauthorized', handler)
     return () => window.removeEventListener('auth:unauthorized', handler)
   }, [init, logout])
+
+  useEffect(() => {
+    if (isLoggedIn) syncAvatarsFromBackend()
+  }, [isLoggedIn])
 
   return (
     <BrowserRouter basename="/chat">
