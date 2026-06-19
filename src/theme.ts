@@ -107,8 +107,8 @@ export function getC(night: boolean): typeof C {
   return night ? { ...C, ...NIGHT } : C
 }
 
-export const FONT = "'Instrument Sans', 'SF Pro Display', -apple-system, sans-serif"
-export const SERIF = "'EB Garamond', 'Noto Serif SC', 'Cormorant Garamond', Georgia, serif"
+export const FONT = "'Anthropic Sans', 'Instrument Sans', 'SF Pro Display', -apple-system, sans-serif"
+export const SERIF = "'Anthropic Serif', 'EB Garamond', 'Noto Serif SC', 'Cormorant Garamond', Georgia, serif"
 
 // 模型颜色
 export function getModelColor(value: string): string {
