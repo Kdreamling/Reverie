@@ -33,6 +33,18 @@ const GROUPS: { key: Group; label: string }[] = [
   { key: 'previous', label: '更早' },
 ]
 
+// 按场景类型把 session 收纳成可折叠的抽屉。null/未知场景归入「日常」与「其他」。
+const KNOWN_SCENES = ['daily', 'roleplay', 'reading', 'dev', 'study', 'event']
+const SCENE_CATEGORIES: { key: string; label: string; match: (sceneType: string) => boolean }[] = [
+  { key: 'daily', label: '日常', match: t => (t || 'daily') === 'daily' },
+  { key: 'roleplay', label: '剧本', match: t => t === 'roleplay' },
+  { key: 'reading', label: '共读', match: t => t === 'reading' },
+  { key: 'study', label: '学习', match: t => t === 'study' },
+  { key: 'dev', label: '开发', match: t => t === 'dev' },
+  { key: 'event', label: '活动', match: t => t === 'event' },
+  { key: 'other', label: '其他', match: t => !KNOWN_SCENES.includes(t || 'daily') },
+]
+
 // 模型清单从后端动态拉取（gateway_models 表），不再硬编码
 // MODELS 作为 fallback 保底，仅在后端请求失败时使用
 const FALLBACK_MODELS: { value: string; label: string }[] = [
@@ -155,6 +167,19 @@ export default function ChatPage() {
   const [showSceneSelect, setShowSceneSelect] = useState(false)
   const [swipedId, setSwipedId] = useState<string | null>(null)
   const [renameModal, setRenameModal] = useState<{ id: string; title: string } | null>(null)
+  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem('reverie_collapsed_cats')
+      if (raw) return new Set(JSON.parse(raw))
+    } catch { /* ignore */ }
+    return new Set()
+  })
+  const toggleCat = (key: string) => setCollapsedCats(prev => {
+    const next = new Set(prev)
+    next.has(key) ? next.delete(key) : next.add(key)
+    try { localStorage.setItem('reverie_collapsed_cats', JSON.stringify([...next])) } catch { /* ignore */ }
+    return next
+  })
   const itemSwipeRef = useRef<{ startX: number; startY: number; id: string; isSwiping: boolean } | null>(null)
   const itemSwipeActive = useRef(false)
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
@@ -985,7 +1010,7 @@ export default function ChatPage() {
               {(() => {
                 const q = searchQuery.trim().toLowerCase()
                 const titleMatches = sessions.filter(s =>
-                  s.scene_type !== 'reading' && (s.title || '').toLowerCase().includes(q)
+                  (s.title || '').toLowerCase().includes(q)
                 )
                 return titleMatches.length > 0 && (
                   <div className="mb-3">
@@ -995,7 +1020,7 @@ export default function ChatPage() {
                     {titleMatches.map(session => (
                       <button
                         key={session.id}
-                        onClick={() => { selectSession(session.id); setSidebarOpen(false); handleSearch('') }}
+                        onClick={() => { if (session.scene_type === 'reading') { navigate(`/read/${session.id}`) } else { selectSession(session.id) } setSidebarOpen(false); handleSearch('') }}
                         className="w-full text-left rounded-xl px-4 py-3 mb-1 transition-colors duration-150 cursor-pointer"
                         style={{
                           background: session.id === currentSession?.id ? 'rgba(160,120,90,0.06)' : 'transparent',
@@ -1059,15 +1084,30 @@ export default function ChatPage() {
               {loading && !sessions.length && (
                 <p className="px-3 py-4 text-sm" style={{ color: C.textMuted }}>Loading…</p>
               )}
-              {GROUPS.map(({ key, label }) => {
-                const items = sessions.filter(s => getGroup(s.created_at) === key && s.scene_type !== 'reading')
-                if (!items.length) return null
+              {SCENE_CATEGORIES.map(({ key: catKey, label: catLabel, match }) => {
+                const catSessions = sessions.filter(s => match(s.scene_type))
+                if (!catSessions.length) return null
+                const catCollapsed = collapsedCats.has(catKey)
                 return (
-                  <div key={key} className="mb-2">
-                    <div className="flex items-center gap-2 px-3 pt-3 pb-1.5 select-none" style={{ color: C.textMuted }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{label}</span>
-                    </div>
-                    {items.map(session => {
+                  <div key={catKey} className="mb-1">
+                    <button
+                      onClick={() => toggleCat(catKey)}
+                      className="w-full flex items-center gap-2 px-3 pt-3 pb-1.5 select-none cursor-pointer"
+                      style={{ color: C.textMuted, background: 'transparent', border: 'none' }}>
+                      <ChevronDown size={11} strokeWidth={2.5}
+                        style={{ transform: catCollapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.18s ease', color: C.metaText }} />
+                      <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', flex: 1, textAlign: 'left' }}>{catLabel}</span>
+                      <span style={{ fontSize: 10, color: C.metaText }}>{catSessions.length}</span>
+                    </button>
+                    {!catCollapsed && GROUPS.map(({ key, label }) => {
+                      const items = catSessions.filter(s => getGroup(s.created_at) === key)
+                      if (!items.length) return null
+                      return (
+                        <div key={key} className="mb-1">
+                          <div className="flex items-center gap-2 px-3 pt-1 pb-1 select-none" style={{ color: C.metaText, paddingLeft: 28 }}>
+                            <span style={{ fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{label}</span>
+                          </div>
+                          {items.map(session => {
                       const isActive = session.id === currentSession?.id
                       const isHovered = session.id === hoveredId
                       const isSwiped = session.id === swipedId
@@ -1132,6 +1172,9 @@ export default function ChatPage() {
                               </span>
                             )}
                           </button>
+                        </div>
+                      )
+                          })}
                         </div>
                       )
                     })}
