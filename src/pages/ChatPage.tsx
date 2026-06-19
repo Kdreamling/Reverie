@@ -1003,7 +1003,7 @@ export default function ChatPage() {
             )}
           </div>
         </div>
-        <nav className="flex-1 overflow-y-auto px-3 pt-2 pb-2" style={{ scrollbarWidth: 'none' }}>
+        <nav className="flex-1 overflow-y-auto px-3 pt-2 pb-2" style={{ scrollbarWidth: 'none', fontFamily: "'Anthropic Sans', 'Instrument Sans', -apple-system, sans-serif" }}>
           {searchQuery.trim() ? (
             <>
               {/* Title matches */}
