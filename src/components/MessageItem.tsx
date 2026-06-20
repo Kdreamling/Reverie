@@ -443,7 +443,7 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
             </div>
           )}
           <div
-            className={`whitespace-pre-wrap ${isRoleplay ? '' : 'user-bubble'}`}
+            className="whitespace-pre-wrap user-bubble"
             style={{
               padding: '14px 20px',
               borderRadius: '20px 20px 4px 20px',
@@ -453,13 +453,6 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
               lineHeight: 1.75,
               overflowWrap: 'break-word',
               wordBreak: 'normal',
-              ...(isRoleplay ? {
-                background: 'rgba(200, 165, 120, 0.1)',
-                border: '1px solid rgba(200, 165, 120, 0.15)',
-                color: 'rgba(232, 225, 214, 0.88)',
-                backdropFilter: 'blur(16px)',
-                WebkitBackdropFilter: 'blur(16px)',
-              } : {}),
             }}
           >
             {msg.content}
@@ -512,15 +505,14 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
   return (
     <div className="room-msg-group mb-10 room-msg-enter" style={isKeepalive ? { opacity: 0.75 } : undefined}>
       {/* Meta line */}
-      <div className="flex items-center gap-2 mb-3">
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: isRoleplay ? 'rgba(200,165,120,0.6)' : C.accent, opacity: 0.6, flexShrink: 0 }} />
-        <span style={{ fontFamily: "'EB Garamond', 'Noto Serif SC', serif", fontSize: 13, fontWeight: 500, color: isRoleplay ? 'rgba(200,165,120,0.7)' : C.accent, letterSpacing: '0.06em' }}>
+      <div className="flex items-baseline gap-2 mb-3">
+        <span style={{ fontFamily: "'EB Garamond', 'Noto Serif SC', serif", fontSize: 16, fontWeight: 500, color: C.accent, letterSpacing: '0.06em' }}>
           Claude
         </span>
         {isKeepalive && (
           <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 6, background: `${C.accent}18`, color: C.accent, fontWeight: 600, letterSpacing: '0.04em' }}>keepalive</span>
         )}
-        <span style={{ fontSize: 11, color: isRoleplay ? 'rgba(232,225,214,0.4)' : C.textMuted }}>{formatMsgTime(msg.created_at)}</span>
+        <span style={{ fontSize: 11, color: C.textMuted }}>{formatMsgTime(msg.created_at)}</span>
       </div>
 
       {/* Process trace — thinking + memory + tool, kelivo-style stacked card */}

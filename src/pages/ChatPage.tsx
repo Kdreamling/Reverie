@@ -907,8 +907,8 @@ export default function ChatPage() {
 
   const showWelcome = !isStreaming && !isLoadingMessages && (!Array.isArray(messages) || messages.length === 0)
 
-  // Night-aware surface colors (RP mode uses dark chrome too)
-  const dark = isNight || isRoleplay
+  // Night-aware surface colors
+  const dark = isNight
   const nGlass = dark ? 'rgba(23,20,17,0.92)' : 'rgba(248,244,238,0.92)'
   const nGlassLight = dark ? 'rgba(23,20,17,0.6)' : 'rgba(248,244,238,0.6)'
   const nGlassHover = dark ? 'rgba(40,35,28,0.8)' : 'rgba(248,244,238,0.8)'
@@ -920,19 +920,12 @@ export default function ChatPage() {
   return (
     <div className="overflow-hidden" style={{
       height: '100%', overscrollBehavior: 'none', position: 'relative',
-      ...(isRoleplay ? {
-        background: `
-          radial-gradient(ellipse at 25% 15%, rgba(80,60,40,0.18) 0%, transparent 55%),
-          radial-gradient(ellipse at 75% 85%, rgba(60,45,30,0.12) 0%, transparent 50%),
-          linear-gradient(170deg, #1a1614 0%, #1e1916 35%, #211c18 65%, #1a1614 100%)
-        `,
-      } : {}),
     }}>
 
       {/* ── Room atmosphere ── */}
-      {!isRoleplay && <div className="room-bg" />}
-      {!isRoleplay && <div className="room-light" />}
-      {!isRoleplay && <div className="room-texture" />}
+      <div className="room-bg" />
+      <div className="room-light" />
+      <div className="room-texture" />
 
       {/* ── Push notification banner ── */}
       <PushNotification onTap={() => {
@@ -1273,7 +1266,6 @@ export default function ChatPage() {
       {/* ── Main chat area (full-screen room) ── */}
       <div className="flex flex-col flex-1 min-w-0 h-full" style={{
         position: 'relative', zIndex: 10,
-        ...(isRoleplay ? { color: 'rgba(232,225,214,0.92)' } : {}),
       }}>
 
         {/* Header fade overlay — keeps nav buttons readable when messages scroll underneath */}
@@ -1407,11 +1399,11 @@ export default function ChatPage() {
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center',
                   padding: '8px 16px', marginBottom: 20, borderRadius: 12,
-                  background: 'rgba(20,25,35,0.6)', border: '1px solid rgba(80,100,140,0.2)',
+                  background: nGlassLight, border: `1px solid ${nBorder}`,
                   fontSize: 12, fontFamily: "'Space Grotesk', 'Noto Sans SC', sans-serif",
-                  color: 'rgba(220,215,205,0.7)', backdropFilter: 'blur(10px)',
+                  color: nTextMuted, backdropFilter: 'blur(10px)',
                 }}>
-                  <span style={{ fontWeight: 600, color: 'rgba(220,215,205,0.9)' }}>{characterState.name}</span>
+                  <span style={{ fontWeight: 600, color: nText }}>{characterState.name}</span>
                   <span>❤ {characterState.hp.current}/{characterState.hp.max}</span>
                   <span>💰 {characterState.currency.amount}</span>
                   <span>🎲 d{characterState.dice_config.current_die}</span>
