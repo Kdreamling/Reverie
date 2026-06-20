@@ -125,7 +125,7 @@ export default function ChatPage() {
   const fromCalendar = searchParams.get('from') === 'calendar'
   const { sessions, currentSession, loading, fetchSessions, ensureTodaySession, createSession, selectSession, deleteSession, updateSessionModel } =
     useSessionStore()
-  const { messages, isStreaming, sessionEnded: streamSessionEnded, loadMessages, sendMessage, clearMessages, deleteConversation, regenerate, switchBranch, retryFailed, dismissFailed, stopStreaming } =
+  const { messages, isStreaming, sessionEnded: streamSessionEnded, loadMessages, loadOlderMessages, hasMore, isLoadingMore, sendMessage, clearMessages, deleteConversation, regenerate, switchBranch, retryFailed, dismissFailed, stopStreaming } =
     useChatStore()
   const { token } = useAuthStore()
 
@@ -689,11 +689,15 @@ export default function ChatPage() {
 
   // Scroll to bottom on new messages (reset user scroll state)
   // Use RAF + smooth for mobile to avoid 'instant' jump that causes visual jank on iOS
-  const prevMsgCountRef = useRef(0)
+  // Skip when older messages are prepended (loadOlderMessages) — only scroll when tail changes
+  const prevLastMsgIdRef = useRef<string | null>(null)
   useEffect(() => {
+    const lastId = messages.length > 0 ? messages[messages.length - 1].id : null
+    if (lastId === prevLastMsgIdRef.current && !isStreaming) {
+      return
+    }
+    prevLastMsgIdRef.current = lastId
     userScrolledUpRef.current = false
-    prevMsgCountRef.current = messages.length
-    // Defer to next frame so layout (padding-bottom, streaming cleanup) settles first
     requestAnimationFrame(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
     })
@@ -711,6 +715,8 @@ export default function ChatPage() {
   }, [isStreaming])
 
   // Track user scroll: if they scroll up, pause auto-scroll; update scroll progress
+  // Also trigger loading older messages when near the top
+  const loadingMoreRef = useRef(false)
   useEffect(() => {
     const el = mainRef.current
     if (!el) return
@@ -721,10 +727,24 @@ export default function ChatPage() {
       setShowScrollBottom(distFromBottom > 400)
       const maxScroll = el.scrollHeight - el.clientHeight
       setScrollProgress(maxScroll > 0 ? el.scrollTop / maxScroll : 1)
+
+      if (el.scrollTop < 200 && !loadingMoreRef.current) {
+        const state = useChatStore.getState()
+        if (state.hasMore && !state.isLoadingMore && currentSession) {
+          loadingMoreRef.current = true
+          const prevHeight = el.scrollHeight
+          state.loadOlderMessages(currentSession.id).finally(() => {
+            requestAnimationFrame(() => {
+              el.scrollTop = el.scrollHeight - prevHeight
+              loadingMoreRef.current = false
+            })
+          })
+        }
+      }
     }
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
-  }, [])
+  }, [currentSession?.id])
 
   // Restore focus after streaming
   useEffect(() => {
@@ -1398,6 +1418,12 @@ export default function ChatPage() {
                   {Object.entries(characterState.attributes).slice(0, 3).map(([k, v]) => (
                     <span key={k}>{k} {v}</span>
                   ))}
+                </div>
+              )}
+
+              {isLoadingMore && (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="animate-spin" size={20} style={{ color: 'var(--text-secondary)' }} />
                 </div>
               )}
 

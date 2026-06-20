@@ -101,8 +101,8 @@ export interface StreamChatOptions {
   regenerateFrom?: string
 }
 
-export async function fetchMessagesAPI(sessionId: string): Promise<ChatMessage[]> {
-  return client.get<ChatMessage[]>(`/sessions/${sessionId}/messages`)
+export async function fetchMessagesAPI(sessionId: string, page = 1, pageSize = 200): Promise<ChatMessage[]> {
+  return client.get<ChatMessage[]>(`/sessions/${sessionId}/messages?page=${page}&page_size=${pageSize}`)
 }
 
 export async function deleteConversationAPI(sessionId: string, conversationId: string): Promise<void> {

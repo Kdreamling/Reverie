@@ -68,8 +68,12 @@ interface ChatState {
   streamBlocks: StreamBlock[]
   _abortController: AbortController | null
   _reader: ReadableStreamDefaultReader<Uint8Array> | null
+  _currentPage: number
 
+  hasMore: boolean
+  isLoadingMore: boolean
   loadMessages: (sessionId: string) => Promise<void>
+  loadOlderMessages: (sessionId: string) => Promise<void>
   sendMessage: (sessionId: string, model: string, content: string, options?: SendMessageOptions) => Promise<void>
   stopStreaming: () => void
   deleteConversation: (sessionId: string, conversationId: string) => Promise<void>
@@ -88,6 +92,132 @@ const EMPTY_STREAM = {
   toolStartTime: null, toolElapsedTime: null, streamBlocks: [] as StreamBlock[],
 }
 
+const PAGE_SIZE = 50
+
+function parseRecords(records: unknown[]): ChatMessage[] {
+  const messages: ChatMessage[] = []
+  for (const rec of records) {
+    const r = rec as {
+      id: string
+      user_msg?: string
+      assistant_msg?: string
+      thinking_summary?: string | null
+      thinking_time?: number | null
+      input_tokens?: number | null
+      output_tokens?: number | null
+      cached_tokens?: number | null
+      memory_ops?: string | null
+      model?: string
+      scene_type?: string
+      source?: string | null
+      created_at: string
+      branch_group?: string | null
+      branch_index?: number | null
+      branch_total?: number | null
+      attachments?: Array<{
+        id: string
+        file_type: 'image' | 'pdf' | 'text'
+        mime_type: string
+        original_filename: string
+        file_size: number
+        preview?: string | null
+      }> | null
+    }
+    const attachments = Array.isArray(r.attachments) && r.attachments.length > 0
+      ? r.attachments.map(a => ({
+          id: a.id,
+          file_type: a.file_type,
+          mime_type: a.mime_type,
+          original_filename: a.original_filename,
+          file_size: a.file_size,
+          preview: a.preview ?? undefined,
+        }))
+      : null
+    if (r.scene_type === 'event' && r.user_msg) {
+      messages.push({
+        id: `${r.id}-event`,
+        role: 'event',
+        content: r.user_msg,
+        created_at: r.created_at,
+        conversationId: r.id,
+      })
+      continue
+    }
+    const isSilentRead = (r.assistant_msg || '').trim() === '[已读]'
+    if (r.user_msg) {
+      messages.push({
+        id: `${r.id}-user`,
+        role: 'user',
+        content: r.user_msg,
+        created_at: r.created_at,
+        conversationId: r.id,
+        silentRead: isSilentRead,
+        attachments,
+      })
+    }
+    if (r.assistant_msg && !isSilentRead) {
+      let parsedOps: MemoryOperation[] | null = null
+      let parsedDevOps: Array<{ tool: string; args?: string; result?: string }> | null = null
+      let parsedMemoryRef: { query: string; found: number; content: string } | null = null
+      let parsedMemoryRefs: Array<{ query: string; found: number; content: string }> | null = null
+      if (r.memory_ops) {
+        try {
+          const raw = typeof r.memory_ops === 'string' ? JSON.parse(r.memory_ops) : r.memory_ops
+          const allOps = raw as Array<{type?: string; content?: string; mem_type?: string; layer?: string; memory_id?: string; new_content?: string; reason?: string; query?: string; found?: number; tool?: string; args?: string; result?: string}>
+          const searchOps = allOps.filter(op => op.type === 'tool_result')
+          if (searchOps.length > 0) {
+            parsedMemoryRef = { query: searchOps[0].query ?? '', found: searchOps[0].found ?? 0, content: searchOps[0].content ?? '' }
+            parsedMemoryRefs = searchOps.map(op => ({ query: op.query ?? '', found: op.found ?? 0, content: op.content ?? '' }))
+          }
+          const devOps = allOps.filter(op => op.type === 'dev_tool_op')
+          if (devOps.length > 0) {
+            parsedDevOps = devOps.map(op => ({
+              tool: op.tool ?? '?',
+              args: op.args,
+              result: op.result,
+            }))
+          }
+          const memOps = allOps.filter(op =>
+            op.type !== 'tool_result'
+            && op.type !== 'tool_searching'
+            && op.type !== 'dev_tool_op'
+          )
+          if (memOps.length > 0) {
+            parsedOps = memOps.map(op => ({
+              type: op.type === 'memory_saved' ? 'saved' : op.type === 'memory_updated' ? 'updated' : op.type === 'memory_deleted' ? 'deleted' : (op.type as 'saved'),
+              content: op.content ?? op.new_content ?? '',
+              mem_type: op.mem_type,
+              layer: op.layer,
+              memory_id: op.memory_id,
+              reason: op.reason,
+              timestamp: '',
+            }))
+          }
+        } catch { /* ignore parse errors */ }
+      }
+      messages.push({
+        id: `${r.id}-assistant`,
+        role: 'assistant',
+        content: r.assistant_msg,
+        thinking: r.thinking_summary ?? null,
+        created_at: r.created_at,
+        conversationId: r.id,
+        memoryRef: parsedMemoryRef,
+        memoryRefs: parsedMemoryRefs,
+        memoryOps: parsedOps,
+        devToolOps: parsedDevOps,
+        thinkingTime: r.thinking_time ?? null,
+        tokens: (r.input_tokens || r.output_tokens) ? { input: r.input_tokens ?? 0, output: r.output_tokens ?? 0, cached: r.cached_tokens ?? 0 } : null,
+        source: r.source ?? null,
+        branchGroup: r.branch_group ?? null,
+        branchIndex: r.branch_index ?? null,
+        branchTotal: r.branch_total ?? null,
+      })
+    }
+  }
+  return messages
+}
+
 // ─── Perf: mutable streamBlocks array, only create new ref on structural changes
 // text_delta / thinking_delta mutate in-place and bump a counter to notify subscribers
 
@@ -95,14 +225,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   isStreaming: false,
   sessionEnded: false,
+  hasMore: false,
+  isLoadingMore: false,
   ...EMPTY_STREAM,
   lastError: null,
   _abortController: null,
   _reader: null,
+  _currentPage: 1,
 
   async loadMessages(sessionId) {
     try {
-      const raw: unknown = await fetchMessagesAPI(sessionId)
+      const raw: unknown = await fetchMessagesAPI(sessionId, 1, PAGE_SIZE)
 
       const records: unknown[] =
         Array.isArray(raw) ? raw
@@ -111,131 +244,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
             : []
 
       records.reverse()
+      const messages = parseRecords(records)
 
-      const messages: ChatMessage[] = []
-      for (const rec of records) {
-        const r = rec as {
-          id: string
-          user_msg?: string
-          assistant_msg?: string
-          thinking_summary?: string | null
-          thinking_time?: number | null
-          input_tokens?: number | null
-          output_tokens?: number | null
-          cached_tokens?: number | null
-          memory_ops?: string | null
-          model?: string
-          scene_type?: string
-          source?: string | null
-          created_at: string
-          branch_group?: string | null
-          branch_index?: number | null
-          branch_total?: number | null
-          attachments?: Array<{
-            id: string
-            file_type: 'image' | 'pdf' | 'text'
-            mime_type: string
-            original_filename: string
-            file_size: number
-            preview?: string | null
-          }> | null
-        }
-        const attachments = Array.isArray(r.attachments) && r.attachments.length > 0
-          ? r.attachments.map(a => ({
-              id: a.id,
-              file_type: a.file_type,
-              mime_type: a.mime_type,
-              original_filename: a.original_filename,
-              file_size: a.file_size,
-              preview: a.preview ?? undefined,
-            }))
-          : null
-        // Event messages (from Dream's device status)
-        if (r.scene_type === 'event' && r.user_msg) {
-          messages.push({
-            id: `${r.id}-event`,
-            role: 'event',
-            content: r.user_msg,
-            created_at: r.created_at,
-            conversationId: r.id,
-          })
-          continue
-        }
-        // Detect silent_read marker — assistant_msg = "[已读]" means Claude chose not to reply
-        const isSilentRead = (r.assistant_msg || '').trim() === '[已读]'
-        if (r.user_msg) {
-          messages.push({
-            id: `${r.id}-user`,
-            role: 'user',
-            content: r.user_msg,
-            created_at: r.created_at,
-            conversationId: r.id,
-            silentRead: isSilentRead,
-            attachments,
-          })
-        }
-        if (r.assistant_msg && !isSilentRead) {
-          let parsedOps: MemoryOperation[] | null = null
-          let parsedDevOps: Array<{ tool: string; args?: string; result?: string }> | null = null
-          let parsedMemoryRef: { query: string; found: number; content: string } | null = null
-          let parsedMemoryRefs: Array<{ query: string; found: number; content: string }> | null = null
-          if (r.memory_ops) {
-            try {
-              const raw = typeof r.memory_ops === 'string' ? JSON.parse(r.memory_ops) : r.memory_ops
-              const allOps = raw as Array<{type?: string; content?: string; mem_type?: string; layer?: string; memory_id?: string; new_content?: string; reason?: string; query?: string; found?: number; tool?: string; args?: string; result?: string}>
-              const searchOps = allOps.filter(op => op.type === 'tool_result')
-              if (searchOps.length > 0) {
-                parsedMemoryRef = { query: searchOps[0].query ?? '', found: searchOps[0].found ?? 0, content: searchOps[0].content ?? '' }
-                parsedMemoryRefs = searchOps.map(op => ({ query: op.query ?? '', found: op.found ?? 0, content: op.content ?? '' }))
-              }
-              const devOps = allOps.filter(op => op.type === 'dev_tool_op')
-              if (devOps.length > 0) {
-                parsedDevOps = devOps.map(op => ({
-                  tool: op.tool ?? '?',
-                  args: op.args,
-                  result: op.result,
-                }))
-              }
-              const memOps = allOps.filter(op =>
-                op.type !== 'tool_result'
-                && op.type !== 'tool_searching'
-                && op.type !== 'dev_tool_op'
-              )
-              if (memOps.length > 0) {
-                parsedOps = memOps.map(op => ({
-                  type: op.type === 'memory_saved' ? 'saved' : op.type === 'memory_updated' ? 'updated' : op.type === 'memory_deleted' ? 'deleted' : (op.type as 'saved'),
-                  content: op.content ?? op.new_content ?? '',
-                  mem_type: op.mem_type,
-                  layer: op.layer,
-                  memory_id: op.memory_id,
-                  reason: op.reason,
-                  timestamp: '',
-                }))
-              }
-            } catch { /* ignore parse errors */ }
-          }
-          messages.push({
-            id: `${r.id}-assistant`,
-            role: 'assistant',
-            content: r.assistant_msg,
-            thinking: r.thinking_summary ?? null,
-            created_at: r.created_at,
-            conversationId: r.id,
-            memoryRef: parsedMemoryRef,
-            memoryRefs: parsedMemoryRefs,
-            memoryOps: parsedOps,
-            devToolOps: parsedDevOps,
-            thinkingTime: r.thinking_time ?? null,
-            tokens: (r.input_tokens || r.output_tokens) ? { input: r.input_tokens ?? 0, output: r.output_tokens ?? 0, cached: r.cached_tokens ?? 0 } : null,
-            source: r.source ?? null,
-            branchGroup: r.branch_group ?? null,
-            branchIndex: r.branch_index ?? null,
-            branchTotal: r.branch_total ?? null,
-          })
-        }
-      }
-
-      set({ messages, sessionEnded: false })
+      set({ messages, sessionEnded: false, hasMore: records.length >= PAGE_SIZE, _currentPage: 1 })
 
       fetchPendingMessagesAPI(sessionId).then(pending => {
         if (!pending.length) return
@@ -256,8 +267,37 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
+  async loadOlderMessages(sessionId) {
+    const { hasMore, isLoadingMore, _currentPage } = get()
+    if (!hasMore || isLoadingMore) return
+
+    set({ isLoadingMore: true })
+    try {
+      const nextPage = _currentPage + 1
+      const raw: unknown = await fetchMessagesAPI(sessionId, nextPage, PAGE_SIZE)
+
+      const records: unknown[] =
+        Array.isArray(raw) ? raw
+          : Array.isArray((raw as { messages?: unknown }).messages)
+            ? (raw as { messages: unknown[] }).messages
+            : []
+
+      records.reverse()
+      const olderMessages = parseRecords(records)
+
+      set(s => ({
+        messages: [...olderMessages, ...s.messages],
+        hasMore: records.length >= PAGE_SIZE,
+        isLoadingMore: false,
+        _currentPage: nextPage,
+      }))
+    } catch {
+      set({ isLoadingMore: false })
+    }
+  },
+
   clearMessages() {
-    set({ messages: [], isStreaming: false, ...EMPTY_STREAM })
+    set({ messages: [], isStreaming: false, hasMore: false, isLoadingMore: false, _currentPage: 1, ...EMPTY_STREAM })
   },
 
   async deleteConversation(sessionId, conversationId) {
