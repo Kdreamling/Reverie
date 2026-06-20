@@ -1446,11 +1446,6 @@ export default function ChatPage() {
                       onRetryFailed={handleRetryFailed}
                       onDismissFailed={handleDismissFailed}
                       onSaveAnchor={handleSaveAnchor}
-                      isRoleplay={isRoleplay}
-                      characterState={characterState}
-                      onCheckResult={handleCheckResult}
-                      onStatusChange={handleRpStatusChange}
-                      onDiceUpgrade={handleDiceUpgrade}
                     />
                   </div>
                 )

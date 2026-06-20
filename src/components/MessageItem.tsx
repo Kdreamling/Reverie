@@ -6,10 +6,6 @@ import type { ChatMessage, MessageAttachment } from '../api/chat'
 import { C } from '../theme'
 import { pickAvatar } from '../utils/avatarEdit'
 import ProcessTrace, { type TraceItem } from './ProcessTrace'
-import { parseRpMessage, type RpBlock, type CheckResult } from './rp/rpParser'
-import CheckBubble from './rp/CheckBubble'
-import { NarrationBlock, NpcDialogue, StatusChangeBubble, DiceUpgradeBubble } from './rp/RpBubbles'
-import type { CharacterState } from '../api/projects'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -330,11 +326,6 @@ interface MessageItemProps {
   onDismissFailed?: () => void
   onSaveAnchor?: (conversationId: string) => Promise<boolean>
   isAnchored?: boolean
-  isRoleplay?: boolean
-  characterState?: import('../api/projects').CharacterState | null
-  onCheckResult?: (result: import('./rp/rpParser').CheckResult) => void
-  onStatusChange?: (block: import('./rp/rpParser').RpBlock) => void
-  onDiceUpgrade?: (newDie: number) => void
 }
 
 // ─── 锚点按钮 ────────────────────────────────────────────────────────────────
@@ -379,59 +370,7 @@ const AnchorButton = memo(function AnchorButton({
   )
 })
 
-function RpMessageBody({ content, characterState, onCheckResult, onStatusChange, onDiceUpgrade }: {
-  content: string
-  characterState?: CharacterState | null
-  onCheckResult?: (result: CheckResult) => void
-  onStatusChange?: (block: RpBlock) => void
-  onDiceUpgrade?: (newDie: number) => void
-}) {
-  const blocks = parseRpMessage(content)
-
-  return (
-    <div style={{
-      padding: '20px 22px',
-      borderRadius: 18,
-      background: 'rgba(18, 16, 14, 0.55)',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
-      border: '1px solid rgba(255, 245, 230, 0.06)',
-      boxShadow: '0 4px 24px rgba(0,0,0,0.12)',
-    }}>
-      {blocks.map((block, i) => {
-        switch (block.type) {
-          case 'narration':
-            return <NarrationBlock key={i} content={block.content} />
-          case 'npc_dialogue':
-            return <NpcDialogue key={i} npcName={block.npcName ?? ''} content={block.content} />
-          case 'check':
-            if (!characterState) return null
-            return (
-              <CheckBubble
-                key={i}
-                attribute={block.attribute ?? ''}
-                target={block.target ?? 5}
-                characterState={characterState}
-                onResult={(r) => onCheckResult?.(r)}
-              />
-            )
-          case 'status_change':
-            if (onStatusChange) onStatusChange(block)
-            return <StatusChangeBubble key={i} block={block} />
-          case 'dice_upgrade':
-            if (onDiceUpgrade && block.newDie) onDiceUpgrade(block.newDie)
-            return <DiceUpgradeBubble key={i} newDie={block.newDie ?? 10} />
-          case 'note':
-            return null
-          default:
-            return <NarrationBlock key={i} content={block.content} />
-        }
-      })}
-    </div>
-  )
-}
-
-const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, isCopied, onToggleDebug, onCopy, onDelete, onRetry, onSwitchBranch, onRetryFailed, onDismissFailed, onSaveAnchor, isAnchored, isRoleplay, characterState, onCheckResult, onStatusChange, onDiceUpgrade }: MessageItemProps) {
+const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, isCopied, onToggleDebug, onCopy, onDelete, onRetry, onSwitchBranch, onRetryFailed, onDismissFailed, onSaveAnchor, isAnchored }: MessageItemProps) {
   if (msg.role === 'user') {
     // 用户消息：右侧轻气泡（书页旁注风格）
     return (
@@ -542,27 +481,17 @@ const MessageItem = memo(function MessageItem({ msg, modelLabel, isDebugOpen, is
         return items.length > 0 ? <ProcessTrace items={items} /> : null
       })()}
 
-      {/* Body — serif book paragraph or RP blocks */}
-      {isRoleplay ? (
-        <RpMessageBody
-          content={msg.content}
-          characterState={characterState}
-          onCheckResult={onCheckResult}
-          onStatusChange={onStatusChange}
-          onDiceUpgrade={onDiceUpgrade}
-        />
-      ) : (
-        <div style={{
-          fontFamily: "'EB Garamond', 'Noto Serif SC', 'Cormorant Garamond', Georgia, serif",
-          fontSize: 16.5,
-          fontWeight: 500,
-          lineHeight: 2,
-          color: C.text,
-          letterSpacing: '0.01em',
-        }}>
-          <MarkdownContent content={msg.content} savedArtifacts={msg.artifacts} />
-        </div>
-      )}
+      {/* Body — serif book paragraph */}
+      <div style={{
+        fontFamily: "'EB Garamond', 'Noto Serif SC', 'Cormorant Garamond', Georgia, serif",
+        fontSize: 16.5,
+        fontWeight: 500,
+        lineHeight: 2,
+        color: C.text,
+        letterSpacing: '0.01em',
+      }}>
+        <MarkdownContent content={msg.content} savedArtifacts={msg.artifacts} />
+      </div>
 
       {/* Action row — only on hover */}
       <div className="room-msg-actions flex items-center justify-between mt-2" style={{ minHeight: 20 }}>
