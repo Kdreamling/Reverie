@@ -629,6 +629,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 flushDeltas() // flush any remaining text
                 if (flushTimer) { clearTimeout(flushTimer); flushTimer = null }
                 const { currentThinking, currentText, pendingMemoryResult, pendingMemoryOps, thinkingElapsedTime } = get()
+
+                // Strip inline <thinking> tags from text (model sometimes writes them into the body)
+                // and merge into the thinking field, mirroring backend's re.sub logic
+                let cleanText = currentText
+                let mergedThinking = currentThinking
+                const thinkRe = /<thinking>([\s\S]*?)<\/thinking>\s*/g
+                let thinkMatch: RegExpExecArray | null
+                while ((thinkMatch = thinkRe.exec(currentText)) !== null) {
+                  const t = thinkMatch[1].trim()
+                  if (t) mergedThinking = mergedThinking ? mergedThinking + '\n\n' + t : t
+                }
+                cleanText = currentText.replace(/<thinking>[\s\S]*?<\/thinking>\s*/g, '')
+
                 const usage = event.usage
                 const tokens = usage ? {
                   input: usage.input_tokens ?? usage.prompt_tokens ?? 0,
@@ -636,7 +649,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   cached: usage.cached_tokens ?? 0,
                 } : null
                 // Detect [已读] silent reply marker — don't add assistant bubble
-                const isSilentRead = currentText.trim() === '[已读]' || currentText.trim().startsWith('[已读]')
+                const isSilentRead = cleanText.trim() === '[已读]' || cleanText.trim().startsWith('[已读]')
                 if (isSilentRead) {
                   set(s => {
                     const msgs = [...s.messages]
@@ -648,12 +661,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     }
                     return { messages: msgs, isStreaming: false, ...EMPTY_STREAM }
                   })
-                } else if (currentText || currentThinking) {
+                } else if (cleanText || mergedThinking) {
                   const assistantMsg: ChatMessage = {
                     id: `ai-${Date.now()}`,
                     role: 'assistant',
-                    content: currentText,
-                    thinking: currentThinking || null,
+                    content: cleanText,
+                    thinking: mergedThinking || null,
                     created_at: new Date().toISOString(),
                     memoryRef: pendingMemoryResult ?? null,
                     memoryRefs: get().pendingMemoryResults.length > 0 ? get().pendingMemoryResults : null,
