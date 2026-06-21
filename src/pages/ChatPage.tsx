@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
-import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square, MapPin, Image, DoorClosed, DoorOpen, Brain, Files, Drama, Network, CalendarDays, BookOpen, GraduationCap, PenLine, Images, Gamepad2, Wrench, Moon, Sun } from 'lucide-react'
+import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square, MapPin, Image, DoorClosed, DoorOpen, Brain, Files, Drama, Network, CalendarDays, BookOpen, GraduationCap, PenLine, Images, Gamepad2, Wrench, Moon, Sun, RefreshCw } from 'lucide-react'
 import StatusBar from '../components/StatusBar'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
 import { useAuthStore } from '../stores/authStore'
-import { updateSessionAPI, searchConversations, type SearchResult } from '../api/sessions'
+import { updateSessionAPI, searchConversations, regenerateSessionSummary, type SearchResult } from '../api/sessions'
 import { uploadAttachment, type AttachmentInfo } from '../api/attachments'
 import { fetchCharacterAPI, saveCharacterAPI, type CharacterState } from '../api/projects'
 import { rollDice, formatCheckResultForModel, applyStatusChange, type CheckResult, type RpBlock } from '../components/rp/rpParser'
@@ -201,6 +201,7 @@ export default function ChatPage() {
   const swipeStartY = useRef<number | null>(null)
   const [locating, setLocating] = useState(false)
   const [showPlusMenu, setShowPlusMenu] = useState(false)
+  const [summaryRegenerating, setSummaryRegenerating] = useState(false)
   // thinking 开关：null = 跟随当前模型默认，true/false = 用户显式覆盖
   const [thinkingOn, setThinkingOn] = useState<boolean | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -1787,6 +1788,26 @@ export default function ChatPage() {
                         action: () => setThinkingOn(!effectiveThinking),
                       },
                       {
+                        icon: summaryRegenerating ? Loader2 : RefreshCw,
+                        title: summaryRegenerating ? '摘要更新中…' : '刷新摘要',
+                        tone: 'normal' as const,
+                        active: false,
+                        spinning: summaryRegenerating,
+                        action: async () => {
+                          if (summaryRegenerating || !currentSession) return
+                          setSummaryRegenerating(true)
+                          try {
+                            await regenerateSessionSummary(currentSession.id)
+                            toastFn('摘要已更新')
+                          } catch (e: any) {
+                            toastFn(e?.message || '摘要更新失败')
+                          } finally {
+                            setSummaryRegenerating(false)
+                            setShowPlusMenu(false)
+                          }
+                        },
+                      },
+                      {
                         icon: dreamLockedChen ? DoorOpen : DoorClosed,
                         title: dreamLockedChen ? '开门（解除封锁）' : '关门（封锁 2 小时）',
                         tone: dreamLockedChen ? ('warn' as const) : ('normal' as const),
@@ -1813,7 +1834,7 @@ export default function ChatPage() {
                         onMouseEnter={e => (e.currentTarget.style.background = isWarn ? 'rgba(229,57,53,0.06)' : isActive ? (dark ? 'rgba(196,154,120,0.14)' : 'rgba(196,154,120,0.14)') : (dark ? 'rgba(224,213,200,0.06)' : 'rgba(160,120,90,0.06)'))}
                         onMouseLeave={e => (e.currentTarget.style.background = isActive ? (dark ? 'rgba(196,154,120,0.08)' : 'rgba(196,154,120,0.08)') : 'transparent')}
                       >
-                        <item.icon size={20} strokeWidth={1.5} />
+                        <item.icon size={20} strokeWidth={1.5} className={(item as any).spinning ? 'animate-spin' : undefined} />
                       </button>
                     )
                   })}

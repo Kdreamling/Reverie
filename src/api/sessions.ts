@@ -81,6 +81,10 @@ export interface CalendarDetail {
   })[]
 }
 
+export async function regenerateSessionSummary(sessionId: string): Promise<{ ok: boolean; summary: string | null }> {
+  return client.post(`/sessions/${sessionId}/summary/regenerate`, {})
+}
+
 export async function fetchCalendarDates(year: number, month: number): Promise<CalendarDates> {
   return client.get<CalendarDates>(`/sessions/calendar/dates?year=${year}&month=${month}`)
 }
