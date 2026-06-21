@@ -92,7 +92,7 @@ const EMPTY_STREAM = {
   toolStartTime: null, toolElapsedTime: null, streamBlocks: [] as StreamBlock[],
 }
 
-const PAGE_SIZE = 50
+const PAGE_SIZE = 200
 
 function parseRecords(records: unknown[]): ChatMessage[] {
   const messages: ChatMessage[] = []
