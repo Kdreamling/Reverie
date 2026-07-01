@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
 import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square, MapPin, Image, DoorClosed, DoorOpen, Brain, Files, Drama, Network, CalendarDays, BookOpen, GraduationCap, PenLine, Images, Gamepad2, Wrench, Moon, Sun, RefreshCw } from 'lucide-react'
 import StatusBar from '../components/StatusBar'
+import FutureLetterCard from '../components/FutureLetterCard'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useSessionStore, getGroup, formatSessionTime, type Group } from '../stores/sessionStore'
 import { useChatStore } from '../stores/chatStore'
@@ -1609,6 +1610,9 @@ export default function ChatPage() {
               />
 
               {/* 敲门弹窗已移至最外层 */}
+
+              {/* 来自过去的信 */}
+              <FutureLetterCard />
 
               {/* Status bar */}
               <StatusBar isNight={dark} />
