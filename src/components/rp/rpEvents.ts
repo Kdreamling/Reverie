@@ -188,9 +188,10 @@ export function npcSealStrokes(name: string): { lines: [number, number, number, 
   let hh = h
   for (let k = 0; k < 4; k++) {
     const a = hh % 8
-    hh = (hh >> 3) ^ (h + k * 97)
+    // XOR 产物是带符号 32 位整数，不归零特定名字会出负下标（pts[-3] → 白屏）
+    hh = ((hh >>> 3) ^ (h + k * 97)) >>> 0
     const b = (a + 2 + (hh % 5)) % 8
-    hh = (hh >> 2) ^ h
+    hh = ((hh >>> 2) ^ h) >>> 0
     lines.push([pts[a][0], pts[a][1], pts[b][0], pts[b][1]])
   }
   return { lines, dot: h % 3 === 0 }
