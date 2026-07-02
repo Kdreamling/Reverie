@@ -145,8 +145,11 @@ export function difficultyLabel(target: number): string {
 export type NarrativeBlock =
   | { kind: 'narration'; paragraphs: string[] }
   | { kind: 'npc'; name: string; speech: string }
+  | { kind: 'divider' }
 
 const NPC_LINE_RE = /^【(.+?)】([\s\S]*)$/
+// 模型爱输出 --- / *** / — — — 当场景分隔，原文裸奔很丑，识别成分隔线节点
+const DIVIDER_RE = /^[-—─–=＝*＊_～~·•\s]{2,}$/
 
 export function parseNarrative(text: string): NarrativeBlock[] {
   const blocks: NarrativeBlock[] = []
@@ -162,6 +165,11 @@ export function parseNarrative(text: string): NarrativeBlock[] {
   for (const para of text.split(/\n+/)) {
     const p = para.trim()
     if (!p) continue
+    if (DIVIDER_RE.test(p)) {
+      flushNarration()
+      blocks.push({ kind: 'divider' })
+      continue
+    }
     const m = p.match(NPC_LINE_RE)
     if (m) {
       flushNarration()

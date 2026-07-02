@@ -37,13 +37,14 @@ export function NpcSeal({ name, size }: { name: string; size: number }) {
 // ─── NPC 台词块：登场版（带 bio 铭牌）/ 回归版（mini 铭牌） ────────────────────
 
 // 引号内是台词正字，引号外的动作描写降格为 aside 小字（mockup v3 约定）。
-// 模型实际输出会混用「」/ 弯引号 / 直引号，三种都认
+// 模型实际输出会混用「」/ 弯引号 / 直引号，三种都认，展示时统一归一成「」
 const QUOTE_SPLIT_RE = /(「[^」]*」|“[^”]*”|"[^"]*")/g
+const QUOTED_RE = /^(?:「[\s\S]*」|“[\s\S]*”|"[\s\S]*")$/
 
 function renderSpeech(speech: string): ReactNode {
   if (!/[「“"]/.test(speech)) return renderInline(speech)
   return speech.split(QUOTE_SPLIT_RE).map((part, i) => {
-    if (/^[「“"]/.test(part) && part.length > 1) return <span key={i}>{renderInline(part)}</span>
+    if (QUOTED_RE.test(part)) return <span key={i}>「{renderInline(part.slice(1, -1))}」</span>
     const aside = part.trim()
     if (!aside) return null
     return <span key={i} className="rp-aside">{renderInline(aside)}</span>
@@ -63,7 +64,7 @@ export function NpcBlock({ name, speech, bio }: { name: string; speech?: string;
         </div>
       ) : (
         <div className="rp-plate-mini">
-          <NpcSeal name={name} size={15} />
+          <NpcSeal name={name} size={20} />
           <span className="rp-npc-name">{name}</span>
         </div>
       )}
@@ -83,6 +84,16 @@ export function Narration({ paragraphs, ts }: { paragraphs: string[]; ts?: strin
     >
       {paragraphs.map((p, i) => <p key={i}>{renderInline(p)}</p>)}
       {ts && <span className="rp-ts">{ts}</span>}
+    </div>
+  )
+}
+
+// ─── 分隔线：模型输出的 --- 归一成安静的细线节点 ──────────────────────────────
+
+export function Divider() {
+  return (
+    <div className="rp-divider rp-node" aria-hidden="true">
+      <span className="rp-divider-dot" />
     </div>
   )
 }

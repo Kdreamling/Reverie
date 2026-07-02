@@ -1,7 +1,7 @@
 import { Fragment, useMemo } from 'react'
 import type { ChatMessage } from '../../api/chat'
 import CheckRing, { type RingResult } from './CheckRing'
-import { Callout, Narration, NpcBlock, RpEventNode } from './RpBlocks'
+import { Callout, Divider, Narration, NpcBlock, RpEventNode } from './RpBlocks'
 import {
   isRollResultMessage, parseFreeRollMessage, parseNarrative,
   type RollOutcome, type RpCheckPendingEvent, type RpEvent,
@@ -41,6 +41,7 @@ type Node =
   | { t: 'npc'; name: string; speech?: string; bio?: string }
   | { t: 'check'; event: RpCheckPendingEvent }
   | { t: 'event'; event: RpEvent }
+  | { t: 'divider' }
 
 function buildNodes(content: string, events: RpEvent[]): Node[] {
   const sorted = [...events].sort(
@@ -52,6 +53,7 @@ function buildNodes(content: string, events: RpEvent[]): Node[] {
   const pushText = (text: string) => {
     for (const b of parseNarrative(text)) {
       if (b.kind === 'npc') nodes.push({ t: 'npc', name: b.name, speech: b.speech })
+      else if (b.kind === 'divider') nodes.push({ t: 'divider' })
       else nodes.push({ t: 'narration', paragraphs: b.paragraphs })
     }
   }
@@ -110,6 +112,8 @@ function RpAssistantMessage({ msg, pendingCheckId, resolvedChecks, onRoll, onSet
         switch (node.t) {
           case 'narration':
             return <Narration key={i} paragraphs={node.paragraphs} ts={ts} />
+          case 'divider':
+            return <Divider key={i} />
           case 'npc':
             return <NpcBlock key={i} name={node.name} speech={node.speech} bio={node.bio} />
           case 'check': {

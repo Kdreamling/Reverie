@@ -121,6 +121,20 @@
 }
 .rp-root .rp-narration.ts-on .rp-ts { max-height: 20px; opacity: 1; margin-top: 4px; }
 
+/* ── 分隔线：模型 --- 的归一节点 ── */
+.rp-root .rp-divider {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  margin: 30px auto;
+}
+.rp-root .rp-divider::before,
+.rp-root .rp-divider::after {
+  content: ''; width: 52px; height: 1px; background: var(--rp-line-strong);
+}
+.rp-root .rp-divider .rp-divider-dot {
+  width: 3px; height: 3px; border-radius: 50%;
+  background: var(--rp-text-faint); flex: none;
+}
+
 /* ── NPC：印记 + 铭牌 ── */
 .rp-root .rp-npc { margin: 24px 0 20px 6px; }
 .rp-root .rp-npc[data-hue='1'] { --rp-npc-hue: var(--rp-npc1); }
@@ -142,10 +156,10 @@
   background: linear-gradient(to right, var(--rp-npc-hue), transparent); opacity: 0.35;
 }
 
-.rp-root .rp-plate-mini { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.rp-root .rp-plate-mini { display: flex; align-items: center; gap: 9px; margin-bottom: 6px; }
 .rp-root .rp-plate-mini .rp-npc-name {
   font-family: 'Noto Sans SC', sans-serif;
-  font-size: 11.5px; font-weight: 700; letter-spacing: 0.22em; color: var(--rp-npc-hue);
+  font-size: 12.5px; font-weight: 700; letter-spacing: 0.22em; color: var(--rp-npc-hue);
 }
 .rp-root .rp-plate-mini::after {
   content: ''; flex: 0 0 42px; height: 1px; background: var(--rp-npc-hue); opacity: 0.35;
