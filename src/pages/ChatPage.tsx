@@ -10,6 +10,7 @@ import { updateSessionAPI, searchConversations, regenerateSessionSummary, type S
 import { uploadAttachment, type AttachmentInfo } from '../api/attachments'
 import { fetchCharacterAPI, rollCheckAPI, type CharacterState, type RollResult } from '../api/projects'
 import RpMessage from '../components/rp/RpMessage'
+import RpStatusStrip from '../components/rp/RpStatusStrip'
 import { formatRollResultMessage, parseRollResultMessage, type RollOutcome, type RpCheckPendingEvent } from '../components/rp/rpEvents'
 import type { RingResult } from '../components/rp/CheckRing'
 import type { MessageAttachment, DreamEvent } from '../api/chat'
@@ -1446,35 +1447,14 @@ export default function ChatPage() {
               style={{ maxWidth: 680, padding: 'clamp(56px, 9vw, 80px) clamp(28px, 7vw, 56px) clamp(140px, 28vw, 220px) clamp(28px, 7vw, 56px)' }}
             >
 
-              {/* RP mini status bar */}
-              {isRoleplay && characterState && (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center',
-                  padding: '8px 16px', marginBottom: 20, borderRadius: 12,
-                  background: nGlassLight, border: `1px solid ${nBorder}`,
-                  fontSize: 12, fontFamily: "'Space Grotesk', 'Noto Sans SC', sans-serif",
-                  color: nTextMuted, backdropFilter: 'blur(10px)',
-                }}>
-                  <span style={{ fontWeight: 600, color: nText }}>{characterState.name}</span>
-                  <span>❤ {characterState.hp.current}/{characterState.hp.max}</span>
-                  <span>💰 {characterState.currency.amount}</span>
-                  <span>🎲 d{characterState.dice_config.current_die}</span>
-                  {Object.entries(characterState.attributes).slice(0, 3).map(([k, v]) => (
-                    <span key={k}>{k} {v}</span>
-                  ))}
-                  <button
-                    onClick={toggleRpMode}
-                    title={rpMode === 'ttrpg' ? '隐藏检定与状态注记，只看故事' : '显示检定与状态注记'}
-                    style={{
-                      padding: '2px 10px', borderRadius: 999, cursor: 'pointer',
-                      background: 'transparent', border: `1px solid ${nBorder}`,
-                      fontSize: 11, letterSpacing: '0.1em', color: nTextMuted,
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    {rpMode === 'ttrpg' ? '跑团' : '叙事'}
-                  </button>
-                </div>
+              {/* RP 状态条 + 角色抽屉 */}
+              {isRoleplay && characterState && currentSession?.project_id && (
+                <RpStatusStrip
+                  state={characterState}
+                  projectId={currentSession.project_id}
+                  mode={rpMode}
+                  onToggleMode={toggleRpMode}
+                />
               )}
 
               {isRoleplay && <div className="rp-axis-head" />}

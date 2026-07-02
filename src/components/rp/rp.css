@@ -347,3 +347,77 @@
   color: var(--rp-text);
 }
 .rp-root .md-content em { font-style: normal; color: var(--rp-text-soft); }
+
+/* ── 状态条 + 角色抽屉 ── */
+.rp-root .rp-strip { margin: 0 0 10px; position: relative; z-index: 2; }
+.rp-root .rp-strip-inner {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--rp-line); border-radius: 12px;
+  background: var(--rp-glass);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  cursor: pointer; transition: border-color 0.3s ease;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.rp-root .rp-strip-inner:hover { border-color: var(--rp-line-strong); }
+.rp-root .rp-strip-name {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 13px; font-weight: 600; letter-spacing: 0.12em; flex: none;
+}
+.rp-root .rp-hp-block { flex: 1; min-width: 60px; }
+.rp-root .rp-hp-label {
+  display: flex; justify-content: space-between;
+  font-size: 9.5px; color: var(--rp-text-faint); letter-spacing: 0.08em; margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.rp-root .rp-hp-track { height: 2px; border-radius: 2px; background: var(--rp-line); overflow: hidden; }
+.rp-root .rp-hp-fill { height: 100%; background: var(--rp-accent); border-radius: 2px; transition: width 0.5s ease; }
+.rp-root .rp-stat-item {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; color: var(--rp-text-faint); flex: none; letter-spacing: 0.06em;
+}
+.rp-root .rp-stat-item b { font-weight: 500; color: var(--rp-text); font-size: 12px; font-variant-numeric: tabular-nums; }
+.rp-root .rp-mode-btn {
+  flex: none; padding: 3px 11px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--rp-line-strong); background: transparent;
+  font-size: 10px; letter-spacing: 0.12em; color: var(--rp-text-soft);
+  font-family: inherit;
+}
+.rp-root .rp-chev { flex: none; color: var(--rp-text-faint); transition: transform 0.3s ease; }
+.rp-root .rp-strip.open .rp-chev { transform: rotate(180deg); }
+.rp-root .rp-char-drawer {
+  overflow: hidden; max-height: 0; opacity: 0;
+  transition: max-height 0.45s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
+}
+.rp-root .rp-strip.open .rp-char-drawer { max-height: min(520px, 60vh); opacity: 1; }
+.rp-root .rp-char-inner {
+  margin-top: 8px; padding: 18px;
+  border: 1px solid var(--rp-line); border-radius: 12px;
+  background: var(--rp-glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  max-height: calc(min(520px, 60vh) - 8px); overflow-y: auto;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.rp-root .rp-char-section + .rp-char-section { margin-top: 16px; }
+.rp-root .rp-sec-label { font-size: 10px; letter-spacing: 0.28em; color: var(--rp-text-faint); margin-bottom: 10px; }
+.rp-root .rp-attr-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.rp-root .rp-attr-row .k { font-size: 12px; color: var(--rp-text-soft); width: 3.5em; flex: none; letter-spacing: 0.1em; }
+.rp-root .rp-attr-row .track { flex: 1; height: 2px; background: var(--rp-line); border-radius: 2px; overflow: hidden; }
+.rp-root .rp-attr-row .fill { height: 100%; background: var(--rp-accent); opacity: 0.85; }
+.rp-root .rp-attr-row .v { font-size: 12px; color: var(--rp-text); width: 1.5em; text-align: right; font-variant-numeric: tabular-nums; }
+.rp-root .rp-inv-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.rp-root .rp-inv-chip {
+  font-size: 11.5px; color: var(--rp-text-soft); letter-spacing: 0.04em;
+  padding: 5px 12px; border: 1px solid var(--rp-line); border-radius: 999px;
+}
+.rp-root .rp-inv-chip.cursed { border-color: rgba(194, 90, 80, 0.45); color: var(--rp-danger); }
+.rp-root .rp-roster-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.rp-root .rp-roster-row .rp-npc-seal { align-self: center; flex: none; color: var(--rp-text-faint); }
+.rp-root .rp-roster-name { font-family: 'Noto Serif SC', serif; font-size: 12.5px; font-weight: 600; letter-spacing: 0.08em; flex: none; }
+.rp-root .rp-roster-bio { font-size: 11.5px; color: var(--rp-text-faint); line-height: 1.6; }
+.rp-root .rp-note-row { font-size: 12px; color: var(--rp-text-soft); line-height: 1.7; margin-bottom: 6px; }
+.rp-root .rp-note-tag {
+  display: inline-block; margin-right: 8px; padding: 1px 7px;
+  border: 1px solid var(--rp-line); border-radius: 999px;
+  font-size: 9.5px; letter-spacing: 0.14em; color: var(--rp-text-faint); vertical-align: 1px;
+}
+.rp-root .rp-drawer-hint { font-size: 11px; color: var(--rp-text-faint); letter-spacing: 0.08em; text-align: center; padding: 6px 0; }
