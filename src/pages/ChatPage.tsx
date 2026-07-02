@@ -1768,10 +1768,13 @@ export default function ChatPage() {
                     onClick={handleFreeRoll}
                     disabled={!currentSession}
                     className="flex-shrink-0 flex items-center justify-center cursor-pointer disabled:opacity-30"
-                    style={{ width: 30, height: 30, color: C.textMuted, fontSize: 16 }}
+                    style={{ width: 30, height: 30, color: C.textMuted }}
                     title={`投 d${characterState.dice_config.current_die}`}
                   >
-                    🎲
+                    <svg width={19} height={19} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2.5 20.2 7.25v9.5L12 21.5 3.8 16.75v-9.5Z" />
+                      <path d="M12 2.5 7.2 9.2h9.6L12 2.5M7.2 9.2 12 17.5l4.8-8.3M7.2 9.2 3.8 7.25M16.8 9.2l3.4-1.95M7.2 9.2l-3.4 7.55M16.8 9.2l3.4 7.55M12 17.5v4" />
+                    </svg>
                   </button>
                 )}
                 {isStreaming ? (
