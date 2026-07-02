@@ -260,7 +260,7 @@ export default function SearchDebugPanel({ onClose }: { onClose: () => void }) {
                   {trace.timing && <span style={{ color: P.faint }}>　耗时 搜索{trace.timing.search_s}s / rerank {trace.timing.rerank_s}s</span>}
                 </span>
               </Row>
-              {trace.timeout && <Row><span style={{ color: P.warn }}>⚠ 超时（10s），真实对话中这次检索会返回空</span></Row>}
+              {trace.timeout && <Row><span style={{ color: P.warn }}>⚠ 总超时（15s 安全网），真实对话中这次检索会返回空</span></Row>}
               {!!trace.recall?.errors?.length && <Row><span style={{ color: P.warn }}>召回异常: {trace.recall.errors.join('; ')}</span></Row>}
             </Section>
 
@@ -276,13 +276,14 @@ export default function SearchDebugPanel({ onClose }: { onClose: () => void }) {
                   }}>
                     <span style={{ color: P.faint, width: 20, textAlign: 'right', flexShrink: 0 }}>{i}</span>
                     <SourceBadge source={c.source} layer={c.layer} />
-                    <span style={{ flex: 1, color: kept ? P.ink : P.muted, wordBreak: 'break-all' }}>
+                    {/* 判决理由放正文列里换行；右列若不许压缩，手机上会把这列挤成一行一个字 */}
+                    <span style={{ flex: 1, minWidth: 0, color: kept ? P.ink : P.muted, wordBreak: 'break-all' }}>
                       {c.snippet}
                       <span style={{ color: P.faint }}>　{ageOf(c.created_at)} · {c.match_type}</span>
+                      {v && !v.kept && <span style={{ color: P.faint }}>　{v.reason}</span>}
                     </span>
-                    <span style={{ flexShrink: 0, color: kept ? P.ok : P.muted, minWidth: 90, textAlign: 'right' }}>
+                    <span style={{ flexShrink: 0, color: kept ? P.ok : P.muted, minWidth: 48, textAlign: 'right' }}>
                       {v ? (v.score != null ? fmtScore(v.score) : '') : ''}
-                      {v && !v.kept && <span style={{ color: P.faint }}> {v.reason}</span>}
                       {v && v.kept && ' ✓'}
                     </span>
                   </div>
