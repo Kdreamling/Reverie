@@ -12,6 +12,7 @@ import { fetchSelectableModels, type SelectableModel } from '../api/models'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
+import SearchDebugPanel from '../components/SearchDebugPanel'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -529,6 +530,7 @@ export default function DevPage() {
   const [devSessions, setDevSessions] = useState<Session[]>([])
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [rightOpen, setRightOpen] = useState(false)
+  const [searchDebugOpen, setSearchDebugOpen] = useState(false)
   const [totalTokens, setTotalTokens] = useState({ input: 0, output: 0, cached: 0 })
   const [gwStatus, setGwStatus] = useState<'ok' | 'disconnected' | 'reconnecting'>('ok')
 
@@ -1121,9 +1123,19 @@ export default function DevPage() {
                 </select>
               </>
             )}
+            <button
+              className="rv-chat-link"
+              style={{ background: 'none', cursor: 'pointer', fontFamily: 'inherit', color: searchDebugOpen ? W.amber : undefined }}
+              onClick={() => setSearchDebugOpen(o => !o)}
+              title="记忆检索调试"
+            >
+              recall
+            </button>
             <a href="/chat/" className="rv-chat-link">chat</a>
           </div>
         </header>
+
+        {searchDebugOpen && <SearchDebugPanel onClose={() => setSearchDebugOpen(false)} />}
 
         {/* ── MAIN GRID ──────────────────────────────────────────────── */}
         <div className="rv-grid">
