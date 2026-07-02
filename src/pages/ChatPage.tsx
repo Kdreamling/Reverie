@@ -957,13 +957,15 @@ export default function ChatPage() {
 
   // Night-aware surface colors
   const dark = isNight
-  const nGlass = dark ? 'rgba(23,20,17,0.92)' : 'rgba(248,244,238,0.92)'
-  const nGlassLight = dark ? 'rgba(23,20,17,0.6)' : 'rgba(248,244,238,0.6)'
-  const nGlassHover = dark ? 'rgba(40,35,28,0.8)' : 'rgba(248,244,238,0.8)'
-  const nText = dark ? '#E0D5C8' : C.text
-  const nTextMuted = dark ? '#9A8A78' : C.textMuted
-  const nBorder = dark ? 'rgba(180,150,120,0.06)' : C.border
-  const nAccent = dark ? '#D4AE8A' : C.accent
+  // RP 模式下聊天室 chrome 跟着 sea/paper 主题走，不然深海背景上浮着茶色玻璃
+  const rp = isRoleplay
+  const nGlass = dark ? (rp ? 'rgba(15,22,35,0.92)' : 'rgba(23,20,17,0.92)') : (rp ? 'rgba(250,246,236,0.92)' : 'rgba(248,244,238,0.92)')
+  const nGlassLight = dark ? (rp ? 'rgba(15,22,35,0.6)' : 'rgba(23,20,17,0.6)') : (rp ? 'rgba(250,246,236,0.6)' : 'rgba(248,244,238,0.6)')
+  const nGlassHover = dark ? (rp ? 'rgba(28,38,56,0.8)' : 'rgba(40,35,28,0.8)') : (rp ? 'rgba(244,237,223,0.85)' : 'rgba(248,244,238,0.8)')
+  const nText = dark ? (rp ? '#EAE3D4' : '#E0D5C8') : (rp ? '#373026' : C.text)
+  const nTextMuted = dark ? (rp ? 'rgba(234,227,212,0.45)' : '#9A8A78') : (rp ? 'rgba(55,48,38,0.45)' : C.textMuted)
+  const nBorder = dark ? (rp ? 'rgba(178,200,222,0.12)' : 'rgba(180,150,120,0.06)') : (rp ? 'rgba(95,75,52,0.16)' : C.border)
+  const nAccent = dark ? (rp ? '#8FB3D4' : '#D4AE8A') : (rp ? '#7A5C3E' : C.accent)
 
   return (
     <div className="overflow-hidden" style={{
@@ -974,6 +976,7 @@ export default function ChatPage() {
       <div className="room-bg" />
       <div className="room-light" />
       <div className="room-texture" />
+      {isRoleplay && <div className="rp-room-bg" data-rp-theme={dark ? 'sea' : 'paper'} />}
 
       {/* ── Push notification banner ── */}
       <PushNotification onTap={() => {
@@ -1434,6 +1437,18 @@ export default function ChatPage() {
           />
         )}
 
+        {/* RP 状态条：悬浮在 header 下常驻，不随消息滚走 */}
+        {isRoleplay && !showWelcome && characterState && currentSession?.project_id && (
+          <div className="rp-root rp-strip-float" data-rp-theme={dark ? 'sea' : 'paper'} data-rp-mode={rpMode}>
+            <RpStatusStrip
+              state={characterState}
+              projectId={currentSession.project_id}
+              mode={rpMode}
+              onToggleMode={toggleRpMode}
+            />
+          </div>
+        )}
+
         {/* Messages — full room scroll */}
         <main ref={mainRef} className="flex-1 overflow-y-auto flex flex-col" style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
           <style>{`.main-scroll::-webkit-scrollbar { width: 0; }`}</style>
@@ -1446,16 +1461,6 @@ export default function ChatPage() {
               data-rp-mode={isRoleplay ? rpMode : undefined}
               style={{ maxWidth: 680, padding: 'clamp(56px, 9vw, 80px) clamp(28px, 7vw, 56px) clamp(140px, 28vw, 220px) clamp(28px, 7vw, 56px)' }}
             >
-
-              {/* RP 状态条 + 角色抽屉 */}
-              {isRoleplay && characterState && currentSession?.project_id && (
-                <RpStatusStrip
-                  state={characterState}
-                  projectId={currentSession.project_id}
-                  mode={rpMode}
-                  onToggleMode={toggleRpMode}
-                />
-              )}
 
               {isRoleplay && <div className="rp-axis-head" />}
 
@@ -1669,8 +1674,8 @@ export default function ChatPage() {
               {/* 来自过去的信 */}
               <FutureLetterCard />
 
-              {/* Status bar */}
-              <StatusBar isNight={dark} />
+              {/* Status bar — 剧本模式里不展示身体状态 */}
+              {!isRoleplay && <StatusBar isNight={dark} />}
 
               {/* Streaming hint */}
               {isStreaming && (

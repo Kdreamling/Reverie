@@ -36,6 +36,20 @@ export function NpcSeal({ name, size }: { name: string; size: number }) {
 
 // ─── NPC 台词块：登场版（带 bio 铭牌）/ 回归版（mini 铭牌） ────────────────────
 
+// 引号内是台词正字，引号外的动作描写降格为 aside 小字（mockup v3 约定）。
+// 模型实际输出会混用「」/ 弯引号 / 直引号，三种都认
+const QUOTE_SPLIT_RE = /(「[^」]*」|“[^”]*”|"[^"]*")/g
+
+function renderSpeech(speech: string): ReactNode {
+  if (!/[「“"]/.test(speech)) return renderInline(speech)
+  return speech.split(QUOTE_SPLIT_RE).map((part, i) => {
+    if (/^[「“"]/.test(part) && part.length > 1) return <span key={i}>{renderInline(part)}</span>
+    const aside = part.trim()
+    if (!aside) return null
+    return <span key={i} className="rp-aside">{renderInline(aside)}</span>
+  })
+}
+
 export function NpcBlock({ name, speech, bio }: { name: string; speech?: string; bio?: string }) {
   return (
     <div className="rp-npc rp-node" data-hue={npcHue(name)}>
@@ -53,7 +67,7 @@ export function NpcBlock({ name, speech, bio }: { name: string; speech?: string;
           <span className="rp-npc-name">{name}</span>
         </div>
       )}
-      {speech && <div className="rp-speech">{renderInline(speech)}</div>}
+      {speech && <div className="rp-speech">{renderSpeech(speech)}</div>}
     </div>
   )
 }

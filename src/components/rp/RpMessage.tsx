@@ -65,22 +65,23 @@ function buildNodes(content: string, events: RpEvent[]): Node[] {
   }
   if (cursor < content.length) pushText(content.slice(cursor))
 
-  // NPC 登场事件与相邻的同名台词块合并成一个登场特写
+  // NPC 登场事件并进同名台词块成登场特写。按整条消息认领而非相邻判定——
+  // text_offset 落在段落中间时事件和台词块不相邻，会退化成 mini 铭牌
+  const bios = new Map<string, string>()
+  const spoken = new Set<string>()
+  for (const n of nodes) {
+    if (n.t === 'event' && n.event.type === 'rp_npc') bios.set(n.event.name, n.event.bio)
+    if (n.t === 'npc') spoken.add(n.name)
+  }
   const merged: Node[] = []
-  for (let i = 0; i < nodes.length; i++) {
-    const cur = nodes[i]
-    const next = nodes[i + 1]
-    if (cur.t === 'event' && cur.event.type === 'rp_npc' && next?.t === 'npc' && next.name === cur.event.name) {
-      merged.push({ t: 'npc', name: next.name, speech: next.speech, bio: cur.event.bio })
-      i++
+  for (const n of nodes) {
+    if (n.t === 'event' && n.event.type === 'rp_npc' && spoken.has(n.event.name)) continue
+    if (n.t === 'npc' && bios.has(n.name)) {
+      merged.push({ ...n, bio: bios.get(n.name) })
+      bios.delete(n.name)
       continue
     }
-    if (cur.t === 'npc' && !cur.bio && next?.t === 'event' && next.event.type === 'rp_npc' && next.event.name === cur.name) {
-      merged.push({ t: 'npc', name: cur.name, speech: cur.speech, bio: next.event.bio })
-      i++
-      continue
-    }
-    merged.push(cur)
+    merged.push(n)
   }
   return merged
 }

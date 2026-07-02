@@ -340,6 +340,35 @@
 /* ── 宿主页面适配 ── */
 /* RP 模式下压掉聊天页原有的左侧茶色书脊，星图轴线由各节点自绘 */
 .conv-spine.rp-root::before { display: none; }
+
+/* 房间背景整体换成 sea/paper（盖掉日常聊天的茶色氛围层） */
+.rp-room-bg {
+  position: absolute; inset: 0; pointer-events: none;
+  transition: background 0.8s ease;
+}
+.rp-room-bg[data-rp-theme='sea'] {
+  background:
+    radial-gradient(ellipse 90% 55% at 18% -8%, rgba(94, 138, 178, 0.10), transparent 60%),
+    radial-gradient(ellipse 70% 45% at 90% 108%, rgba(146, 66, 54, 0.055), transparent 60%),
+    #0C121D;
+}
+.rp-room-bg[data-rp-theme='paper'] {
+  background:
+    radial-gradient(ellipse 90% 55% at 18% -8%, rgba(196, 154, 120, 0.10), transparent 60%),
+    radial-gradient(ellipse 70% 45% at 90% 108%, rgba(150, 130, 100, 0.06), transparent 60%),
+    #F4EDDF;
+}
+
+/* 状态条悬浮层：header 下常驻，抽屉向下展开盖在正文上 */
+.rp-strip-float {
+  position: absolute; left: 0; right: 0; z-index: 25;
+  top: calc(env(safe-area-inset-top) + 58px);
+  display: flex; justify-content: center;
+  padding: 0 14px; pointer-events: none;
+}
+.rp-root.rp-strip-float .rp-strip { margin: 0; width: 100%; max-width: 560px; pointer-events: auto; }
+/* 正文顶部给悬浮状态条让位 */
+.conv-spine.rp-root { padding-top: 118px !important; }
 /* 流式输出的正文（markdown 容器）跟旁白同一副衬线嗓音 */
 .rp-root .md-content {
   font-family: 'Noto Serif SC', 'EB Garamond', serif;
