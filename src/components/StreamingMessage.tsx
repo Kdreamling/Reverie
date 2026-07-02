@@ -9,6 +9,8 @@ import { C } from '../theme'
 import { pickAvatar } from '../utils/avatarEdit'
 import { ChatImage } from './MessageItem'
 import ProcessTrace, { type TraceItem } from './ProcessTrace'
+import CheckRing from './rp/CheckRing'
+import { RpEventNode } from './rp/RpBlocks'
 
 const streamMdComponents: Components = { img: ChatImage as Components['img'] }
 
@@ -325,6 +327,22 @@ function renderStreamBlocks(blocks: StreamBlock[]): React.ReactNode[] {
     } else if (block.kind === 'tool_searching' && block.query.startsWith('绘制 · ')) {
       flushTrace()
       out.push(<ImageGeneratingCard key={`img-${i}`} prompt={block.query.slice('绘制 · '.length)} startTime={block.startTime} />)
+    } else if (block.kind === 'rp_event') {
+      // 剧本模式：流式中就地渲染机制节点（检定环此时不可点，消息完成后接管）
+      flushTrace()
+      if (block.event.type === 'rp_check_pending') {
+        const ev = block.event
+        out.push(
+          <CheckRing
+            key={`rp-${i}`}
+            action={ev.action} attribute={ev.attribute} target={ev.target}
+            die={ev.die} bonus={(ev.attr_value ?? 0) + (ev.equip_bonus ?? 0)}
+            successRate={ev.success_rate} interactive={false}
+          />,
+        )
+      } else {
+        out.push(<RpEventNode key={`rp-${i}`} event={block.event} />)
+      }
     } else {
       const item = blockToTraceItem(block, i)
       if (item) traceBuffer.push(item)

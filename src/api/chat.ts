@@ -1,4 +1,5 @@
 import { client } from './client'
+import type { RpEvent } from '../components/rp/rpEvents'
 
 export interface MemoryOperation {
   type: 'saved' | 'updated' | 'deleted'
@@ -73,6 +74,7 @@ export interface ChatMessage {
   silentRead?: boolean
   memoryOps?: MemoryOperation[] | null
   devToolOps?: DevToolOp[] | null
+  rpEvents?: RpEvent[] | null
   conversationId?: string
   tokens?: { input: number; output: number; cached?: number } | null
   thinkingTime?: number | null

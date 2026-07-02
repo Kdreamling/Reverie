@@ -6,6 +6,25 @@ export interface InventoryItem {
   stat_bonus?: Record<string, number> | null
 }
 
+export interface PendingCheck {
+  id: string
+  attribute: string
+  target: number
+  action: string
+  attr_value: number
+  equip_bonus: number
+  die: number
+  session_id?: string
+  created_at?: string
+}
+
+export interface RollResult extends PendingCheck {
+  roll: number
+  total: number
+  success: boolean
+  critical: 'success' | 'fail' | null
+}
+
 export interface CharacterState {
   name: string
   hp: { current: number; max: number }
@@ -20,6 +39,7 @@ export interface CharacterState {
     crit_success: 'max' | number
     crit_fail: number
   }
+  pending_check?: PendingCheck | null
 }
 
 export interface Project {
@@ -117,6 +137,12 @@ export async function fetchCharacterAPI(projectId: string): Promise<CharacterSta
 export async function saveCharacterAPI(projectId: string, state: CharacterState): Promise<CharacterState> {
   const res = await client.put<{ ok: boolean; character_state: CharacterState }>(`/projects/${projectId}/character`, state)
   return res.character_state
+}
+
+// 掷骰：服务器掷（防刷新重掷），结果同时写进战报
+export async function rollCheckAPI(projectId: string, checkId?: string): Promise<RollResult> {
+  const res = await client.post<{ ok: boolean; result: RollResult }>(`/projects/${projectId}/roll`, { check_id: checkId ?? null })
+  return res.result
 }
 
 // 故事笔记

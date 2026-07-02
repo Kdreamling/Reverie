@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo, KeyboardEvent } from 'react'
 import { Plus, Settings, ArrowUp, ChevronDown, X, Menu, Paperclip, FileText, File as FileIcon, Loader2, Square, MapPin, Image, DoorClosed, DoorOpen, Brain, Files, Drama, Network, CalendarDays, BookOpen, GraduationCap, PenLine, Images, Gamepad2, Wrench, Moon, Sun, RefreshCw } from 'lucide-react'
 import StatusBar from '../components/StatusBar'
 import FutureLetterCard from '../components/FutureLetterCard'
@@ -8,9 +8,10 @@ import { useChatStore } from '../stores/chatStore'
 import { useAuthStore } from '../stores/authStore'
 import { updateSessionAPI, searchConversations, regenerateSessionSummary, type SearchResult } from '../api/sessions'
 import { uploadAttachment, type AttachmentInfo } from '../api/attachments'
-import { fetchCharacterAPI, saveCharacterAPI, type CharacterState } from '../api/projects'
-import { rollDice, formatCheckResultForModel, applyStatusChange, type CheckResult, type RpBlock } from '../components/rp/rpParser'
-import { FreeRollBubble } from '../components/rp/RpBubbles'
+import { fetchCharacterAPI, rollCheckAPI, type CharacterState, type RollResult } from '../api/projects'
+import RpMessage from '../components/rp/RpMessage'
+import { formatRollResultMessage, parseRollResultMessage, type RollOutcome, type RpCheckPendingEvent } from '../components/rp/rpEvents'
+import type { RingResult } from '../components/rp/CheckRing'
 import type { MessageAttachment, DreamEvent } from '../api/chat'
 import { fetchDreamEvents } from '../api/chat'
 import { fetchSelectableModels, sceneTypeToScene, type SelectableModel } from '../api/models'
@@ -299,37 +300,81 @@ export default function ChatPage() {
     }, 350)
   }, [])
 
+  // 角色面板：进入剧本时拉取；每轮流结束后刷新（rp_check / rp_update_state 都会改它）
   useEffect(() => {
     if (!isRoleplay || !currentSession?.project_id) { setCharacterState(null); return }
+    if (isStreaming) return
     fetchCharacterAPI(currentSession.project_id).then(cs => {
       if (cs) setCharacterState(cs)
     }).catch(() => {})
-  }, [isRoleplay, currentSession?.project_id])
+  }, [isRoleplay, currentSession?.project_id, isStreaming])
 
-  const handleCheckResult = useCallback((result: CheckResult) => {
-    if (!currentSession) return
-    const text = formatCheckResultForModel(result)
+  // 剧本主题/模式：夜间 = 深海，白天 = 纸页；跑团显示机制节点，叙事隐藏
+  const [rpMode, setRpMode] = useState<'ttrpg' | 'novel'>(() =>
+    (localStorage.getItem('reverie_rp_mode') as 'ttrpg' | 'novel') || 'ttrpg')
+  const toggleRpMode = useCallback(() => {
+    setRpMode(m => {
+      const next = m === 'ttrpg' ? 'novel' : 'ttrpg'
+      localStorage.setItem('reverie_rp_mode', next)
+      return next
+    })
+  }, [])
+
+  // 已掷检定：把 [检定结果] 消息按顺序对回前面的 rp_check_pending 事件
+  const resolvedChecks = useMemo(() => {
+    const map = new Map<string, RollOutcome>()
+    if (!isRoleplay) return map
+    const unresolved: { id: string; attribute: string; target: number }[] = []
+    for (const m of messages) {
+      if (m.role === 'assistant' && m.rpEvents) {
+        for (const ev of m.rpEvents) {
+          if (ev.type === 'rp_check_pending') {
+            const e = ev as RpCheckPendingEvent
+            unresolved.push({ id: e.id, attribute: e.attribute, target: e.target })
+          }
+        }
+      } else if (m.role === 'user') {
+        const outcome = parseRollResultMessage(m.content)
+        if (!outcome || unresolved.length === 0) continue
+        const idx = unresolved.findIndex(u => u.attribute === outcome.attribute && u.target === outcome.target)
+        const hit = unresolved.splice(idx >= 0 ? idx : 0, 1)[0]
+        map.set(hit.id, outcome)
+      }
+    }
+    return map
+  }, [isRoleplay, messages])
+
+  // 掷骰在服务器执行（防刷新重掷）。完整结果留在 ref 里，定格后拼续写消息用
+  const rollResultsRef = useRef(new Map<string, RollResult>())
+  const handleRoll = useCallback(async (checkId: string): Promise<RingResult> => {
+    if (!currentSession?.project_id) throw new Error('no project')
+    const result = await rollCheckAPI(currentSession.project_id, checkId)
+    rollResultsRef.current.set(checkId, result)
+    setCharacterState(cs => cs ? { ...cs, pending_check: null } : cs)
+    return result
+  }, [currentSession?.project_id])
+
+  const handleCheckSettled = useCallback((checkId: string, _r: RingResult) => {
+    const full = rollResultsRef.current.get(checkId)
+    if (!full || !currentSession) return
+    const text = formatRollResultMessage({
+      action: full.action,
+      attribute: full.attribute,
+      die: full.die,
+      roll: full.roll,
+      bonus: (full.attr_value ?? 0) + (full.equip_bonus ?? 0),
+      total: full.total,
+      target: full.target,
+      success: full.success,
+      critical: full.critical,
+    })
     sendMessage(currentSession.id, model, text)
   }, [currentSession, model, sendMessage])
-
-  const handleRpStatusChange = useCallback((block: RpBlock) => {
-    if (!characterState || !currentSession?.project_id) return
-    const next = applyStatusChange(characterState, block)
-    setCharacterState(next)
-    saveCharacterAPI(currentSession.project_id, next).catch(() => {})
-  }, [characterState, currentSession?.project_id])
-
-  const handleDiceUpgrade = useCallback((newDie: number) => {
-    if (!characterState || !currentSession?.project_id) return
-    const next = { ...characterState, dice_config: { ...characterState.dice_config, current_die: newDie } }
-    setCharacterState(next)
-    saveCharacterAPI(currentSession.project_id, next).catch(() => {})
-  }, [characterState, currentSession?.project_id])
 
   const handleFreeRoll = useCallback(() => {
     if (!characterState || !currentSession) return
     const die = characterState.dice_config.current_die
-    const result = rollDice(die)
+    const result = Math.floor(Math.random() * die) + 1
     const text = `[自由投骰：d${die} = ${result}]`
     sendMessage(currentSession.id, model, text)
   }, [characterState, currentSession, model, sendMessage])
@@ -1394,7 +1439,12 @@ export default function ChatPage() {
           {showWelcome ? (
             loading || !currentSession ? <RippleLoading /> : <WelcomeScreen />
           ) : (
-            <div className="mx-auto w-full relative conv-spine" style={{ maxWidth: 680, padding: 'clamp(56px, 9vw, 80px) clamp(28px, 7vw, 56px) clamp(140px, 28vw, 220px) clamp(28px, 7vw, 56px)' }}>
+            <div
+              className={`mx-auto w-full relative conv-spine${isRoleplay ? ' rp-root' : ''}`}
+              data-rp-theme={isRoleplay ? (isNight ? 'sea' : 'paper') : undefined}
+              data-rp-mode={isRoleplay ? rpMode : undefined}
+              style={{ maxWidth: 680, padding: 'clamp(56px, 9vw, 80px) clamp(28px, 7vw, 56px) clamp(140px, 28vw, 220px) clamp(28px, 7vw, 56px)' }}
+            >
 
               {/* RP mini status bar */}
               {isRoleplay && characterState && (
@@ -1412,8 +1462,22 @@ export default function ChatPage() {
                   {Object.entries(characterState.attributes).slice(0, 3).map(([k, v]) => (
                     <span key={k}>{k} {v}</span>
                   ))}
+                  <button
+                    onClick={toggleRpMode}
+                    title={rpMode === 'ttrpg' ? '隐藏检定与状态注记，只看故事' : '显示检定与状态注记'}
+                    style={{
+                      padding: '2px 10px', borderRadius: 999, cursor: 'pointer',
+                      background: 'transparent', border: `1px solid ${nBorder}`,
+                      fontSize: 11, letterSpacing: '0.1em', color: nTextMuted,
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {rpMode === 'ttrpg' ? '跑团' : '叙事'}
+                  </button>
                 </div>
               )}
+
+              {isRoleplay && <div className="rp-axis-head" />}
 
               {isLoadingMore && (
                 <div className="flex justify-center py-4">
@@ -1433,22 +1497,33 @@ export default function ChatPage() {
                   : msg
                 return (
                   <div key={msg.id} data-conv-id={msg.conversationId || msg.id}>
-                    <MessageItem
-                      msg={msgWithSeen}
-                      modelLabel={msg.role === 'assistant' ? (models.find(m => m.name === model || m.value === model)?.label ?? model) : undefined}
-                      isDebugOpen={_debugOpenMsgId === msg.id}
-                      isCopied={copiedMsgId === msg.id}
-                      onToggleDebug={() => {
-                        if (msg.debugInfo) setSheetDebugInfo(msg.debugInfo)
-                      }}
-                      onCopy={handleCopyMsg}
-                      onDelete={handleDeleteConv}
-                      onRetry={handleRetry}
-                      onSwitchBranch={handleSwitchBranch}
-                      onRetryFailed={handleRetryFailed}
-                      onDismissFailed={handleDismissFailed}
-                      onSaveAnchor={handleSaveAnchor}
-                    />
+                    {isRoleplay && !msg.failed ? (
+                      <RpMessage
+                        msg={msgWithSeen}
+                        characterName={characterState?.name}
+                        pendingCheckId={characterState?.pending_check?.id ?? null}
+                        resolvedChecks={resolvedChecks}
+                        onRoll={handleRoll}
+                        onSettled={handleCheckSettled}
+                      />
+                    ) : (
+                      <MessageItem
+                        msg={msgWithSeen}
+                        modelLabel={msg.role === 'assistant' ? (models.find(m => m.name === model || m.value === model)?.label ?? model) : undefined}
+                        isDebugOpen={_debugOpenMsgId === msg.id}
+                        isCopied={copiedMsgId === msg.id}
+                        onToggleDebug={() => {
+                          if (msg.debugInfo) setSheetDebugInfo(msg.debugInfo)
+                        }}
+                        onCopy={handleCopyMsg}
+                        onDelete={handleDeleteConv}
+                        onRetry={handleRetry}
+                        onSwitchBranch={handleSwitchBranch}
+                        onRetryFailed={handleRetryFailed}
+                        onDismissFailed={handleDismissFailed}
+                        onSaveAnchor={handleSaveAnchor}
+                      />
+                    )}
                   </div>
                 )
               })}

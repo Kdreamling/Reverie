@@ -14,6 +14,7 @@ import {
 import { updateSessionAPI } from '../api/sessions'
 import { savePendingMessageAPI, fetchPendingMessagesAPI, deletePendingMessageAPI } from '../api/pendingMessages'
 import { useSessionStore } from './sessionStore'
+import { isRpEventType, type RpEvent } from '../components/rp/rpEvents'
 
 interface SseEvent {
   type: string
@@ -48,6 +49,7 @@ export type StreamBlock =
   | { kind: 'tool_searching'; query: string; startTime: number }
   | { kind: 'tool_result'; query: string; found: number; content: string; elapsed: number | null }
   | { kind: 'memory_op'; op: MemoryOperation; elapsed: number | null }
+  | { kind: 'rp_event'; event: RpEvent }
 
 interface ChatState {
   messages: ChatMessage[]
@@ -60,6 +62,7 @@ interface ChatState {
   pendingMemoryResult: MemorySearchResult | null
   pendingMemoryResults: MemorySearchResult[]
   pendingMemoryOps: MemoryOperation[]
+  pendingRpEvents: RpEvent[]
   lastError: string | null
   thinkingStartTime: number | null
   thinkingElapsedTime: number | null
@@ -88,6 +91,7 @@ interface ChatState {
 const EMPTY_STREAM = {
   currentThinking: '', currentText: '', isSearchingMemory: false, searchingQuery: '',
   pendingMemoryResult: null, pendingMemoryResults: [] as MemorySearchResult[], pendingMemoryOps: [] as MemoryOperation[],
+  pendingRpEvents: [] as RpEvent[],
   thinkingStartTime: null, thinkingElapsedTime: null,
   toolStartTime: null, toolElapsedTime: null, streamBlocks: [] as StreamBlock[],
 }
@@ -160,6 +164,7 @@ function parseRecords(records: unknown[]): ChatMessage[] {
       let parsedDevOps: Array<{ tool: string; args?: string; result?: string }> | null = null
       let parsedMemoryRef: { query: string; found: number; content: string } | null = null
       let parsedMemoryRefs: Array<{ query: string; found: number; content: string }> | null = null
+      let parsedRpEvents: RpEvent[] | null = null
       if (r.memory_ops) {
         try {
           const raw = typeof r.memory_ops === 'string' ? JSON.parse(r.memory_ops) : r.memory_ops
@@ -177,10 +182,15 @@ function parseRecords(records: unknown[]): ChatMessage[] {
               result: op.result,
             }))
           }
+          const rpOps = allOps.filter(op => isRpEventType(op.type))
+          if (rpOps.length > 0) {
+            parsedRpEvents = rpOps as unknown as RpEvent[]
+          }
           const memOps = allOps.filter(op =>
             op.type !== 'tool_result'
             && op.type !== 'tool_searching'
             && op.type !== 'dev_tool_op'
+            && !isRpEventType(op.type)
           )
           if (memOps.length > 0) {
             parsedOps = memOps.map(op => ({
@@ -206,6 +216,7 @@ function parseRecords(records: unknown[]): ChatMessage[] {
         memoryRefs: parsedMemoryRefs,
         memoryOps: parsedOps,
         devToolOps: parsedDevOps,
+        rpEvents: parsedRpEvents,
         thinkingTime: r.thinking_time ?? null,
         tokens: (r.input_tokens || r.output_tokens) ? { input: r.input_tokens ?? 0, output: r.output_tokens ?? 0, cached: r.cached_tokens ?? 0 } : null,
         source: r.source ?? null,
@@ -540,6 +551,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 })
                 break
               }
+              case 'rp_check_pending':
+              case 'rp_state_changed':
+              case 'rp_scene':
+              case 'rp_npc':
+              case 'rp_note': {
+                flushDeltas()
+                set(s => {
+                  // 记录事件落点的正文偏移，消息完成后按此位置插回节点
+                  const ev = { ...(event as unknown as RpEvent), text_offset: s.currentText.length }
+                  return {
+                    pendingRpEvents: [...s.pendingRpEvents, ev],
+                    streamBlocks: [...s.streamBlocks, { kind: 'rp_event', event: ev }],
+                  }
+                })
+                break
+              }
               case 'thinking_start': {
                 flushDeltas()
                 const now = Date.now()
@@ -628,7 +655,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
               case 'done': {
                 flushDeltas() // flush any remaining text
                 if (flushTimer) { clearTimeout(flushTimer); flushTimer = null }
-                const { currentThinking, currentText, pendingMemoryResult, pendingMemoryOps, thinkingElapsedTime } = get()
+                const { currentThinking, currentText, pendingMemoryResult, pendingMemoryOps, pendingRpEvents, thinkingElapsedTime } = get()
 
                 // Strip inline <thinking> tags from text (model sometimes writes them into the body)
                 // and merge into the thinking field, mirroring backend's re.sub logic
@@ -661,7 +688,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     }
                     return { messages: msgs, isStreaming: false, ...EMPTY_STREAM }
                   })
-                } else if (cleanText || mergedThinking) {
+                } else if (cleanText || mergedThinking || pendingRpEvents.length > 0) {
                   const assistantMsg: ChatMessage = {
                     id: `ai-${Date.now()}`,
                     role: 'assistant',
@@ -671,6 +698,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     memoryRef: pendingMemoryResult ?? null,
                     memoryRefs: get().pendingMemoryResults.length > 0 ? get().pendingMemoryResults : null,
                     memoryOps: pendingMemoryOps.length > 0 ? pendingMemoryOps : null,
+                    rpEvents: pendingRpEvents.length > 0 ? pendingRpEvents : null,
                     tokens,
                     thinkingTime: thinkingElapsedTime,
                     debugInfo: event.debug_info ?? null,
@@ -708,7 +736,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   stopStreaming() {
-    const { _abortController, _reader, isStreaming, currentText, currentThinking, pendingMemoryResult, pendingMemoryOps, thinkingElapsedTime } = get()
+    const { _abortController, _reader, isStreaming, currentText, currentThinking, pendingMemoryResult, pendingMemoryOps, pendingRpEvents, thinkingElapsedTime } = get()
     if (!isStreaming) return
     try { _reader?.cancel() } catch { /* ignore */ }
     try { _abortController?.abort() } catch { /* ignore */ }
@@ -723,6 +751,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         memoryRef: pendingMemoryResult ?? null,
         memoryRefs: get().pendingMemoryResults.length > 0 ? get().pendingMemoryResults : null,
         memoryOps: pendingMemoryOps.length > 0 ? pendingMemoryOps : null,
+        rpEvents: pendingRpEvents.length > 0 ? pendingRpEvents : null,
         thinkingTime: thinkingElapsedTime,
       }
       set(s => ({

@@ -1,0 +1,349 @@
+/* RP 剧本模式视觉层 —— 移植自 rp-mockup-v3.html（占星图/炼金手稿方向）
+   全部作用域在 .rp-root 下，data-rp-theme 切深海/纸页，data-rp-mode="novel" 隐藏跑团元素 */
+
+.rp-root[data-rp-theme='sea'] {
+  --rp-bg: #0c121d;
+  --rp-text: #eae3d4;
+  --rp-text-soft: rgba(234, 227, 212, 0.66);
+  --rp-text-faint: rgba(234, 227, 212, 0.4);
+  --rp-line: rgba(178, 200, 222, 0.15);
+  --rp-line-strong: rgba(178, 200, 222, 0.3);
+  --rp-glass: rgba(17, 25, 40, 0.62);
+  --rp-accent: #8fb3d4;
+  --rp-accent-dim: rgba(143, 179, 212, 0.14);
+  --rp-danger: #c25a50;
+  --rp-gold: #d9b36c;
+  --rp-user-bg: rgba(143, 179, 212, 0.09);
+  --rp-user-border: rgba(143, 179, 212, 0.3);
+  --rp-npc1: #9fb9d9;
+  --rp-npc2: #c9a47a;
+}
+.rp-root[data-rp-theme='paper'] {
+  --rp-bg: #f4eddf;
+  --rp-text: #373026;
+  --rp-text-soft: rgba(55, 48, 38, 0.66);
+  --rp-text-faint: rgba(55, 48, 38, 0.4);
+  --rp-line: rgba(95, 75, 52, 0.16);
+  --rp-line-strong: rgba(95, 75, 52, 0.34);
+  --rp-glass: rgba(255, 252, 244, 0.72);
+  --rp-accent: #7a5c3e;
+  --rp-accent-dim: rgba(122, 92, 62, 0.1);
+  --rp-danger: #a8443c;
+  --rp-gold: #a87f34;
+  --rp-user-bg: rgba(122, 92, 62, 0.07);
+  --rp-user-border: rgba(122, 92, 62, 0.3);
+  --rp-npc1: #4e6b8a;
+  --rp-npc2: #8a6636;
+}
+
+.rp-root { color: var(--rp-text); }
+.rp-root[data-rp-mode='novel'] .ttrpg-only { display: none; }
+
+.rp-node { animation: rp-rise 0.6s ease both; }
+@keyframes rp-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── 星图轴线头 ── */
+.rp-root .rp-axis-head { position: relative; height: 30px; margin-top: 4px; }
+.rp-root .rp-axis-head::before {
+  content: ''; position: absolute; left: 50%; top: 8px; bottom: 0; width: 1px;
+  background: linear-gradient(to bottom, transparent, var(--rp-line-strong));
+  transform: translateX(-0.5px);
+}
+.rp-root .rp-axis-head::after {
+  content: ''; position: absolute; left: 50%; top: 0; width: 5px; height: 5px;
+  border: 1px solid var(--rp-line-strong); transform: translate(-50%, 0) rotate(45deg);
+}
+
+/* ── 场景 slugline：老电视开机 ── */
+.rp-root .rp-slugline {
+  display: flex; align-items: center; gap: 14px; margin: 8px 0; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.rp-root .rp-slugline::before, .rp-root .rp-slugline::after {
+  content: ''; flex: 1; height: 1px; background: var(--rp-line);
+}
+.rp-root .rp-slug-core { position: relative; flex: none; padding: 2px 6px; }
+.rp-root .rp-slug-text {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 10.5px; letter-spacing: 0.34em; color: var(--rp-text-faint);
+  white-space: nowrap;
+}
+.rp-root .rp-slug-text .rp-phase { flex: none; color: var(--rp-text-faint); }
+.rp-root .rp-slug-core .rp-scan {
+  position: absolute; left: -10px; right: -10px; top: 50%; height: 2px;
+  background: var(--rp-accent);
+  box-shadow: 0 0 14px var(--rp-accent), 0 0 4px var(--rp-accent);
+  border-radius: 2px;
+  transform: translateY(-50%) scaleX(0);
+  opacity: 0; pointer-events: none;
+}
+.rp-root .rp-slugline.crt .rp-scan { animation: rp-crt-line 1.1s ease-out both; }
+.rp-root .rp-slugline.crt .rp-slug-text { animation: rp-crt-text 1.1s ease-out both; }
+@keyframes rp-crt-line {
+  0% { transform: translateY(-50%) scaleX(0) scaleY(1); opacity: 1; }
+  8% { transform: translateY(-50%) scaleX(0.12) scaleY(1); opacity: 1; }
+  32% { transform: translateY(-50%) scaleX(1) scaleY(1); opacity: 1; }
+  45% { transform: translateY(-50%) scaleX(1) scaleY(8); opacity: 0.8; }
+  52% { opacity: 0.3; }
+  58% { opacity: 0.75; }
+  64% { opacity: 0.35; }
+  80% { transform: translateY(-50%) scaleX(1) scaleY(13); opacity: 0.15; }
+  100% { transform: translateY(-50%) scaleX(1) scaleY(15); opacity: 0; }
+}
+@keyframes rp-crt-text {
+  0%, 42% { opacity: 0; filter: blur(5px); }
+  58% { opacity: 0.55; filter: blur(1.5px); transform: translateX(1.5px); }
+  66% { transform: translateX(-1.5px); opacity: 0.8; }
+  74% { transform: translateX(0.5px); }
+  100% { opacity: 1; filter: blur(0); transform: none; }
+}
+
+/* ── 旁白：无署名，点一下浮现时间 ── */
+.rp-root .rp-narration {
+  font-family: 'Noto Serif SC', 'EB Garamond', serif;
+  font-size: 16px; line-height: 2.05; letter-spacing: 0.03em;
+  color: var(--rp-text);
+  margin: 24px 0;
+  cursor: default;
+}
+.rp-root .rp-narration p + p { margin-top: 10px; }
+.rp-root .rp-narration em { font-style: normal; color: var(--rp-text-soft); }
+.rp-root .rp-narration .rp-ts {
+  display: block; text-align: right;
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 10px; color: var(--rp-text-faint); letter-spacing: 0.08em;
+  max-height: 0; opacity: 0; overflow: hidden;
+  transition: max-height 0.3s ease, opacity 0.3s ease, margin 0.3s ease;
+}
+.rp-root .rp-narration.ts-on .rp-ts { max-height: 20px; opacity: 1; margin-top: 4px; }
+
+/* ── NPC：印记 + 铭牌 ── */
+.rp-root .rp-npc { margin: 24px 0 20px 6px; }
+.rp-root .rp-npc[data-hue='1'] { --rp-npc-hue: var(--rp-npc1); }
+.rp-root .rp-npc[data-hue='2'] { --rp-npc-hue: var(--rp-npc2); }
+.rp-root .rp-npc-seal { color: var(--rp-npc-hue); flex: none; }
+
+.rp-root .rp-plate-full { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.rp-root .rp-plate-full .rp-plate-text { display: flex; flex-direction: column; gap: 2px; }
+.rp-root .rp-plate-full .rp-npc-name {
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.24em; color: var(--rp-npc-hue);
+}
+.rp-root .rp-plate-full .rp-npc-desc {
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 10.5px; letter-spacing: 0.12em; color: var(--rp-text-faint);
+}
+.rp-root .rp-plate-full::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(to right, var(--rp-npc-hue), transparent); opacity: 0.35;
+}
+
+.rp-root .rp-plate-mini { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.rp-root .rp-plate-mini .rp-npc-name {
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.22em; color: var(--rp-npc-hue);
+}
+.rp-root .rp-plate-mini::after {
+  content: ''; flex: 0 0 42px; height: 1px; background: var(--rp-npc-hue); opacity: 0.35;
+}
+
+.rp-root .rp-speech {
+  border-left: 1.5px solid var(--rp-npc-hue);
+  padding: 1px 0 1px 14px;
+  font-family: 'Noto Serif SC', serif;
+  font-size: 16px; line-height: 1.95; letter-spacing: 0.03em;
+  color: var(--rp-text);
+}
+.rp-root .rp-speech .rp-aside {
+  display: block; font-size: 13px; color: var(--rp-text-soft); margin-top: 4px; letter-spacing: 0.02em;
+}
+
+/* ── 玩家消息 ── */
+.rp-root .rp-user-msg { display: flex; flex-direction: column; align-items: flex-end; margin: 28px 0; }
+.rp-root .rp-user-msg .rp-meta {
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 10.5px; color: var(--rp-text-faint); letter-spacing: 0.08em; margin-bottom: 5px;
+}
+.rp-root .rp-user-msg .rp-bubble {
+  max-width: 85%;
+  padding: 12px 16px;
+  background: var(--rp-user-bg);
+  border: 1px solid var(--rp-user-border);
+  border-radius: 14px 14px 4px 14px;
+  font-size: 14.5px; line-height: 1.85; letter-spacing: 0.02em;
+  color: var(--rp-text);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  white-space: pre-wrap; word-break: break-word;
+}
+
+/* ── 注记：轴上挑出去的天体标注 ── */
+.rp-root .rp-callout { position: relative; height: 16px; margin: 30px 0; }
+.rp-root .rp-callout::before {
+  content: ''; position: absolute; left: 50%; top: -16px; bottom: -16px; width: 1px;
+  background: linear-gradient(to bottom, transparent, var(--rp-line-strong) 35%, var(--rp-line-strong) 65%, transparent);
+  transform: translateX(-0.5px);
+}
+.rp-root .rp-callout .rp-c-dot {
+  position: absolute; left: 50%; top: 50%; width: 5px; height: 5px;
+  border: 1px solid var(--rp-line-strong); border-radius: 50%;
+  transform: translate(-50%, -50%); background: var(--rp-bg);
+}
+.rp-root .rp-callout .rp-c-line { position: absolute; top: 50%; width: 42px; height: 1px; background: var(--rp-line-strong); }
+.rp-root .rp-callout .rp-c-txt {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 10px; letter-spacing: 0.14em; color: var(--rp-text-faint); white-space: nowrap;
+}
+.rp-root .rp-callout.right .rp-c-line { left: calc(50% + 8px); }
+.rp-root .rp-callout.right .rp-c-txt { left: calc(50% + 58px); }
+.rp-root .rp-callout.left .rp-c-line { right: calc(50% + 8px); }
+.rp-root .rp-callout.left .rp-c-txt { right: calc(50% + 58px); }
+
+/* ── 检定：刻印环 ── */
+.rp-root .rp-check { margin: 34px auto; text-align: center; max-width: 360px; position: relative; padding: 20px 0 6px; }
+.rp-root .rp-check::before, .rp-root .rp-check::after {
+  content: ''; position: absolute; left: 50%; width: 1px; height: 22px;
+  background: var(--rp-line-strong); opacity: 0.65; transform: translateX(-0.5px);
+}
+.rp-root .rp-check::before { top: -14px; }
+.rp-root .rp-check::after { bottom: -18px; }
+.rp-root .rp-check-head .rp-kind {
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 9.5px; letter-spacing: 0.34em; text-indent: 0.34em; color: var(--rp-text-faint);
+}
+.rp-root .rp-check-head .rp-subject {
+  font-family: 'Noto Serif SC', serif; font-size: 15px; font-weight: 600; letter-spacing: 0.1em; margin-top: 7px;
+  color: var(--rp-text);
+}
+.rp-root .rp-check-head .rp-difficulty {
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 11px; color: var(--rp-text-soft); margin-top: 4px; letter-spacing: 0.06em;
+}
+
+.rp-root .rp-seal-wrap { position: relative; width: 152px; height: 152px; margin: 16px auto 4px; -webkit-tap-highlight-color: transparent; }
+.rp-root .rp-check.pending .rp-seal-wrap { cursor: pointer; }
+.rp-root .rp-ring { width: 100%; height: 100%; display: block; overflow: visible; }
+.rp-root .rp-ring .rp-rotor { transform-origin: 60px 60px; }
+.rp-root .rp-check.pending .rp-rotor { animation: rp-spin 70s linear infinite; }
+.rp-root .rp-check.rolling .rp-rotor { animation: rp-spin 0.55s linear infinite; }
+@keyframes rp-spin { to { transform: rotate(360deg); } }
+.rp-root .rp-ring .rp-ticks { fill: none; stroke: var(--rp-text-soft); stroke-width: 1; stroke-dasharray: 1.5 7.3; opacity: 0.55; transition: stroke 0.4s ease; }
+.rp-root .rp-ring .rp-deca { fill: none; stroke: var(--rp-text-soft); stroke-width: 1; opacity: 0.5; transition: stroke 0.4s ease; }
+.rp-root .rp-ring .rp-inner { fill: none; stroke: var(--rp-text-soft); stroke-width: 0.8; opacity: 0.3; transition: stroke 0.4s ease; }
+.rp-root .rp-ring .rp-rotor2 { transform-origin: 60px 60px; }
+.rp-root .rp-check.pending .rp-rotor2 { animation: rp-spin-r 90s linear infinite; }
+.rp-root .rp-check.rolling .rp-rotor2 { animation: rp-spin-r 0.8s linear infinite; }
+@keyframes rp-spin-r { to { transform: rotate(-360deg); } }
+.rp-root .rp-ring .rp-orbit { fill: none; stroke: var(--rp-text-soft); stroke-width: 0.8; stroke-dasharray: 0.4 4.4; opacity: 0.5; stroke-linecap: round; transition: opacity 0.5s ease; }
+.rp-root .rp-check.done .rp-orbit { opacity: 0.18; }
+.rp-root .rp-check.crit .rp-orbit { stroke: var(--rp-gold); }
+.rp-root .rp-check.success .rp-ticks, .rp-root .rp-check.success .rp-deca, .rp-root .rp-check.success .rp-inner { stroke: var(--rp-accent); }
+.rp-root .rp-check.fail .rp-ticks, .rp-root .rp-check.fail .rp-deca, .rp-root .rp-check.fail .rp-inner { stroke: var(--rp-danger); }
+.rp-root .rp-check.crit .rp-ticks, .rp-root .rp-check.crit .rp-deca, .rp-root .rp-check.crit .rp-inner { stroke: var(--rp-gold); opacity: 0.85; }
+.rp-root .rp-check.critfail .rp-ticks, .rp-root .rp-check.critfail .rp-deca, .rp-root .rp-check.critfail .rp-inner { stroke: var(--rp-danger); }
+.rp-root .rp-check.expired .rp-seal-wrap { opacity: 0.5; }
+
+/* 大失败：环上裂缝 */
+.rp-root .rp-ring .rp-crack {
+  fill: none; stroke: var(--rp-danger); stroke-width: 1.3; stroke-linejoin: bevel;
+  stroke-dasharray: 130; stroke-dashoffset: 130; opacity: 0;
+}
+.rp-root .rp-check.critfail .rp-crack { animation: rp-crack-draw 0.5s ease-out 0.15s forwards; }
+@keyframes rp-crack-draw {
+  from { stroke-dashoffset: 130; opacity: 1; }
+  to { stroke-dashoffset: 0; opacity: 1; }
+}
+
+/* 大成功：辉光 + 星芒 */
+.rp-root .rp-burst {
+  position: absolute; inset: -30px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--rp-gold) 30%, transparent) 0%, transparent 65%);
+  opacity: 0; transform: scale(0.4);
+}
+.rp-root .rp-check.crit .rp-burst { animation: rp-burst 1.1s ease-out both; }
+@keyframes rp-burst {
+  0% { opacity: 0; transform: scale(0.4); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.7); }
+}
+.rp-root .rp-rays {
+  position: absolute; inset: -44px; pointer-events: none;
+  color: var(--rp-gold);
+  opacity: 0; transform: scale(0.6) rotate(-10deg);
+}
+.rp-root .rp-rays svg { width: 100%; height: 100%; display: block; }
+.rp-root .rp-check.crit .rp-rays { animation: rp-rays-in 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both; }
+@keyframes rp-rays-in {
+  0% { opacity: 0; transform: scale(0.6) rotate(-10deg); }
+  35% { opacity: 0.95; }
+  100% { opacity: 0.55; transform: scale(1) rotate(0); }
+}
+
+.rp-root .rp-seal-center {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center; flex-direction: column;
+}
+.rp-root .rp-seal-center .rp-cta {
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 13px; letter-spacing: 0.3em; text-indent: 0.3em;
+  color: var(--rp-accent); line-height: 1.8;
+}
+.rp-root .rp-check.pending .rp-seal-wrap:hover .rp-cta { text-shadow: 0 0 14px var(--rp-accent-dim); }
+.rp-root .rp-check:not(.pending):not(.expired) .rp-cta { display: none; }
+.rp-root .rp-check.expired .rp-cta { color: var(--rp-text-faint); }
+.rp-root .rp-seal-center .rp-num {
+  display: none;
+  font-family: 'EB Garamond', 'Noto Serif SC', serif;
+  font-size: 46px; font-weight: 500; line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--rp-text);
+}
+.rp-root .rp-check.rolling .rp-num, .rp-root .rp-check.done .rp-num { display: block; }
+.rp-root .rp-check.rolling .rp-num { color: var(--rp-text-soft); }
+.rp-root .rp-check.done .rp-num { animation: rp-stamp 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes rp-stamp {
+  0% { opacity: 0; transform: scale(1.7) rotate(-6deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+.rp-root .rp-check.success .rp-num { color: var(--rp-accent); }
+.rp-root .rp-check.fail .rp-num { color: var(--rp-danger); }
+.rp-root .rp-check.crit .rp-num { color: var(--rp-gold); text-shadow: 0 0 26px color-mix(in srgb, var(--rp-gold) 50%, transparent); }
+.rp-root .rp-check.critfail .rp-num { color: var(--rp-danger); }
+
+.rp-root .rp-verdict-line { min-height: 34px; }
+.rp-root .rp-verdict {
+  display: block;
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 11px; letter-spacing: 0.32em; text-indent: 0.32em; color: var(--rp-text-soft); opacity: 0;
+}
+.rp-root .rp-check.done .rp-verdict { opacity: 1; transition: opacity 0.4s ease 0.2s; }
+.rp-root .rp-check.success .rp-verdict { color: var(--rp-accent); }
+.rp-root .rp-check.fail .rp-verdict, .rp-root .rp-check.critfail .rp-verdict { color: var(--rp-danger); }
+.rp-root .rp-check.crit .rp-verdict { color: var(--rp-gold); }
+.rp-root .rp-formula {
+  display: block;
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 10.5px; color: var(--rp-text-faint); margin-top: 5px;
+  font-variant-numeric: tabular-nums; letter-spacing: 0.05em; opacity: 0;
+}
+.rp-root .rp-check.done .rp-formula { opacity: 1; transition: opacity 0.4s ease 0.35s; }
+.rp-root .rp-rate {
+  display: block;
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 10.5px; color: var(--rp-text-faint); letter-spacing: 0.1em;
+}
+
+/* ── 宿主页面适配 ── */
+/* RP 模式下压掉聊天页原有的左侧茶色书脊，星图轴线由各节点自绘 */
+.conv-spine.rp-root::before { display: none; }
+/* 流式输出的正文（markdown 容器）跟旁白同一副衬线嗓音 */
+.rp-root .md-content {
+  font-family: 'Noto Serif SC', 'EB Garamond', serif;
+  font-size: 16px; line-height: 2.05; letter-spacing: 0.03em;
+  color: var(--rp-text);
+}
+.rp-root .md-content em { font-style: normal; color: var(--rp-text-soft); }
