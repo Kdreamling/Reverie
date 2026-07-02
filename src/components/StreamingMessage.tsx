@@ -344,9 +344,8 @@ export default function StreamingMessage() {
   return (
     <div className="mb-10 room-msg-enter">
       {/* Meta line */}
-      <div className="flex items-center gap-2 mb-3">
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.accent, opacity: 0.6, flexShrink: 0 }} />
-        <span style={{ fontFamily: "'EB Garamond', 'Noto Serif SC', serif", fontSize: 13, fontWeight: 500, color: C.accent, letterSpacing: '0.06em' }}>
+      <div className="flex items-baseline gap-2 mb-3">
+        <span style={{ fontFamily: "'EB Garamond', 'Noto Serif SC', serif", fontSize: 16, fontWeight: 500, color: C.accent, letterSpacing: '0.06em' }}>
           Claude
         </span>
       </div>
